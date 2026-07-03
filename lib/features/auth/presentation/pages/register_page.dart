@@ -1,0 +1,217 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+
+import '../../../../core/di/di.dart';
+import '../../../../core/constants/app_constants.dart';
+import '../../../../core/helpers/validation_helper.dart';
+import '../../../../core/widgets/app_button.dart';
+import '../../../../core/widgets/app_text_field.dart';
+import '../../../../core/widgets/glass_background.dart';
+import '../../../../core/widgets/glass_card.dart';
+import '../../../../core/widgets/spacing.dart';
+import '../../../../core/utils/context_extension.dart';
+import '../bloc/auth_bloc.dart';
+import '../bloc/auth_event.dart';
+import '../bloc/auth_state.dart';
+
+class RegisterPage extends StatefulWidget {
+  const RegisterPage({super.key});
+
+  @override
+  State<RegisterPage> createState() => _RegisterPageState();
+}
+
+class _RegisterPageState extends State<RegisterPage> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  bool _obscurePassword = true;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  void _submit(BuildContext context) {
+    if (_formKey.currentState?.validate() ?? false) {
+      context.read<AuthBloc>().add(
+            RegisterWithEmail(
+              name: _nameController.text,
+              email: _emailController.text,
+              password: _passwordController.text,
+            ),
+          );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocProvider(
+      create: (context) => getIt<AuthBloc>(),
+      child: GlassBackground(
+        child: BlocListener<AuthBloc, AuthState>(
+          listener: (context, state) {
+            if (state is Authenticated) {
+              context.go('/home');
+            } else if (state is AuthError) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(state.message),
+                  backgroundColor: context.colorScheme.error,
+                ),
+              );
+            }
+          },
+          child: Builder(
+            builder: (context) {
+              final authState = context.watch<AuthBloc>().state;
+              final isLoading = authState is AuthLoading;
+
+              return Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: AppDimensions.xl),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      // Header
+                      Icon(
+                        Icons.account_balance_wallet_rounded,
+                        size: 64,
+                        color: context.colorScheme.primary,
+                      ),
+                      Spacing.sm,
+                      Text(
+                        context.translate('app_title'),
+                        style: context.textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: context.colorScheme.primary,
+                        ),
+                      ),
+                      Spacing.vertical(AppDimensions.xxl),
+
+                      // Frosted SignUp Card
+                      GlassCard(
+                        child: Form(
+                          key: _formKey,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                'Create Account',
+                                style: context.textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                              Spacing.lg,
+
+                              // Name Input
+                              AppTextField(
+                                controller: _nameController,
+                                labelText: 'Full Name',
+                                hintText: 'Enter your full name',
+                                validator: (val) => ValidationHelper.validateRequired(val, 'Name'),
+                                prefixIcon: Icon(
+                                  Icons.person_outline_rounded,
+                                  color: context.colorScheme.onSurface.withOpacity(0.6),
+                                ),
+                                enabled: !isLoading,
+                              ),
+                              Spacing.md,
+
+                              // Email Input
+                              AppTextField(
+                                controller: _emailController,
+                                labelText: 'Email',
+                                hintText: 'Enter your email',
+                                keyboardType: TextInputType.emailAddress,
+                                validator: ValidationHelper.validateEmail,
+                                prefixIcon: Icon(
+                                  Icons.email_outlined,
+                                  color: context.colorScheme.onSurface.withOpacity(0.6),
+                                ),
+                                enabled: !isLoading,
+                              ),
+                              Spacing.md,
+
+                              // Password Input
+                              AppTextField(
+                                controller: _passwordController,
+                                labelText: 'Password',
+                                hintText: 'Enter your password',
+                                obscureText: _obscurePassword,
+                                validator: ValidationHelper.validatePassword,
+                                prefixIcon: Icon(
+                                  Icons.lock_outline_rounded,
+                                  color: context.colorScheme.onSurface.withOpacity(0.6),
+                                ),
+                                suffixIcon: IconButton(
+                                  icon: Icon(
+                                    _obscurePassword
+                                        ? Icons.visibility_outlined
+                                        : Icons.visibility_off_outlined,
+                                    color: context.colorScheme.onSurface.withOpacity(0.6),
+                                  ),
+                                  onPressed: () {
+                                    setState(() {
+                                      _obscurePassword = !_obscurePassword;
+                                    });
+                                  },
+                                ),
+                                enabled: !isLoading,
+                              ),
+                              Spacing.xl,
+
+                              // Submit button
+                              AppButton(
+                                text: 'Sign Up',
+                                isLoading: isLoading,
+                                onPressed: () => _submit(context),
+                              ),
+                              Spacing.lg,
+
+                              // Switch to Login link
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    "Already have an account?",
+                                    style: context.textTheme.bodyMedium?.copyWith(
+                                      color: context.colorScheme.onSurface.withOpacity(0.7),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: isLoading
+                                        ? null
+                                        : () => context.pop(),
+                                    child: Text(
+                                      'Sign In',
+                                      style: TextStyle(
+                                        color: context.colorScheme.primary,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}

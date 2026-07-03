@@ -1,0 +1,36 @@
+import '../../../../shared/bloc/base_state.dart';
+import '../../domain/entities/user_entity.dart';
+
+abstract class AuthState extends BaseState {
+  const AuthState();
+}
+
+class AuthInitial extends AuthState {
+  const AuthInitial();
+}
+
+class AuthLoading extends AuthState {
+  const AuthLoading();
+}
+
+class Authenticated extends AuthState {
+  final UserEntity user;
+
+  const Authenticated(this.user);
+
+  @override
+  List<Object?> get props => [user];
+}
+
+class Unauthenticated extends AuthState {
+  const Unauthenticated();
+}
+
+class AuthError extends AuthState {
+  final String message;
+
+  const AuthError(this.message);
+
+  @override
+  List<Object?> get props => [message];
+}
