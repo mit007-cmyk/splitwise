@@ -6,6 +6,13 @@ import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
+import '../../features/home/presentation/pages/create_group_page.dart';
+import '../../features/home/presentation/pages/main_navigation_page.dart';
+import '../../features/home/presentation/pages/group_detail_page.dart';
+import '../../features/home/presentation/pages/add_group_members_page.dart';
+import '../../features/home/presentation/pages/add_friend_page.dart';
+import '../../features/home/presentation/pages/group_settings_page.dart';
+import '../../features/home/presentation/pages/edit_group_page.dart';
 import 'route_constants.dart';
 import 'placeholder_screens.dart';
 
@@ -87,18 +94,74 @@ class AppRouter {
       ),
       GoRoute(
         path: RouteConstants.homePath,
-        name: RouteConstants.homeName,
-        builder: (context, state) => const HomePage(),
+        redirect: (context, state) => RouteConstants.groupsPath,
+      ),
+      StatefulShellRoute.indexedStack(
+        builder: (context, state, navigationShell) {
+          return MainNavigationPage(navigationShell: navigationShell);
+        },
+        branches: [
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: RouteConstants.groupsPath,
+                name: RouteConstants.groupsName,
+                builder: (context, state) => const HomePage(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: RouteConstants.accountPath,
+                name: RouteConstants.accountName,
+                builder: (context, state) => const AccountScreen(),
+              ),
+            ],
+          ),
+        ],
       ),
       GoRoute(
-        path: RouteConstants.maintenancePath,
-        name: RouteConstants.maintenanceName,
-        builder: (context, state) => const MaintenanceScreen(),
+        path: RouteConstants.createGroupPath,
+        name: RouteConstants.createGroupName,
+        builder: (context, state) => const CreateGroupPage(),
       ),
       GoRoute(
-        path: RouteConstants.updateRequiredPath,
-        name: RouteConstants.updateRequiredName,
-        builder: (context, state) => const UpdateRequiredScreen(),
+        path: RouteConstants.groupDetailPath,
+        name: RouteConstants.groupDetailName,
+        builder: (context, state) {
+          final groupId = state.pathParameters['groupId'] ?? '';
+          return GroupDetailPage(groupId: groupId);
+        },
+      ),
+      GoRoute(
+        path: RouteConstants.addGroupMembersPath,
+        name: RouteConstants.addGroupMembersName,
+        builder: (context, state) {
+          final groupId = state.pathParameters['groupId'] ?? '';
+          return AddGroupMembersPage(groupId: groupId);
+        },
+      ),
+      GoRoute(
+        path: RouteConstants.addFriendPath,
+        name: RouteConstants.addFriendName,
+        builder: (context, state) => const AddFriendPage(),
+      ),
+      GoRoute(
+        path: RouteConstants.groupSettingsPath,
+        name: RouteConstants.groupSettingsName,
+        builder: (context, state) {
+          final groupId = state.pathParameters['groupId'] ?? '';
+          return GroupSettingsPage(groupId: groupId);
+        },
+      ),
+      GoRoute(
+        path: RouteConstants.editGroupPath,
+        name: RouteConstants.editGroupName,
+        builder: (context, state) {
+          final groupId = state.pathParameters['groupId'] ?? '';
+          return EditGroupPage(groupId: groupId);
+        },
       ),
       GoRoute(
         path: RouteConstants.unknownPath,

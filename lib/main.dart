@@ -5,6 +5,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import 'core/di/di.dart';
 import 'core/theme/app_theme.dart';
@@ -17,6 +18,8 @@ import 'core/services/remote_config_service.dart';
 import 'core/services/app_logger.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/auth/presentation/bloc/auth_event.dart';
+import 'features/home/presentation/bloc/home_bloc.dart';
+import 'features/home/presentation/bloc/home_event.dart';
 
 void main() async {
   runZonedGuarded(() async {
@@ -86,31 +89,45 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider<AuthBloc>(
-      create: (context) => getIt<AuthBloc>()..add(const CheckAuthStatus()),
-      child: MaterialApp.router(
-        title: 'Splitwise',
-        debugShowCheckedModeBanner: false,
-        
-        // Theme settings
-        themeMode: ThemeMode.system,
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<AuthBloc>(
+          create: (context) => getIt<AuthBloc>()..add(const CheckAuthStatus()),
+        ),
+        BlocProvider<HomeBloc>(
+          create: (context) => getIt<HomeBloc>()..add(const LoadHome()),
+        ),
+      ],
+      child: ScreenUtilInit(
+        designSize: const Size(375, 812),
+        minTextAdapt: true,
+        splitScreenMode: true,
+        builder: (context, child) {
+          return MaterialApp.router(
+            title: 'Splitwise',
+            debugShowCheckedModeBanner: false,
+            
+            // Theme settings
+            themeMode: ThemeMode.system,
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
 
-        // Routing configuration
-        routerConfig: AppRouter.router,
+            // Routing configuration
+            routerConfig: AppRouter.router,
 
-        // Localization config
-        supportedLocales: const [
-          Locale('en'),
-          Locale('es'),
-        ],
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
-        ],
+            // Localization config
+            supportedLocales: const [
+              Locale('en'),
+              Locale('es'),
+            ],
+            localizationsDelegates: const [
+              AppLocalizations.delegate,
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+          );
+        },
       ),
     );
   }

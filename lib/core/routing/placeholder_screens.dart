@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../utils/context_extension.dart';
 import '../constants/app_constants.dart';
 import '../widgets/app_button.dart';
 import '../widgets/loading_indicator.dart';
+import '../widgets/spacing.dart';
+import '../widgets/glass_card.dart';
+import '../../features/auth/presentation/bloc/auth_bloc.dart';
+import '../../features/auth/presentation/bloc/auth_event.dart';
+import '../../features/auth/presentation/bloc/auth_state.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -79,116 +85,13 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 }
 
-class MaintenanceScreen extends StatelessWidget {
-  const MaintenanceScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppDimensions.xl),
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.construction_rounded,
-                  size: 80,
-                  color: context.colorScheme.error,
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  context.translate('maintenance_title'),
-                  style: context.textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  context.translate('maintenance_msg'),
-                  style: context.textTheme.bodyLarge?.copyWith(
-                    color: context.colorScheme.onSurface.withOpacity(0.7),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 32),
-                AppButton(
-                  text: context.translate('common_retry'),
-                  onPressed: () {
-                    // Try to re-route or refresh config
-                    context.go('/');
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class UpdateRequiredScreen extends StatelessWidget {
-  const UpdateRequiredScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppDimensions.xl),
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.system_update_rounded,
-                  size: 80,
-                  color: context.colorScheme.primary,
-                ),
-                const SizedBox(height: 24),
-                Text(
-                  context.translate('force_update_title'),
-                  style: context.textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  context.translate('force_update_msg'),
-                  style: context.textTheme.bodyLarge?.copyWith(
-                    color: context.colorScheme.onSurface.withOpacity(0.7),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 32),
-                AppButton(
-                  text: context.translate('force_update_btn'),
-                  onPressed: () {
-                    // Navigate to App Store or Play Store link
-                  },
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class UnknownScreen extends StatelessWidget {
   const UnknownScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text(context.translate('common_error')),
-      ),
+      appBar: AppBar(title: Text(context.translate('common_error'))),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(AppDimensions.xl),
@@ -226,6 +129,77 @@ class UnknownScreen extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+class AccountScreen extends StatelessWidget {
+  const AccountScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Account')),
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppDimensions.xl),
+          child: BlocBuilder<AuthBloc, AuthState>(
+            builder: (context, state) {
+              String name = 'Guest';
+              String email = 'No session';
+
+              if (state is Authenticated) {
+                name = state.user.name;
+                email = state.user.email;
+              }
+
+              return GlassCard(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircleAvatar(
+                      radius: AppDimensions.avatarSizeLg / 2,
+                      backgroundColor: context.colorScheme.primary,
+                      child: Text(
+                        name.isNotEmpty
+                            ? name.substring(0, 1).toUpperCase()
+                            : 'G',
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      name,
+                      style: context.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      email,
+                      style: context.textTheme.bodyMedium?.copyWith(
+                        color: context.colorScheme.onSurface.withOpacity(0.7),
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    AppButton.secondary(
+                      text: 'Log Out',
+                      onPressed: () {
+                        context.read<AuthBloc>().add(const LogoutRequested());
+                      },
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
         ),
       ),

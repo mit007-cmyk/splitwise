@@ -9,6 +9,8 @@ class EmptyStateWidget extends StatelessWidget {
   final IconData? icon;
   final String? actionText;
   final VoidCallback? onAction;
+  final String? secondaryActionText;
+  final VoidCallback? onSecondaryAction;
 
   const EmptyStateWidget({
     super.key,
@@ -17,6 +19,8 @@ class EmptyStateWidget extends StatelessWidget {
     this.icon,
     this.actionText,
     this.onAction,
+    this.secondaryActionText,
+    this.onSecondaryAction,
   });
 
   @override
@@ -48,14 +52,31 @@ class EmptyStateWidget extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
-            if (actionText != null && onAction != null) ...[
+            if ((actionText != null && onAction != null) || 
+                (secondaryActionText != null && onSecondaryAction != null)) ...[
               const SizedBox(height: 24),
-              SizedBox(
-                width: 180,
-                child: AppButton(
-                  text: actionText!,
-                  onPressed: onAction,
-                ),
+              Wrap(
+                spacing: AppDimensions.md,
+                runSpacing: AppDimensions.sm,
+                alignment: WrapAlignment.center,
+                children: [
+                  if (actionText != null && onAction != null)
+                    SizedBox(
+                      width: 160,
+                      child: AppButton(
+                        text: actionText!,
+                        onPressed: onAction,
+                      ),
+                    ),
+                  if (secondaryActionText != null && onSecondaryAction != null)
+                    SizedBox(
+                      width: 160,
+                      child: AppButton.secondary(
+                        text: secondaryActionText!,
+                        onPressed: onSecondaryAction,
+                      ),
+                    ),
+                ],
               ),
             ],
           ],

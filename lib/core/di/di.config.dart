@@ -28,6 +28,14 @@ import '../../features/auth/domain/usecases/register_usecase.dart' as _i941;
 import '../../features/auth/domain/usecases/watch_auth_status_usecase.dart'
     as _i281;
 import '../../features/auth/presentation/bloc/auth_bloc.dart' as _i797;
+import '../../features/home/data/datasources/home_local_datasource.dart'
+    as _i314;
+import '../../features/home/data/datasources/home_remote_datasource.dart'
+    as _i278;
+import '../../features/home/data/repositories/home_repository_impl.dart'
+    as _i76;
+import '../../features/home/domain/repositories/home_repository.dart' as _i0;
+import '../../features/home/presentation/bloc/home_bloc.dart' as _i202;
 import '../helpers/permission_helper.dart' as _i650;
 import '../services/analytics_service.dart' as _i222;
 import '../services/app_logger.dart' as _i1019;
@@ -69,6 +77,8 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i858.RemoteConfigService(gh<_i1019.AppLogger>()));
     gh.singleton<_i306.StorageService>(
         () => _i306.StorageService(gh<_i1019.AppLogger>()));
+    gh.lazySingleton<_i314.HomeLocalDataSource>(
+        () => _i314.HomeLocalDataSourceImpl(gh<_i1047.HiveService>()));
     gh.lazySingleton<_i992.AuthLocalDataSource>(
         () => _i992.AuthLocalDataSourceImpl(gh<_i1047.HiveService>()));
     gh.lazySingleton<_i161.AuthRemoteDataSource>(
@@ -77,9 +87,21 @@ extension GetItInjectableX on _i174.GetIt {
               gh<_i1019.AppLogger>(),
               gh<_i52.FirestoreService>(),
             ));
+    gh.lazySingleton<_i278.HomeRemoteDataSource>(
+        () => _i278.HomeRemoteDataSourceImpl(gh<_i52.FirestoreService>()));
+    gh.lazySingleton<_i0.HomeRepository>(() => _i76.HomeRepositoryImpl(
+          gh<_i278.HomeRemoteDataSource>(),
+          gh<_i314.HomeLocalDataSource>(),
+          gh<_i47.ConnectivityService>(),
+        ));
     gh.lazySingleton<_i787.AuthRepository>(() => _i153.AuthRepositoryImpl(
           gh<_i161.AuthRemoteDataSource>(),
           gh<_i992.AuthLocalDataSource>(),
+        ));
+    gh.factory<_i202.HomeBloc>(() => _i202.HomeBloc(
+          gh<_i0.HomeRepository>(),
+          gh<_i787.AuthRepository>(),
+          gh<_i47.ConnectivityService>(),
         ));
     gh.lazySingleton<_i17.GetCurrentUserUseCase>(
         () => _i17.GetCurrentUserUseCase(gh<_i787.AuthRepository>()));

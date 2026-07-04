@@ -4,12 +4,6 @@ class RouteConstants {
   static const String splashPath = '/';
   static const String splashName = 'splash';
 
-  static const String maintenancePath = '/maintenance';
-  static const String maintenanceName = 'maintenance';
-
-  static const String updateRequiredPath = '/update-required';
-  static const String updateRequiredName = 'update-required';
-
   static const String unknownPath = '/unknown';
   static const String unknownName = 'unknown';
 
@@ -18,7 +12,29 @@ class RouteConstants {
 
   static const String registerPath = '/register';
   static const String registerName = 'register';
-
   static const String homePath = '/home';
   static const String homeName = 'home';
+
+  static const String groupsPath = '/home/groups';
+  static const String groupsName = 'groups';
+  static const String accountPath = '/home/account';
+  static const String accountName = 'account';
+
+  static const String createGroupPath = '/create-group';
+  static const String createGroupName = 'create-group';
+
+  static const String groupDetailPath = '/group-detail/:groupId';
+  static const String groupDetailName = 'group-detail';
+
+  static const String addGroupMembersPath = '/group-detail/:groupId/add-members';
+  static const String addGroupMembersName = 'add-group-members';
+
+  static const String addFriendPath = '/add-friend';
+  static const String addFriendName = 'add-friend';
+
+  static const String groupSettingsPath = '/group-detail/:groupId/settings';
+  static const String groupSettingsName = 'group-settings';
+
+  static const String editGroupPath = '/group-detail/:groupId/edit';
+  static const String editGroupName = 'edit-group';
 }
