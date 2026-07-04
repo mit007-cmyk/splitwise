@@ -1,34 +1,40 @@
+import 'dart:convert';
+import 'package:json_annotation/json_annotation.dart';
 import '../../domain/entities/balance_summary.dart';
 import '../../domain/entities/group_summary.dart';
 
+part 'group_summary_model.g.dart';
+
+@JsonSerializable(includeIfNull: false, explicitToJson: true)
 class MemberBalanceModel extends MemberBalance {
+  @override
+  final String userId;
+  @override
+  final String userName;
+  @override
+  final double amount;
+  @override
+  @JsonKey(fromJson: _typeFromJson, toJson: _typeToJson)
+  final BalanceType type;
+
   const MemberBalanceModel({
-    required super.userId,
-    required super.userName,
-    required super.amount,
-    required super.type,
-  });
+    required this.userId,
+    required this.userName,
+    required this.amount,
+    required this.type,
+  }) : super(
+          userId: userId,
+          userName: userName,
+          amount: amount,
+          type: type,
+        );
 
-  factory MemberBalanceModel.fromJson(Map<String, dynamic> json) {
-    return MemberBalanceModel(
-      userId: json['userId'] as String? ?? '',
-      userName: json['userName'] as String? ?? '',
-      amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
-      type: BalanceType.values.firstWhere(
-        (e) => e.toString() == json['type'],
-        orElse: () => BalanceType.settled,
-      ),
-    );
-  }
+  factory MemberBalanceModel.fromJson(Map<String, dynamic> json) => _$MemberBalanceModelFromJson(json);
 
-  Map<String, dynamic> toJson() {
-    return {
-      'userId': userId,
-      'userName': userName,
-      'amount': amount,
-      'type': type.toString(),
-    };
-  }
+  Map<String, dynamic> toJson() => _$MemberBalanceModelToJson(this);
+
+  @override
+  String toString() => jsonEncode(toJson());
 
   factory MemberBalanceModel.fromEntity(MemberBalance entity) {
     return MemberBalanceModel(
@@ -38,64 +44,72 @@ class MemberBalanceModel extends MemberBalance {
       type: entity.type,
     );
   }
-}
 
-class GroupSummaryModel extends GroupSummary {
-  const GroupSummaryModel({
-    required super.groupId,
-    required super.groupName,
-    super.groupImage,
-    required super.totalBalance,
-    required super.balanceType,
-    required List<MemberBalanceModel> super.memberBalances,
-    required super.memberCount,
-    required super.memberIds,
-    required super.groupType,
-    super.lastExpenseDate,
-  });
-
-  factory GroupSummaryModel.fromJson(Map<String, dynamic> json) {
-    return GroupSummaryModel(
-      groupId: json['groupId'] as String? ?? '',
-      groupName: json['groupName'] as String? ?? '',
-      groupImage: json['groupImage'] as String?,
-      totalBalance: (json['totalBalance'] as num?)?.toDouble() ?? 0.0,
-      balanceType: BalanceType.values.firstWhere(
-        (e) => e.toString() == json['balanceType'],
-        orElse: () => BalanceType.settled,
-      ),
-      memberBalances: (json['memberBalances'] as List<dynamic>?)
-              ?.map((e) => MemberBalanceModel.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          [],
-      memberCount: json['memberCount'] as int? ?? 0,
-      memberIds: (json['memberIds'] as List<dynamic>?)
-              ?.map((e) => e.toString())
-              .toList() ??
-          [],
-      groupType: json['groupType'] as String? ?? 'Other',
-      lastExpenseDate: json['lastExpenseDate'] != null
-          ? DateTime.tryParse(json['lastExpenseDate'] as String)
-          : null,
+  static BalanceType _typeFromJson(dynamic jsonVal) {
+    final String val = jsonVal?.toString() ?? '';
+    return BalanceType.values.firstWhere(
+      (e) => e.toString() == val,
+      orElse: () => BalanceType.settled,
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'groupId': groupId,
-      'groupName': groupName,
-      'groupImage': groupImage,
-      'totalBalance': totalBalance,
-      'balanceType': balanceType.toString(),
-      'memberBalances': memberBalances
-          .map((e) => MemberBalanceModel.fromEntity(e).toJson())
-          .toList(),
-      'memberCount': memberCount,
-      'memberIds': memberIds,
-      'groupType': groupType,
-      'lastExpenseDate': lastExpenseDate?.toIso8601String(),
-    };
-  }
+  static String _typeToJson(BalanceType type) => type.toString();
+}
+
+@JsonSerializable(includeIfNull: false, explicitToJson: true)
+class GroupSummaryModel extends GroupSummary {
+  @override
+  final String groupId;
+  @override
+  final String groupName;
+  @override
+  final String? groupImage;
+  @override
+  final double totalBalance;
+  @override
+  @JsonKey(fromJson: _typeFromJson, toJson: _typeToJson)
+  final BalanceType balanceType;
+  @override
+  final List<MemberBalanceModel> memberBalances;
+  @override
+  final int memberCount;
+  @override
+  final List<String> memberIds;
+  @override
+  final String groupType;
+  @override
+  final DateTime? lastExpenseDate;
+
+  const GroupSummaryModel({
+    required this.groupId,
+    required this.groupName,
+    this.groupImage,
+    required this.totalBalance,
+    required this.balanceType,
+    required this.memberBalances,
+    required this.memberCount,
+    required this.memberIds,
+    required this.groupType,
+    this.lastExpenseDate,
+  }) : super(
+          groupId: groupId,
+          groupName: groupName,
+          groupImage: groupImage,
+          totalBalance: totalBalance,
+          balanceType: balanceType,
+          memberBalances: memberBalances,
+          memberCount: memberCount,
+          memberIds: memberIds,
+          groupType: groupType,
+          lastExpenseDate: lastExpenseDate,
+        );
+
+  factory GroupSummaryModel.fromJson(Map<String, dynamic> json) => _$GroupSummaryModelFromJson(json);
+
+  Map<String, dynamic> toJson() => _$GroupSummaryModelToJson(this);
+
+  @override
+  String toString() => jsonEncode(toJson());
 
   factory GroupSummaryModel.fromEntity(GroupSummary entity) {
     return GroupSummaryModel(
@@ -113,4 +127,14 @@ class GroupSummaryModel extends GroupSummary {
       lastExpenseDate: entity.lastExpenseDate,
     );
   }
+
+  static BalanceType _typeFromJson(dynamic jsonVal) {
+    final String val = jsonVal?.toString() ?? '';
+    return BalanceType.values.firstWhere(
+      (e) => e.toString() == val,
+      orElse: () => BalanceType.settled,
+    );
+  }
+
+  static String _typeToJson(BalanceType type) => type.toString();
 }

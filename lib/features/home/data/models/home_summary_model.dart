@@ -1,33 +1,32 @@
+import 'dart:convert';
+import 'package:json_annotation/json_annotation.dart';
 import '../../domain/entities/home_summary.dart';
 import 'balance_summary_model.dart';
 import 'group_summary_model.dart';
 
+part 'home_summary_model.g.dart';
+
+@JsonSerializable(includeIfNull: false, explicitToJson: true)
 class HomeSummaryModel extends HomeSummary {
+  @override
+  final BalanceSummaryModel overallBalance;
+  @override
+  final List<GroupSummaryModel> groups;
+
   const HomeSummaryModel({
-    required BalanceSummaryModel super.overallBalance,
-    required List<GroupSummaryModel> super.groups,
-  });
+    required this.overallBalance,
+    required this.groups,
+  }) : super(
+          overallBalance: overallBalance,
+          groups: groups,
+        );
 
-  factory HomeSummaryModel.fromJson(Map<String, dynamic> json) {
-    return HomeSummaryModel(
-      overallBalance: BalanceSummaryModel.fromJson(
-        json['overallBalance'] as Map<String, dynamic>? ?? {},
-      ),
-      groups: (json['groups'] as List<dynamic>?)
-              ?.map((e) => GroupSummaryModel.fromJson(e as Map<String, dynamic>))
-              .toList() ??
-          [],
-    );
-  }
+  factory HomeSummaryModel.fromJson(Map<String, dynamic> json) => _$HomeSummaryModelFromJson(json);
 
-  Map<String, dynamic> toJson() {
-    return {
-      'overallBalance': BalanceSummaryModel.fromEntity(overallBalance).toJson(),
-      'groups': groups
-          .map((e) => GroupSummaryModel.fromEntity(e).toJson())
-          .toList(),
-    };
-  }
+  Map<String, dynamic> toJson() => _$HomeSummaryModelToJson(this);
+
+  @override
+  String toString() => jsonEncode(toJson());
 
   factory HomeSummaryModel.fromEntity(HomeSummary entity) {
     return HomeSummaryModel(

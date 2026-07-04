@@ -1,27 +1,29 @@
+import 'dart:convert';
+import 'package:json_annotation/json_annotation.dart';
 import '../../domain/entities/balance_summary.dart';
 
+part 'balance_summary_model.g.dart';
+
+@JsonSerializable(includeIfNull: false, explicitToJson: true)
 class BalanceSummaryModel extends BalanceSummary {
+  @override
+  final double amount;
+  
+  @override
+  @JsonKey(fromJson: _typeFromJson, toJson: _typeToJson)
+  final BalanceType type;
+
   const BalanceSummaryModel({
-    required super.amount,
-    required super.type,
-  });
+    required this.amount,
+    required this.type,
+  }) : super(amount: amount, type: type);
 
-  factory BalanceSummaryModel.fromJson(Map<String, dynamic> json) {
-    return BalanceSummaryModel(
-      amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
-      type: BalanceType.values.firstWhere(
-        (e) => e.toString() == json['type'],
-        orElse: () => BalanceType.settled,
-      ),
-    );
-  }
+  factory BalanceSummaryModel.fromJson(Map<String, dynamic> json) => _$BalanceSummaryModelFromJson(json);
 
-  Map<String, dynamic> toJson() {
-    return {
-      'amount': amount,
-      'type': type.toString(),
-    };
-  }
+  Map<String, dynamic> toJson() => _$BalanceSummaryModelToJson(this);
+
+  @override
+  String toString() => jsonEncode(toJson());
 
   factory BalanceSummaryModel.fromEntity(BalanceSummary entity) {
     return BalanceSummaryModel(
@@ -29,4 +31,14 @@ class BalanceSummaryModel extends BalanceSummary {
       type: entity.type,
     );
   }
+
+  static BalanceType _typeFromJson(dynamic jsonVal) {
+    final String val = jsonVal?.toString() ?? '';
+    return BalanceType.values.firstWhere(
+      (e) => e.toString() == val,
+      orElse: () => BalanceType.settled,
+    );
+  }
+
+  static String _typeToJson(BalanceType type) => type.toString();
 }
