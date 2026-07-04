@@ -11,6 +11,7 @@ import 'package:splitwise/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:splitwise/features/auth/presentation/bloc/auth_event.dart';
 import 'package:splitwise/features/auth/presentation/bloc/auth_state.dart';
 import 'package:splitwise/features/auth/domain/repositories/auth_repository.dart';
+import 'package:splitwise/features/auth/domain/usecases/login_with_google_usecase.dart';
 
 // Fake implementations of repositories and use cases to test bloc states
 class FakeAuthRepository implements AuthRepository {
@@ -35,6 +36,11 @@ class FakeAuthRepository implements AuthRepository {
   @override
   Future<Result<UserEntity>> getCurrentUser() async {
     return Result.success(UserEntity.empty);
+  }
+
+  @override
+  Future<Result<UserEntity>> loginWithGoogle() async {
+    return Result.success(const UserEntity(id: 'google-1', email: 'google@example.com', name: 'Google User'));
   }
 
   @override
@@ -93,6 +99,16 @@ class FakeWatchAuthStatusUseCase extends WatchAuthStatusUseCase {
   }
 }
 
+class FakeLoginWithGoogleUseCase extends LoginWithGoogleUseCase {
+  final FakeAuthRepository repo;
+  FakeLoginWithGoogleUseCase(this.repo) : super(repo);
+
+  @override
+  Future<Result<UserEntity>> call() {
+    return repo.loginWithGoogle();
+  }
+}
+
 void main() {
   late FakeAuthRepository repo;
   late FakeLoginUseCase loginUseCase;
@@ -100,6 +116,7 @@ void main() {
   late FakeLogoutUseCase logoutUseCase;
   late FakeGetCurrentUserUseCase getCurrentUserUseCase;
   late FakeWatchAuthStatusUseCase watchAuthStatusUseCase;
+  late FakeLoginWithGoogleUseCase loginWithGoogleUseCase;
   late AuthBloc authBloc;
 
   setUp(() {
@@ -109,6 +126,7 @@ void main() {
     logoutUseCase = FakeLogoutUseCase(repo);
     getCurrentUserUseCase = FakeGetCurrentUserUseCase(repo);
     watchAuthStatusUseCase = FakeWatchAuthStatusUseCase(repo);
+    loginWithGoogleUseCase = FakeLoginWithGoogleUseCase(repo);
     
     authBloc = AuthBloc(
       loginUseCase,
@@ -116,6 +134,7 @@ void main() {
       logoutUseCase,
       getCurrentUserUseCase,
       watchAuthStatusUseCase,
+      loginWithGoogleUseCase,
     );
   });
 

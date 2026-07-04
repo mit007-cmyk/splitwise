@@ -9,6 +9,7 @@ import '../../domain/usecases/login_usecase.dart';
 import '../../domain/usecases/logout_usecase.dart';
 import '../../domain/usecases/register_usecase.dart';
 import '../../domain/usecases/watch_auth_status_usecase.dart';
+import '../../domain/usecases/login_with_google_usecase.dart';
 import 'auth_event.dart';
 import 'auth_state.dart';
 
@@ -28,6 +29,7 @@ class AuthBloc extends BaseBloc<AuthEvent, AuthState> {
   final LogoutUseCase _logoutUseCase;
   final GetCurrentUserUseCase _getCurrentUserUseCase;
   final WatchAuthStatusUseCase _watchAuthStatusUseCase;
+  final LoginWithGoogleUseCase _loginWithGoogleUseCase;
 
   StreamSubscription<UserEntity>? _authStatusSubscription;
 
@@ -37,11 +39,13 @@ class AuthBloc extends BaseBloc<AuthEvent, AuthState> {
     this._logoutUseCase,
     this._getCurrentUserUseCase,
     this._watchAuthStatusUseCase,
+    this._loginWithGoogleUseCase,
   ) : super(const AuthInitial()) {
     on<CheckAuthStatus>(_onCheckAuthStatus);
     on<LoginWithEmail>(_onLoginWithEmail);
     on<RegisterWithEmail>(_onRegisterWithEmail);
     on<LogoutRequested>(_onLogoutRequested);
+    on<LoginWithGoogle>(_onLoginWithGoogle);
     on<_AuthStatusChanged>(_onAuthStatusChanged);
 
     // Subscribe to auth status changes
@@ -118,6 +122,22 @@ class AuthBloc extends BaseBloc<AuthEvent, AuthState> {
       emit(Authenticated(event.user));
     } else {
       emit(const Unauthenticated());
+    }
+  }
+
+  Future<void> _onLoginWithGoogle(LoginWithGoogle event, Emitter<AuthState> emit) async {
+    emit(const AuthLoading());
+    final result = await _loginWithGoogleUseCase();
+
+    if (result.isSuccess) {
+      emit(Authenticated(result.dataOrThrow));
+    } else {
+      try {
+        result.dataOrThrow;
+      } catch (failure) {
+        final message = failure is Failure ? failure.message : failure.toString();
+        emit(AuthError(message));
+      }
     }
   }
 

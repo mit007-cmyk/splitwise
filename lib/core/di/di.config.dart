@@ -21,6 +21,8 @@ import '../../features/auth/domain/repositories/auth_repository.dart' as _i787;
 import '../../features/auth/domain/usecases/get_current_user_usecase.dart'
     as _i17;
 import '../../features/auth/domain/usecases/login_usecase.dart' as _i188;
+import '../../features/auth/domain/usecases/login_with_google_usecase.dart'
+    as _i57;
 import '../../features/auth/domain/usecases/logout_usecase.dart' as _i48;
 import '../../features/auth/domain/usecases/register_usecase.dart' as _i941;
 import '../../features/auth/domain/usecases/watch_auth_status_usecase.dart'
@@ -73,6 +75,7 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i161.AuthRemoteDataSourceImpl(
               gh<_i1047.HiveService>(),
               gh<_i1019.AppLogger>(),
+              gh<_i52.FirestoreService>(),
             ));
     gh.lazySingleton<_i787.AuthRepository>(() => _i153.AuthRepositoryImpl(
           gh<_i161.AuthRemoteDataSource>(),
@@ -82,6 +85,8 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i17.GetCurrentUserUseCase(gh<_i787.AuthRepository>()));
     gh.lazySingleton<_i188.LoginUseCase>(
         () => _i188.LoginUseCase(gh<_i787.AuthRepository>()));
+    gh.lazySingleton<_i57.LoginWithGoogleUseCase>(
+        () => _i57.LoginWithGoogleUseCase(gh<_i787.AuthRepository>()));
     gh.lazySingleton<_i48.LogoutUseCase>(
         () => _i48.LogoutUseCase(gh<_i787.AuthRepository>()));
     gh.lazySingleton<_i941.RegisterUseCase>(
@@ -94,6 +99,7 @@ extension GetItInjectableX on _i174.GetIt {
           gh<_i48.LogoutUseCase>(),
           gh<_i17.GetCurrentUserUseCase>(),
           gh<_i281.WatchAuthStatusUseCase>(),
+          gh<_i57.LoginWithGoogleUseCase>(),
         ));
     return this;
   }

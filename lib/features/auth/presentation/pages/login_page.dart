@@ -9,6 +9,7 @@ import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/glass_background.dart';
 import '../../../../core/widgets/glass_card.dart';
+import '../../../../core/widgets/google_sign_in_button.dart';
 import '../../../../core/widgets/spacing.dart';
 import '../../../../core/utils/context_extension.dart';
 import '../bloc/auth_bloc.dart';
@@ -156,6 +157,30 @@ class _LoginPageState extends State<LoginPage> {
                                 text: 'Login',
                                 isLoading: isLoading,
                                 onPressed: () => _submit(context),
+                              ),
+                              Spacing.md,
+                              Row(
+                                children: [
+                                  Expanded(child: Divider(color: context.colorScheme.onSurface.withOpacity(0.12))),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: AppDimensions.md),
+                                    child: Text(
+                                      'OR',
+                                      style: context.textTheme.labelMedium?.copyWith(
+                                        color: context.colorScheme.onSurface.withOpacity(0.4),
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(child: Divider(color: context.colorScheme.onSurface.withOpacity(0.12))),
+                                ],
+                              ),
+                              Spacing.md,
+                              GoogleSignInButton(
+                                isLoading: isLoading,
+                                onPressed: () {
+                                  context.read<AuthBloc>().add(const LoginWithGoogle());
+                                },
                               ),
                               Spacing.lg,
 

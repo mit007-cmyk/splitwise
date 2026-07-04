@@ -10,6 +10,7 @@ import 'package:splitwise/features/auth/domain/usecases/register_usecase.dart';
 import 'package:splitwise/features/auth/domain/usecases/logout_usecase.dart';
 import 'package:splitwise/features/auth/domain/usecases/get_current_user_usecase.dart';
 import 'package:splitwise/features/auth/domain/usecases/watch_auth_status_usecase.dart';
+import 'package:splitwise/features/auth/domain/usecases/login_with_google_usecase.dart';
 import 'package:splitwise/features/auth/presentation/bloc/auth_bloc.dart';
 import 'package:splitwise/main.dart';
 
@@ -50,6 +51,9 @@ class MockAuthRepository implements AuthRepository {
   Future<Result<void>> logout() async => Result.success(null);
 
   @override
+  Future<Result<UserEntity>> loginWithGoogle() async => Result.success(UserEntity.empty);
+
+  @override
   Stream<UserEntity> watchAuthStatus() => Stream.value(UserEntity.empty);
 }
 
@@ -71,6 +75,7 @@ void main() {
       final logoutUseCase = LogoutUseCase(authRepo);
       final getCurrentUserUseCase = GetCurrentUserUseCase(authRepo);
       final watchAuthStatusUseCase = WatchAuthStatusUseCase(authRepo);
+      final loginWithGoogleUseCase = LoginWithGoogleUseCase(authRepo);
       
       getIt.registerSingleton<AuthBloc>(AuthBloc(
         loginUseCase,
@@ -78,6 +83,7 @@ void main() {
         logoutUseCase,
         getCurrentUserUseCase,
         watchAuthStatusUseCase,
+        loginWithGoogleUseCase,
       ));
     }
   });

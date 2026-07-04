@@ -39,3 +39,7 @@ class RegisterWithEmail extends AuthEvent {
 class LogoutRequested extends AuthEvent {
   const LogoutRequested();
 }
+
+class LoginWithGoogle extends AuthEvent {
+  const LoginWithGoogle();
+}

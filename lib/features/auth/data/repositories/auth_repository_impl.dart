@@ -27,6 +27,15 @@ class AuthRepositoryImpl extends BaseRepository implements AuthRepository {
   }
 
   @override
+  Future<Result<UserEntity>> loginWithGoogle() async {
+    return safeCall(() async {
+      final userModel = await _remoteDataSource.loginWithGoogle();
+      await _localDataSource.cacheUser(userModel);
+      return userModel;
+    });
+  }
+
+  @override
   Future<Result<UserEntity>> signUp({
     required String name,
     required String email,
