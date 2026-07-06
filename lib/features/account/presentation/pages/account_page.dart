@@ -5,6 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/di.dart';
 import '../../../../core/routing/route_constants.dart';
+import '../../../../core/services/app_launcher_service.dart';
 import '../../../../core/services/support_email_service.dart';
 import '../../../../core/utils/context_extension.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -238,7 +239,7 @@ class AccountPage extends StatelessWidget {
                     context,
                     icon: Icons.star_outline,
                     title: 'Rate Splitwise',
-                    onTap: () {},
+                    onTap: () => AppLauncherService.rateApp(),
                   ),
                   _buildMenuItem(
                     context,
