@@ -1,7 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
-import '../../../auth/data/models/user_model.dart';
-import '../../domain/repositories/home_repository.dart';
+import 'package:splitwise/features/auth/data/models/user_model.dart';
+import 'package:splitwise/features/home/domain/repositories/home_repository.dart';
 
 class AddGroupMembersState extends Equatable {
   final List<UserModel> allUsers;

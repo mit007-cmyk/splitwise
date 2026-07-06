@@ -6,15 +6,16 @@ import '../../features/auth/domain/repositories/auth_repository.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
-import '../../features/home/presentation/pages/create_group_page.dart';
-import '../../features/home/presentation/pages/main_navigation_page.dart';
-import '../../features/home/presentation/pages/group_detail_page.dart';
-import '../../features/home/presentation/pages/add_group_members_page.dart';
-import '../../features/home/presentation/pages/add_friend_page.dart';
-import '../../features/home/presentation/pages/group_settings_page.dart';
-import '../../features/home/presentation/pages/edit_group_page.dart';
-import '../../features/home/presentation/pages/friends_page.dart';
-import '../../features/home/presentation/pages/activity_page.dart';
+import 'package:splitwise/features/groups/presentation/pages/create_group_page.dart';
+import 'package:splitwise/features/navigation/presentation/pages/main_navigation_page.dart';
+import 'package:splitwise/features/groups/presentation/pages/group_detail_page.dart';
+import 'package:splitwise/features/groups/presentation/pages/add_group_members_page.dart';
+import 'package:splitwise/features/friends/presentation/pages/add_friend_page.dart';
+import 'package:splitwise/features/groups/presentation/pages/group_settings_page.dart';
+import 'package:splitwise/features/groups/presentation/pages/edit_group_page.dart';
+import 'package:splitwise/features/friends/presentation/pages/friends_page.dart';
+import 'package:splitwise/features/activity/presentation/pages/activity_page.dart';
+import 'package:splitwise/features/account/presentation/pages/account_page.dart';
 import 'route_constants.dart';
 import 'placeholder_screens.dart';
 
@@ -135,7 +136,7 @@ class AppRouter {
               GoRoute(
                 path: RouteConstants.accountPath,
                 name: RouteConstants.accountName,
-                builder: (context, state) => const AccountScreen(),
+                builder: (context, state) => const AccountPage(),
               ),
             ],
           ),

@@ -7,9 +7,9 @@ import 'package:intl/intl.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/utils/context_extension.dart';
 import '../../../../core/widgets/app_scaffold.dart';
-import '../bloc/home_bloc.dart';
-import '../bloc/home_event.dart';
-import '../bloc/home_state.dart';
+import 'package:splitwise/features/home/presentation/bloc/home_bloc.dart';
+import 'package:splitwise/features/home/presentation/bloc/home_event.dart';
+import 'package:splitwise/features/home/presentation/bloc/home_state.dart';
 
 class CreateGroupPage extends StatefulWidget {
   const CreateGroupPage({super.key});

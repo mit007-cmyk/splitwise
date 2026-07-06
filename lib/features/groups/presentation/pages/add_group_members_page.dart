@@ -7,12 +7,12 @@ import '../../../../core/di/di.dart';
 import '../../../../core/utils/context_extension.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../auth/data/models/user_model.dart';
-import '../../domain/entities/group_summary.dart';
-import '../../domain/repositories/home_repository.dart';
-import '../bloc/home_bloc.dart';
-import '../bloc/home_event.dart';
-import '../bloc/home_state.dart';
-import '../bloc/add_group_members_cubit.dart';
+import 'package:splitwise/features/home/domain/entities/group_summary.dart';
+import 'package:splitwise/features/home/domain/repositories/home_repository.dart';
+import 'package:splitwise/features/home/presentation/bloc/home_bloc.dart';
+import 'package:splitwise/features/home/presentation/bloc/home_event.dart';
+import 'package:splitwise/features/home/presentation/bloc/home_state.dart';
+import 'package:splitwise/features/groups/presentation/bloc/add_group_members_cubit.dart';
 
 class AddGroupMembersPage extends StatefulWidget {
   final String groupId;
