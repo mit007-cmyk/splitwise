@@ -17,6 +17,10 @@ class RouteConstants {
 
   static const String groupsPath = '/home/groups';
   static const String groupsName = 'groups';
+  static const String friendsPath = '/home/friends';
+  static const String friendsName = 'friends';
+  static const String activityPath = '/home/activity';
+  static const String activityName = 'activity';
   static const String accountPath = '/home/account';
   static const String accountName = 'account';
 

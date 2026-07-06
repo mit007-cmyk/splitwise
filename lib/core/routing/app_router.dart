@@ -13,6 +13,8 @@ import '../../features/home/presentation/pages/add_group_members_page.dart';
 import '../../features/home/presentation/pages/add_friend_page.dart';
 import '../../features/home/presentation/pages/group_settings_page.dart';
 import '../../features/home/presentation/pages/edit_group_page.dart';
+import '../../features/home/presentation/pages/friends_page.dart';
+import '../../features/home/presentation/pages/activity_page.dart';
 import 'route_constants.dart';
 import 'placeholder_screens.dart';
 
@@ -107,6 +109,24 @@ class AppRouter {
                 path: RouteConstants.groupsPath,
                 name: RouteConstants.groupsName,
                 builder: (context, state) => const HomePage(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: RouteConstants.friendsPath,
+                name: RouteConstants.friendsName,
+                builder: (context, state) => const FriendsPage(),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: RouteConstants.activityPath,
+                name: RouteConstants.activityName,
+                builder: (context, state) => const ActivityPage(),
               ),
             ],
           ),
