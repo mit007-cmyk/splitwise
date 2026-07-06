@@ -99,3 +99,19 @@ class LeaveGroupRequested extends HomeEvent {
   @override
   List<Object?> get props => [groupId];
 }
+
+class ChangeFilter extends HomeEvent {
+  final String filter;
+  const ChangeFilter(this.filter);
+
+  @override
+  List<Object?> get props => [filter];
+}
+
+class ChangeFabExtension extends HomeEvent {
+  final bool isExtended;
+  const ChangeFabExtension(this.isExtended);
+
+  @override
+  List<Object?> get props => [isExtended];
+}

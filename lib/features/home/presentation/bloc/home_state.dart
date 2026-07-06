@@ -19,20 +19,40 @@ class HomeLoading extends HomeState {
 class HomeLoaded extends HomeState {
   final HomeSummary summary;
   final bool isOffline;
+  final String selectedFilter;
+  final bool isFabExtended;
 
   const HomeLoaded({
     required this.summary,
     this.isOffline = false,
+    this.selectedFilter = 'all',
+    this.isFabExtended = true,
   });
 
+  HomeLoaded copyWith({
+    HomeSummary? summary,
+    bool? isOffline,
+    String? selectedFilter,
+    bool? isFabExtended,
+  }) {
+    return HomeLoaded(
+      summary: summary ?? this.summary,
+      isOffline: isOffline ?? this.isOffline,
+      selectedFilter: selectedFilter ?? this.selectedFilter,
+      isFabExtended: isFabExtended ?? this.isFabExtended,
+    );
+  }
+
   @override
-  List<Object?> get props => [summary, isOffline];
+  List<Object?> get props => [summary, isOffline, selectedFilter, isFabExtended];
 }
 
 class HomeRefreshing extends HomeLoaded {
   const HomeRefreshing({
     required super.summary,
     super.isOffline,
+    super.selectedFilter,
+    super.isFabExtended,
   });
 }
 

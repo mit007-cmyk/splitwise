@@ -26,6 +26,8 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     on<AddGroupMembersRequested>(_onAddGroupMembersRequested);
     on<EditGroupRequested>(_onEditGroupRequested);
     on<LeaveGroupRequested>(_onLeaveGroupRequested);
+    on<ChangeFilter>(_onChangeFilter);
+    on<ChangeFabExtension>(_onChangeFabExtension);
   }
 
   Future<void> _onLoadHome(LoadHome event, Emitter<HomeState> emit) async {
@@ -176,6 +178,18 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
       ));
     } else if (summaryResult is FailureResult<HomeSummary>) {
       emit(HomeError(summaryResult.failure.message));
+    }
+  }
+
+  void _onChangeFilter(ChangeFilter event, Emitter<HomeState> emit) {
+    if (state is HomeLoaded) {
+      emit((state as HomeLoaded).copyWith(selectedFilter: event.filter));
+    }
+  }
+
+  void _onChangeFabExtension(ChangeFabExtension event, Emitter<HomeState> emit) {
+    if (state is HomeLoaded) {
+      emit((state as HomeLoaded).copyWith(isFabExtended: event.isExtended));
     }
   }
 }
