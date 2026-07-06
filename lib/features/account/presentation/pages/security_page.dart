@@ -7,6 +7,7 @@ import '../../../../core/services/app_logger.dart';
 import '../../../../core/services/biometric_lock_service.dart';
 import '../../../../core/services/hive_service.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/widgets/app_switch.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../bloc/security_cubit.dart';
@@ -90,9 +91,8 @@ class SecurityPage extends StatelessWidget {
                                   ],
                                 ),
                               ),
-                              Switch(
+                              AppSwitch(
                                 value: state.isBiometricsEnabled,
-                                activeThumbColor: theme.colorScheme.primary,
                                 onChanged: (val) async {
                                   if (val) {
                                     final result =

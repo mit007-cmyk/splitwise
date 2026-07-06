@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/utils/context_extension.dart';
 import '../../../../core/widgets/app_scaffold.dart';
+import '../../../../core/widgets/app_switch.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_bloc.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_event.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_state.dart';
@@ -244,9 +245,8 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                           ),
                         ],
                       ),
-                      Switch.adaptive(
+                      AppSwitch(
                         value: _addSettleUpReminders,
-                        activeColor: theme.colorScheme.primary,
                         onChanged: (val) {
                           setState(() {
                             _addSettleUpReminders = val;
@@ -272,9 +272,8 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      Switch.adaptive(
+                      AppSwitch(
                         value: _addTripDates,
-                        activeColor: theme.colorScheme.primary,
                         onChanged: (val) {
                           setState(() {
                             _addTripDates = val;

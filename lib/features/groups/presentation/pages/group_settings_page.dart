@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/di.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/widgets/app_switch.dart';
 import '../../../auth/data/models/user_model.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -278,14 +279,13 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      Switch(
+                      AppSwitch(
                         value: _simplifyDebts,
                         onChanged: (val) {
                           setState(() {
                             _simplifyDebts = val;
                           });
                         },
-                        activeColor: theme.colorScheme.primary,
                       ),
                     ],
                   ),
