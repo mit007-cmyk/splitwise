@@ -39,6 +39,7 @@ import '../../features/home/presentation/bloc/home_bloc.dart' as _i202;
 import '../helpers/permission_helper.dart' as _i650;
 import '../services/analytics_service.dart' as _i222;
 import '../services/app_logger.dart' as _i1019;
+import '../services/biometric_lock_service.dart' as _i600;
 import '../services/connectivity_service.dart' as _i47;
 import '../services/firestore_service.dart' as _i52;
 import '../services/hive_service.dart' as _i1047;
@@ -89,6 +90,11 @@ extension GetItInjectableX on _i174.GetIt {
             ));
     gh.lazySingleton<_i278.HomeRemoteDataSource>(
         () => _i278.HomeRemoteDataSourceImpl(gh<_i52.FirestoreService>()));
+    gh.lazySingleton<_i600.BiometricLockService>(
+        () => _i600.BiometricLockService(
+              gh<_i1047.HiveService>(),
+              gh<_i1019.AppLogger>(),
+            ));
     gh.lazySingleton<_i0.HomeRepository>(() => _i76.HomeRepositoryImpl(
           gh<_i278.HomeRemoteDataSource>(),
           gh<_i314.HomeLocalDataSource>(),

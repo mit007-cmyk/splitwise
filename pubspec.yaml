@@ -61,6 +61,7 @@ dependencies:
   google_sign_in: ^6.2.1
   flutter_screenutil: ^5.9.3
   json_annotation: ^4.9.0
+  local_auth: ^3.0.1
 
 dev_dependencies:
   flutter_test:

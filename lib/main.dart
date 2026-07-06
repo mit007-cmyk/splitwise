@@ -16,6 +16,7 @@ import 'core/services/hive_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/remote_config_service.dart';
 import 'core/services/app_logger.dart';
+import 'core/widgets/biometric_lock_gate.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/auth/presentation/bloc/auth_event.dart';
 import 'features/home/presentation/bloc/home_bloc.dart';
@@ -106,7 +107,7 @@ class MyApp extends StatelessWidget {
           return MaterialApp.router(
             title: 'Splitwise',
             debugShowCheckedModeBanner: false,
-            
+
             // Theme settings
             themeMode: ThemeMode.system,
             theme: AppTheme.lightTheme,
@@ -126,6 +127,9 @@ class MyApp extends StatelessWidget {
               GlobalWidgetsLocalizations.delegate,
               GlobalCupertinoLocalizations.delegate,
             ],
+            builder: (context, child) {
+              return BiometricLockGate(child: child ?? const SizedBox.shrink());
+            },
           );
         },
       ),

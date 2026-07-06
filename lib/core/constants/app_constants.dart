@@ -24,6 +24,7 @@ class FirestorePaths {
   static const String root = 'Splitwise';
   static const String app = 'app';
   static const String emailConfiguration = 'email_configuration';
+  static const String securityDetails = 'security_details';
 }
 
 class AppDimensions {

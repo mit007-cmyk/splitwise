@@ -195,7 +195,7 @@ class AccountPage extends StatelessWidget {
                   _buildMenuItem(
                     icon: Icons.lock_outline,
                     title: 'Security',
-                    onTap: () {},
+                    onTap: () => context.push(RouteConstants.accountSecurityPath),
                   ),
                   _buildMenuItem(
                     icon: Icons.palette_outlined,

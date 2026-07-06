@@ -47,4 +47,10 @@ class RouteConstants {
 
   static const String emailSettingsPath = '/account/email-settings';
   static const String emailSettingsName = 'account-email-settings';
+
+  static const String accountSecurityPath = '/account/security';
+  static const String accountSecurityName = 'account-security';
+
+  static const String useBiometricsPath = '/account/security/use-biometrics';
+  static const String useBiometricsName = 'use-biometrics';
 }

@@ -18,6 +18,8 @@ import 'package:splitwise/features/activity/presentation/pages/activity_page.dar
 import 'package:splitwise/features/account/presentation/pages/account_page.dart';
 import 'package:splitwise/features/account/presentation/pages/account_settings_page.dart';
 import 'package:splitwise/features/account/presentation/pages/email_settings_page.dart';
+import 'package:splitwise/features/account/presentation/pages/security_page.dart';
+import 'package:splitwise/features/account/presentation/pages/use_biometrics_page.dart';
 import 'route_constants.dart';
 import 'placeholder_screens.dart';
 
@@ -195,6 +197,16 @@ class AppRouter {
         path: RouteConstants.emailSettingsPath,
         name: RouteConstants.emailSettingsName,
         builder: (context, state) => const EmailSettingsPage(),
+      ),
+      GoRoute(
+        path: RouteConstants.accountSecurityPath,
+        name: RouteConstants.accountSecurityName,
+        builder: (context, state) => const SecurityPage(),
+      ),
+      GoRoute(
+        path: RouteConstants.useBiometricsPath,
+        name: RouteConstants.useBiometricsName,
+        builder: (context, state) => const UseBiometricsPage(),
       ),
       GoRoute(
         path: RouteConstants.unknownPath,
