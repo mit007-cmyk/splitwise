@@ -47,6 +47,7 @@ import '../services/image_picker_service.dart' as _i644;
 import '../services/notification_service.dart' as _i941;
 import '../services/remote_config_service.dart' as _i858;
 import '../services/storage_service.dart' as _i306;
+import '../theme/theme_cubit.dart' as _i611;
 
 extension GetItInjectableX on _i174.GetIt {
 // initializes the registration of main-scope dependencies inside of GetIt
@@ -82,6 +83,8 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i314.HomeLocalDataSourceImpl(gh<_i1047.HiveService>()));
     gh.lazySingleton<_i992.AuthLocalDataSource>(
         () => _i992.AuthLocalDataSourceImpl(gh<_i1047.HiveService>()));
+    gh.lazySingleton<_i611.ThemeCubit>(
+        () => _i611.ThemeCubit(gh<_i1047.HiveService>()));
     gh.lazySingleton<_i161.AuthRemoteDataSource>(
         () => _i161.AuthRemoteDataSourceImpl(
               gh<_i1047.HiveService>(),

@@ -34,7 +34,7 @@ class AppButton extends StatelessWidget {
     final Widget labelWidget = isLoading
         ? AppLoadingIndicator(
             size: 20,
-            color: isSecondary ? context.colorScheme.primary : Colors.white,
+            color: isSecondary ? context.colorScheme.primary : context.colorScheme.onPrimary,
           )
         : Row(
             mainAxisSize: MainAxisSize.min,

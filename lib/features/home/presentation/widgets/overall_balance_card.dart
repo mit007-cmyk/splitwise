@@ -19,23 +19,25 @@ class OverallBalanceCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = context.theme;
 
+    final colors = context.appColors;
+
     final Color amountColor;
     final String prefixLabel;
     final String amountText;
 
     switch (balance.type) {
       case BalanceType.owed:
-        amountColor = const Color(0xFF26E09C);
+        amountColor = colors.positiveBalanceColor;
         prefixLabel = 'Overall, you are owed ';
         amountText = '₹${balance.amount.toStringAsFixed(2)}';
         break;
       case BalanceType.owe:
-        amountColor = const Color(0xFFDD6B20);
+        amountColor = colors.negativeBalanceColor;
         prefixLabel = 'Overall, you owe ';
         amountText = '₹${balance.amount.toStringAsFixed(2)}';
         break;
       case BalanceType.settled:
-        amountColor = theme.colorScheme.onSurfaceVariant;
+        amountColor = colors.settledBalanceColor;
         prefixLabel = "You're all settled up";
         amountText = '';
         break;

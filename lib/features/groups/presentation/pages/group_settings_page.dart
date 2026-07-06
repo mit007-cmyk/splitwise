@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/di.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/context_extension.dart';
 import '../../../../core/widgets/app_switch.dart';
 import '../../../auth/data/models/user_model.dart';
@@ -47,27 +48,12 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
   }
 
   Color _getGroupColor(String name) {
-    final colors = [
-      const Color(0xFF0F766E), // teal
-      const Color(0xFF1E3A8A), // deep blue
-      const Color(0xFF065F46), // deep green
-      const Color(0xFF9D174D), // pink
-      const Color(0xFF374151), // slate grey
-    ];
-    final index = name.length % colors.length;
-    return colors[index];
+    final index = name.length % AppColors.avatarPlaceholders.length;
+    return AppColors.avatarPlaceholders[index];
   }
 
-  Widget _buildUserAvatar(String name) {
-    final colors = [
-      const Color(0xFF0F766E),
-      const Color(0xFF1E3A8A),
-      const Color(0xFF065F46),
-      const Color(0xFF9D174D),
-      const Color(0xFF374151),
-    ];
-    final index = name.length % colors.length;
-    final color = colors[index];
+  Widget _buildUserAvatar(BuildContext context, String name) {
+    final color = _getGroupColor(name);
     final initial = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'U';
 
     return CircleAvatar(
@@ -75,8 +61,8 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
       backgroundColor: color,
       child: Text(
         initial,
-        style: const TextStyle(
-          color: Colors.white,
+        style: TextStyle(
+          color: context.appColors.onImageColor,
           fontWeight: FontWeight.bold,
         ),
       ),
@@ -134,9 +120,9 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
                           color: _getGroupColor(group.groupName),
                           borderRadius: BorderRadius.circular(8.r),
                         ),
-                        child: const Icon(
+                        child: Icon(
                           Icons.list_alt_rounded,
-                          color: Colors.white,
+                          color: context.appColors.onImageColor,
                           size: 32,
                         ),
                       ),
@@ -232,7 +218,7 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
                     final displayName = isMe ? '${user.name} (you)' : user.name;
 
                     return ListTile(
-                      leading: _buildUserAvatar(user.name),
+                      leading: _buildUserAvatar(context, user.name),
                       title: Text(
                         displayName,
                         style: context.textTheme.titleMedium?.copyWith(
@@ -360,11 +346,11 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
                 ),
 
                 ListTile(
-                  leading: const Icon(Icons.logout_rounded, color: Colors.redAccent),
-                  title: const Text(
+                  leading: Icon(Icons.logout_rounded, color: theme.colorScheme.error),
+                  title: Text(
                     'Leave group',
                     style: TextStyle(
-                      color: Colors.redAccent,
+                      color: theme.colorScheme.error,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -372,22 +358,27 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
                     showDialog(
                       context: context,
                       builder: (dialogContext) => AlertDialog(
-                        backgroundColor: const Color(0xFF2C2C2E),
+                        backgroundColor: theme.colorScheme.surfaceContainerHigh,
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16.r),
                         ),
                         title: Text(
                           'Leave group?',
-                          style: TextStyle(color: Colors.white, fontSize: 18.sp, fontWeight: FontWeight.bold),
+                          style: context.textTheme.titleLarge,
                         ),
                         content: Text(
                           'Are you sure you want to leave this group? This cannot be undone.',
-                          style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 14.sp),
+                          style: context.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
                         ),
                         actions: [
                           TextButton(
                             onPressed: () => Navigator.of(dialogContext).pop(),
-                            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+                            child: Text(
+                              'Cancel',
+                              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+                            ),
                           ),
                           TextButton(
                             onPressed: () {
@@ -398,7 +389,13 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
                               );
                               context.go('/home/groups');
                             },
-                            child: const Text('Leave', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                            child: Text(
+                              'Leave',
+                              style: TextStyle(
+                                color: theme.colorScheme.error,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
                           ),
                         ],
                       ),

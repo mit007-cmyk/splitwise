@@ -10,7 +10,7 @@ import '../bloc/email_settings_cubit.dart';
 class EmailSettingsPage extends StatelessWidget {
   const EmailSettingsPage({super.key});
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildSectionHeader(BuildContext context, String title) {
     return Padding(
       padding: EdgeInsets.only(top: 24.h, bottom: 8.h, left: 16.w, right: 16.w),
       child: Text(
@@ -18,7 +18,7 @@ class EmailSettingsPage extends StatelessWidget {
         style: TextStyle(
           fontSize: 12.sp,
           fontWeight: FontWeight.bold,
-          color: Colors.grey[600],
+          color: context.colorScheme.onSurfaceVariant,
           letterSpacing: 1.0,
         ),
       ),
@@ -35,7 +35,7 @@ class EmailSettingsPage extends StatelessWidget {
           color: context.theme.colorScheme.onSurface,
         ),
       ),
-      activeColor: Colors.blue[600],
+      activeColor: context.colorScheme.primary,
       controlAffinity: ListTileControlAffinity.trailing,
       onChanged: (val) {
         if (val != null) {
@@ -94,18 +94,18 @@ class EmailSettingsPage extends StatelessWidget {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
-                                _buildSectionHeader('Groups and Friends'),
+                                _buildSectionHeader(context, 'Groups and Friends'),
                                 _buildSettingRow(context, cubit, state.settings, 'addsMeToGroup', 'When someone adds me to a group'),
                                 _buildSettingRow(context, cubit, state.settings, 'addsMeAsFriend', 'When someone adds me as a friend'),
                                 
-                                _buildSectionHeader('Expenses'),
+                                _buildSectionHeader(context, 'Expenses'),
                                 _buildSettingRow(context, cubit, state.settings, 'expenseAdded', 'When an expense is added'),
                                 _buildSettingRow(context, cubit, state.settings, 'expenseEditedDeleted', 'When an expense is edited/deleted'),
                                 _buildSettingRow(context, cubit, state.settings, 'expenseCommented', 'When someone comments on an expense'),
                                 _buildSettingRow(context, cubit, state.settings, 'expenseDue', 'When an expense is due'),
                                 _buildSettingRow(context, cubit, state.settings, 'paysMe', 'When someone pays me'),
                                 
-                                _buildSectionHeader('News and Updates'),
+                                _buildSectionHeader(context, 'News and Updates'),
                                 _buildSettingRow(context, cubit, state.settings, 'monthlyActivitySummary', 'Monthly summary of my activity'),
                                 _buildSettingRow(context, cubit, state.settings, 'majorNewsUpdates', 'Major Splitwise news and updates'),
                                 SizedBox(height: 24.h),
@@ -118,15 +118,7 @@ class EmailSettingsPage extends StatelessWidget {
                           child: SizedBox(
                             width: double.infinity,
                             child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFFE55C35), // brand orange
-                                foregroundColor: Colors.white,
-                                padding: EdgeInsets.symmetric(vertical: 14.h),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(8.r),
-                                ),
-                                elevation: 0,
-                              ),
+                              style: theme.elevatedButtonTheme.style,
                               onPressed: () => cubit.saveSettings(userId),
                               child: Text(
                                 'Save changes',

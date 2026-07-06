@@ -85,7 +85,7 @@ class SecurityPage extends StatelessWidget {
                                       'Require device passcode or biometrics to open Splitwise',
                                       style: TextStyle(
                                         fontSize: 12.sp,
-                                        color: Colors.grey[500],
+                                        color: theme.colorScheme.onSurfaceVariant,
                                       ),
                                     ),
                                   ],
@@ -129,7 +129,7 @@ class SecurityPage extends StatelessWidget {
                                       'Authentication will not be required if Splitwise is reopened before the timeout expires.',
                                       style: TextStyle(
                                         fontSize: 12.sp,
-                                        color: Colors.grey[500],
+                                        color: theme.colorScheme.onSurfaceVariant,
                                       ),
                                     ),
                                   ],
@@ -166,22 +166,23 @@ class SecurityPage extends StatelessWidget {
                     child: SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFE55C35),
-                          foregroundColor: Colors.white,
-                          padding: EdgeInsets.symmetric(vertical: 14.h),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8.r),
+                        style: theme.elevatedButtonTheme.style?.copyWith(
+                          padding: WidgetStatePropertyAll(
+                            EdgeInsets.symmetric(vertical: 14.h),
                           ),
-                          elevation: 0,
+                          shape: WidgetStatePropertyAll(
+                            RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8.r),
+                            ),
+                          ),
                         ),
                         onPressed: state.isLoading ? null : cubit.saveSettings,
                         child: state.isLoading
-                            ? const SizedBox(
+                            ? SizedBox(
                                 height: 20,
                                 width: 20,
                                 child: CircularProgressIndicator(
-                                  color: Colors.white,
+                                  color: theme.colorScheme.onPrimary,
                                   strokeWidth: 2,
                                 ),
                               )

@@ -78,7 +78,7 @@ class AccountSettingsPage extends StatelessWidget {
             label,
             style: TextStyle(
               fontSize: 12.sp,
-              color: Colors.grey[600],
+              color: context.colorScheme.onSurfaceVariant,
             ),
           ),
           SizedBox(height: 4.h),
@@ -105,13 +105,13 @@ class AccountSettingsPage extends StatelessWidget {
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.edit, size: 14.sp, color: Colors.blue[600]),
+                    Icon(Icons.edit, size: 14.sp, color: context.colorScheme.primary),
                     SizedBox(width: 4.w),
                     Text(
                       'Edit',
                       style: TextStyle(
                         fontSize: 14.sp,
-                        color: Colors.blue[600],
+                        color: context.colorScheme.primary,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -141,7 +141,7 @@ class AccountSettingsPage extends StatelessWidget {
             label,
           style: TextStyle(
               fontSize: 12.sp,
-              color: Colors.grey[600],
+              color: context.colorScheme.onSurfaceVariant,
             ),
           ),
           DropdownButton<T>(
@@ -149,7 +149,7 @@ class AccountSettingsPage extends StatelessWidget {
             isExpanded: true,
             underline: Container(
               height: 1,
-              color: Colors.grey[300],
+              color: context.colorScheme.outline,
             ),
             items: items.map((T item) {
               return DropdownMenuItem<T>(
@@ -271,9 +271,9 @@ class AccountSettingsPage extends StatelessWidget {
                                     ),
                                     subtitle: Text(
                                       'Splitwise will only recommend you to users who already have your email address or phone number in their phone\'s contact book',
-                                      style: TextStyle(fontSize: 12.sp, color: Colors.grey[600]),
+                                      style: TextStyle(fontSize: 12.sp, color: theme.colorScheme.onSurfaceVariant),
                                     ),
-                                    activeColor: Colors.blue[600],
+                                    activeColor: theme.colorScheme.primary,
                                     controlAffinity: ListTileControlAffinity.leading,
                                     onChanged: (val) => cubit.updateAllowSuggest(val ?? state.allowSuggest),
                                   ),
@@ -284,14 +284,15 @@ class AccountSettingsPage extends StatelessWidget {
                                   child: SizedBox(
                                     width: double.infinity,
                                     child: ElevatedButton(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFFE55C35), // Brand orange
-                                        foregroundColor: Colors.white,
-                                        padding: EdgeInsets.symmetric(vertical: 12.h),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8.r),
+                                      style: theme.elevatedButtonTheme.style?.copyWith(
+                                        padding: WidgetStatePropertyAll(
+                                          EdgeInsets.symmetric(vertical: 12.h),
                                         ),
-                                        elevation: 0,
+                                        shape: WidgetStatePropertyAll(
+                                          RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(8.r),
+                                          ),
+                                        ),
                                       ),
                                       onPressed: () => cubit.saveChanges(userId),
                                       child: Text(
@@ -319,7 +320,7 @@ class AccountSettingsPage extends StatelessWidget {
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      Text('Block other users', style: TextStyle(fontSize: 12.sp, color: Colors.grey[600])),
+                                      Text('Block other users', style: TextStyle(fontSize: 12.sp, color: theme.colorScheme.onSurfaceVariant)),
                                       SizedBox(height: 4.h),
                                       OutlinedButton(
                                         onPressed: () {
@@ -330,7 +331,7 @@ class AccountSettingsPage extends StatelessWidget {
                                         child: const Text('Manage your blocklist'),
                                       ),
                                       SizedBox(height: 16.h),
-                                      Text('Log out on all devices', style: TextStyle(fontSize: 12.sp, color: Colors.grey[600])),
+                                      Text('Log out on all devices', style: TextStyle(fontSize: 12.sp, color: theme.colorScheme.onSurfaceVariant)),
                                       SizedBox(height: 4.h),
                                       OutlinedButton(
                                         onPressed: () {

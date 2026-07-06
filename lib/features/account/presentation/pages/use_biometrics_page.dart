@@ -62,7 +62,7 @@ class UseBiometricsPage extends StatelessWidget {
                       child: Icon(
                         Icons.fingerprint_rounded,
                         size: 96.sp,
-                        color: const Color(0xFF1CC29F), // Teal brand tone
+                        color: theme.colorScheme.primary,
                       ),
                     ),
                     SizedBox(height: 32.h),
@@ -84,7 +84,7 @@ class UseBiometricsPage extends StatelessWidget {
                       'Turn on biometrics to add an extra layer of security when opening Splitwise.',
                       style: TextStyle(
                         fontSize: 14.sp,
-                        color: Colors.grey[500],
+                        color: theme.colorScheme.onSurfaceVariant,
                         height: 1.4,
                       ),
                       textAlign: TextAlign.center,
@@ -93,23 +93,27 @@ class UseBiometricsPage extends StatelessWidget {
 
                     // Yes, turn on button
                     ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1CC29F), // Primary teal
-                        foregroundColor: Colors.white,
-                        padding: EdgeInsets.symmetric(vertical: 14.h),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8.r),
+                      style: theme.elevatedButtonTheme.style?.copyWith(
+                        padding: WidgetStatePropertyAll(
+                          EdgeInsets.symmetric(vertical: 14.h),
                         ),
-                        elevation: 0,
+                        shape: WidgetStatePropertyAll(
+                          RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8.r),
+                          ),
+                        ),
                       ),
                       onPressed: state.isAuthenticating
                           ? null
                           : () => cubit.enableBiometrics(localAuth),
                       child: state.isAuthenticating
-                          ? const SizedBox(
+                          ? SizedBox(
                               height: 20,
                               width: 20,
-                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                              child: CircularProgressIndicator(
+                                color: theme.colorScheme.onPrimary,
+                                strokeWidth: 2,
+                              ),
                             )
                           : Text(
                               'Yes, turn on biometrics',
@@ -131,7 +135,7 @@ class UseBiometricsPage extends StatelessWidget {
                         'No thanks',
                         style: TextStyle(
                           fontSize: 16.sp,
-                          color: const Color(0xFF1CC29F),
+                          color: theme.colorScheme.primary,
                           fontWeight: FontWeight.bold,
                         ),
                       ),

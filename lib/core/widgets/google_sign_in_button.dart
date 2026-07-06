@@ -18,14 +18,15 @@ class GoogleSignInButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = context.theme.brightness == Brightness.dark;
     final isUnderTest = Platform.environment.containsKey('FLUTTER_TEST');
+    final colors = context.appColors;
+    final scheme = context.colorScheme;
 
-    // Outlined frosted visual structure matching Google styling guidelines
-    final Color buttonBg = isDark
-        ? Colors.white.withOpacity(0.06)
-        : Colors.white.withOpacity(0.5);
+    final Color buttonBg = colors.glassSurface.withValues(
+      alpha: isDark ? 0.06 : 0.5,
+    );
 
     final BorderSide borderSide = BorderSide(
-      color: isDark ? Colors.white.withOpacity(0.12) : Colors.black.withOpacity(0.12),
+      color: colors.overlayColor.withValues(alpha: 0.12),
       width: 1.0,
     );
 
@@ -35,7 +36,7 @@ class GoogleSignInButton extends StatelessWidget {
       child: OutlinedButton(
         style: OutlinedButton.styleFrom(
           backgroundColor: buttonBg,
-          foregroundColor: context.colorScheme.onSurface,
+          foregroundColor: scheme.onSurface,
           side: borderSide,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
@@ -53,7 +54,7 @@ class GoogleSignInButton extends StatelessWidget {
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   valueColor: AlwaysStoppedAnimation<Color>(
-                    isDark ? Colors.white70 : Colors.black54,
+                    isDark ? colors.onImageColor.withValues(alpha: 0.7) : scheme.onSurface.withValues(alpha: 0.54),
                   ),
                 ),
               )

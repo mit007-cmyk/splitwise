@@ -9,6 +9,7 @@ class AppConstants {
   static const String hiveSettingsBox = 'settings_box';
   static const String hiveCacheBox = 'cache_box';
   static const String hiveThemeBox = 'theme_box';
+  static const String hiveThemeModeKey = 'theme_mode';
   static const String hivePendingSyncBox = 'pending_sync_box';
 
   // Remote Config Keys

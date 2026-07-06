@@ -53,4 +53,7 @@ class RouteConstants {
 
   static const String useBiometricsPath = '/account/security/use-biometrics';
   static const String useBiometricsName = 'use-biometrics';
+
+  static const String appearancePath = '/account/appearance';
+  static const String appearanceName = 'account-appearance';
 }

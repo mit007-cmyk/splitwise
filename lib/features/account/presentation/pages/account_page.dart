@@ -26,7 +26,7 @@ class AccountPage extends StatelessWidget {
     }
   }
 
-  Widget _buildSectionHeader(String title) {
+  Widget _buildSectionHeader(BuildContext context, String title) {
     return Padding(
       padding: EdgeInsets.only(top: 24.h, bottom: 8.h, left: 16.w, right: 16.w),
       child: Text(
@@ -34,13 +34,14 @@ class AccountPage extends StatelessWidget {
         style: TextStyle(
           fontSize: 14.sp,
           fontWeight: FontWeight.bold,
-          color: Colors.grey[500],
+          color: context.colorScheme.onSurfaceVariant,
         ),
       ),
     );
   }
 
-  Widget _buildMenuItem({
+  Widget _buildMenuItem(
+    BuildContext context, {
     required IconData icon,
     required String title,
     required VoidCallback onTap,
@@ -48,16 +49,18 @@ class AccountPage extends StatelessWidget {
     Color? textColor,
     Widget? trailing,
   }) {
+    final scheme = context.colorScheme;
     return ListTile(
-      leading: Icon(icon, color: iconColor ?? Colors.grey[600], size: 24.sp),
+      leading: Icon(icon, color: iconColor ?? scheme.onSurfaceVariant, size: 24.sp),
       title: Text(
         title,
         style: TextStyle(
           fontSize: 16.sp,
-          color: textColor,
+          color: textColor ?? scheme.onSurface,
         ),
       ),
-      trailing: trailing ?? Icon(Icons.chevron_right, color: Colors.grey[400], size: 20.sp),
+      trailing: trailing ??
+          Icon(Icons.chevron_right, color: context.appColors.hintTextColor, size: 20.sp),
       onTap: onTap,
     );
   }
@@ -126,9 +129,9 @@ class AccountPage extends StatelessWidget {
                                 decoration: BoxDecoration(
                                   color: theme.colorScheme.surface,
                                   shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.grey[300]!, width: 1),
+                                  border: Border.all(color: theme.colorScheme.outline, width: 1),
                                 ),
-                                child: Icon(Icons.camera_alt, size: 14.sp, color: Colors.grey[600]),
+                                child: Icon(Icons.camera_alt, size: 14.sp, color: theme.colorScheme.onSurfaceVariant),
                               ),
                             ),
                           ],
@@ -151,7 +154,7 @@ class AccountPage extends StatelessWidget {
                                 email,
                                 style: TextStyle(
                                   fontSize: 14.sp,
-                                  color: Colors.grey[500],
+                                  color: theme.colorScheme.onSurfaceVariant,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -176,40 +179,47 @@ class AccountPage extends StatelessWidget {
 
                   // Menu lists
                   _buildMenuItem(
+                    context,
                     icon: Icons.qr_code_scanner,
                     title: 'Scan code',
                     onTap: () {},
                   ),
 
-                  _buildSectionHeader('Preferences'),
+                  _buildSectionHeader(context, 'Preferences'),
                   _buildMenuItem(
+                    context,
                     icon: Icons.mail_outline,
                     title: 'Email settings',
                     onTap: () => context.push(RouteConstants.emailSettingsPath),
                   ),
                   _buildMenuItem(
+                    context,
                     icon: Icons.notifications_none,
                     title: 'Device and push notification settings',
                     onTap: () => _openNotificationSettings(context),
                   ),
                   _buildMenuItem(
+                    context,
                     icon: Icons.lock_outline,
                     title: 'Security',
                     onTap: () => context.push(RouteConstants.accountSecurityPath),
                   ),
                   _buildMenuItem(
+                    context,
                     icon: Icons.palette_outlined,
                     title: 'Appearance',
-                    onTap: () {},
+                    onTap: () => context.push(RouteConstants.appearancePath),
                   ),
 
-                  _buildSectionHeader('Feedback'),
+                  _buildSectionHeader(context, 'Feedback'),
                   _buildMenuItem(
+                    context,
                     icon: Icons.star_outline,
                     title: 'Rate Splitwise',
                     onTap: () {},
                   ),
                   _buildMenuItem(
+                    context,
                     icon: Icons.help_outline,
                     title: 'Contact Splitwise support',
                     onTap: () {},
@@ -217,10 +227,11 @@ class AccountPage extends StatelessWidget {
 
                   SizedBox(height: 16.h),
                   _buildMenuItem(
+                    context,
                     icon: Icons.exit_to_app,
                     title: 'Log out',
-                    iconColor: const Color(0xFF1CC29F), // Primary-teal brand tone
-                    textColor: const Color(0xFF1CC29F),
+                    iconColor: theme.colorScheme.primary,
+                    textColor: theme.colorScheme.primary,
                     trailing: const SizedBox.shrink(),
                     onTap: () {
                       context.read<AuthBloc>().add(const LogoutRequested());
@@ -235,13 +246,13 @@ class AccountPage extends StatelessWidget {
                       children: [
                         Text(
                           'Made with ✨ in Providence, RI, USA',
-                          style: TextStyle(fontSize: 12.sp, color: Colors.grey[500]),
+                          style: TextStyle(fontSize: 12.sp, color: theme.colorScheme.onSurfaceVariant),
                           textAlign: TextAlign.center,
                         ),
                         SizedBox(height: 4.h),
                         Text(
                           'Copyright © 2026 Splitwise, Inc.',
-                          style: TextStyle(fontSize: 12.sp, color: Colors.grey[500]),
+                          style: TextStyle(fontSize: 12.sp, color: theme.colorScheme.onSurfaceVariant),
                           textAlign: TextAlign.center,
                         ),
                         SizedBox(height: 2.h),
@@ -250,13 +261,13 @@ class AccountPage extends StatelessWidget {
                           children: [
                             Text(
                               'P.S. ',
-                              style: TextStyle(fontSize: 12.sp, color: Colors.grey[500]),
+                              style: TextStyle(fontSize: 12.sp, color: theme.colorScheme.onSurfaceVariant),
                             ),
                             Text(
                               'Bunnies!',
                               style: TextStyle(
                                 fontSize: 12.sp,
-                                color: const Color(0xFF1CC29F),
+                                color: theme.colorScheme.primary,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -267,7 +278,7 @@ class AccountPage extends StatelessWidget {
                           'Privacy Policy',
                           style: TextStyle(
                             fontSize: 12.sp,
-                            color: Colors.grey[500],
+                            color: theme.colorScheme.onSurfaceVariant,
                             decoration: TextDecoration.underline,
                           ),
                           textAlign: TextAlign.center,
@@ -275,7 +286,7 @@ class AccountPage extends StatelessWidget {
                         SizedBox(height: 12.h),
                         Text(
                           'v26.6.3/945',
-                          style: TextStyle(fontSize: 12.sp, color: Colors.grey[400]),
+                          style: TextStyle(fontSize: 12.sp, color: context.appColors.hintTextColor),
                           textAlign: TextAlign.center,
                         ),
                       ],

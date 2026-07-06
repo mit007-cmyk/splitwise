@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_colors.dart';
 import '../utils/context_extension.dart';
 
 class AppLoadingIndicator extends StatelessWidget {
@@ -46,7 +47,7 @@ class AppLoadingOverlay extends StatelessWidget {
         if (isLoading) ...[
           const ModalBarrier(
             dismissible: false,
-            color: Colors.black45,
+            color: AppColors.scrim,
           ),
           Center(
             child: Card(

@@ -5,7 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/di.dart';
 import '../../../../core/utils/context_extension.dart';
-import '../../../../core/constants/app_constants.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../auth/data/models/user_model.dart';
 import 'package:splitwise/features/home/domain/entities/group_summary.dart';
 import 'package:splitwise/features/home/domain/repositories/home_repository.dart';
@@ -57,13 +57,7 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
       );
     }
 
-    final colors = [
-      const Color(0xFF0F766E), // teal
-      const Color(0xFF1E3A8A), // deep blue
-      const Color(0xFF065F46), // deep green
-      const Color(0xFF9D174D), // pink
-      const Color(0xFF374151), // slate grey
-    ];
+    final colors = AppColors.avatarPlaceholders;
     final index = user.name.length % colors.length;
     final color = colors[index];
     final initial = user.name.isNotEmpty ? user.name.substring(0, 1).toUpperCase() : 'U';
@@ -74,7 +68,7 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
       child: Text(
         initial,
         style: TextStyle(
-          color: Colors.white,
+          color: context.appColors.onImageColor,
           fontWeight: FontWeight.bold,
           fontSize: (radius * 0.75).sp,
         ),
@@ -84,9 +78,9 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
 
   Widget? _buildTrailingIcon(BuildContext context, UserModel user, AddGroupMembersState state) {
     if (state.existingMemberIds.contains(user.id)) {
-      return const Icon(
+      return Icon(
         Icons.check,
-        color: Colors.grey,
+        color: context.appColors.hintTextColor,
       );
     }
 
@@ -135,11 +129,11 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
                             onTap: () => cubit.deselectUser(user.id),
                             child: CircleAvatar(
                               radius: 8.r,
-                              backgroundColor: Colors.grey[700],
+                              backgroundColor: context.colorScheme.onSurfaceVariant,
                               child: Icon(
                                 Icons.close,
                                 size: 10.r,
-                                color: Colors.white,
+                                color: context.appColors.onImageColor,
                               ),
                             ),
                           ),
@@ -351,8 +345,8 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
                         ? theme.colorScheme.onSurface.withOpacity(0.08)
                         : theme.colorScheme.primary,
                     foregroundColor: state.selectedUsers.isEmpty
-                        ? theme.colorScheme.onSurfaceVariant.withOpacity(0.4)
-                        : Colors.white,
+                        ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4)
+                        : theme.colorScheme.onPrimary,
                     minimumSize: Size(double.infinity, 48.h),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(24.r),

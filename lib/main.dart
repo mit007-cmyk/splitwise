@@ -9,6 +9,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import 'core/di/di.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/theme_cubit.dart';
 import 'core/routing/app_router.dart';
 import 'core/localization/app_localizations.dart';
 import 'core/errors/global_bloc_observer.dart';
@@ -98,37 +99,46 @@ class MyApp extends StatelessWidget {
         BlocProvider<HomeBloc>(
           create: (context) => getIt<HomeBloc>()..add(const LoadHome()),
         ),
+        BlocProvider<ThemeCubit>(
+          create: (context) => getIt<ThemeCubit>(),
+        ),
       ],
       child: ScreenUtilInit(
         designSize: const Size(375, 812),
         minTextAdapt: true,
         splitScreenMode: true,
         builder: (context, child) {
-          return MaterialApp.router(
-            title: 'Splitwise',
-            debugShowCheckedModeBanner: false,
+          return BlocBuilder<ThemeCubit, ThemeMode>(
+            builder: (context, themeMode) {
+              return MaterialApp.router(
+                title: 'Splitwise',
+                debugShowCheckedModeBanner: false,
 
-            // Theme settings
-            themeMode: ThemeMode.system,
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
+                // Theme settings
+                themeMode: themeMode,
+                theme: AppTheme.lightTheme,
+                darkTheme: AppTheme.darkTheme,
 
-            // Routing configuration
-            routerConfig: AppRouter.router,
+                // Routing configuration
+                routerConfig: AppRouter.router,
 
-            // Localization config
-            supportedLocales: const [
-              Locale('en'),
-              Locale('es'),
-            ],
-            localizationsDelegates: const [
-              AppLocalizations.delegate,
-              GlobalMaterialLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
-            ],
-            builder: (context, child) {
-              return BiometricLockGate(child: child ?? const SizedBox.shrink());
+                // Localization config
+                supportedLocales: const [
+                  Locale('en'),
+                  Locale('es'),
+                ],
+                localizationsDelegates: const [
+                  AppLocalizations.delegate,
+                  GlobalMaterialLocalizations.delegate,
+                  GlobalWidgetsLocalizations.delegate,
+                  GlobalCupertinoLocalizations.delegate,
+                ],
+                builder: (context, child) {
+                  return BiometricLockGate(
+                    child: child ?? const SizedBox.shrink(),
+                  );
+                },
+              );
             },
           );
         },

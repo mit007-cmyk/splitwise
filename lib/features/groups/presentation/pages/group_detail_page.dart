@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/context_extension.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_bloc.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_state.dart';
@@ -14,12 +15,22 @@ class GroupDetailPage extends StatelessWidget {
     required this.groupId,
   });
 
+  Color _heroColor(String name) {
+    return AppColors.avatarPlaceholders[
+        name.length % AppColors.avatarPlaceholders.length];
+  }
+
+  Color _heroColorDark(String name) {
+    return Color.lerp(_heroColor(name), AppColors.shadow, 0.35)!;
+  }
+
   void _showAddExpenseDialog(BuildContext context, String groupId) {
+    final theme = context.theme;
     showDialog(
       context: context,
       builder: (dialogContext) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF2C2C2E),
+          backgroundColor: theme.colorScheme.surfaceContainerHigh,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16.r),
           ),
@@ -32,7 +43,7 @@ class GroupDetailPage extends StatelessWidget {
                 'You are the only person in this group.',
                 style: context.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: theme.colorScheme.onSurface,
                 ),
                 textAlign: TextAlign.center,
               ),
@@ -40,21 +51,14 @@ class GroupDetailPage extends StatelessWidget {
               Text(
                 'Do you need to add anyone to your group before you start adding expenses?',
                 style: context.textTheme.bodyMedium?.copyWith(
-                  color: Colors.white.withOpacity(0.7),
+                  color: theme.colorScheme.onSurfaceVariant,
                   height: 1.4,
                 ),
                 textAlign: TextAlign.center,
               ),
               SizedBox(height: 24.h),
               ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF15B77E),
-                  foregroundColor: Colors.white,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8.r),
-                  ),
-                ),
+                style: theme.elevatedButtonTheme.style,
                 onPressed: () {
                   Navigator.of(dialogContext).pop();
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -75,7 +79,7 @@ class GroupDetailPage extends StatelessWidget {
                 child: Text(
                   'Add group members',
                   style: TextStyle(
-                    color: const Color(0xFF15B77E),
+                    color: theme.colorScheme.primary,
                     fontWeight: FontWeight.bold,
                     fontSize: 15.sp,
                   ),
@@ -88,24 +92,28 @@ class GroupDetailPage extends StatelessWidget {
     );
   }
 
-  Widget _buildActionPill(String label, {IconData? icon}) {
+  Widget _buildActionPill(BuildContext context, String label, {IconData? icon}) {
+    final scheme = context.colorScheme;
     return Container(
       margin: EdgeInsets.only(right: 8.w),
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.white24),
+        border: Border.all(color: scheme.outline),
         borderRadius: BorderRadius.circular(20.r),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 16.r, color: Colors.purpleAccent),
+            Icon(icon, size: 16.r, color: scheme.secondary),
             SizedBox(width: 6.w),
           ],
           Text(
             label,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w500),
+            style: context.textTheme.bodyMedium?.copyWith(
+              color: scheme.onSurface,
+              fontWeight: FontWeight.w500,
+            ),
           ),
         ],
       ),
@@ -126,7 +134,9 @@ class GroupDetailPage extends StatelessWidget {
             );
           }
           final group = state.summary.groups[groupIndex];
-          
+          final colors = context.appColors;
+          final heroColor = _heroColor(group.groupName);
+          final heroColorDark = _heroColorDark(group.groupName);
           final memberCount = group.memberIds.length;
           final isSingleMember = memberCount <= 1;
 
@@ -137,14 +147,14 @@ class GroupDetailPage extends StatelessWidget {
                   SliverAppBar(
                     pinned: true,
                     expandedHeight: 180.h,
-                    backgroundColor: const Color(0xFF8B4513),
+                    backgroundColor: heroColor,
                     elevation: 0,
                     leading: Padding(
                       padding: EdgeInsets.only(left: 8.w, top: 4.h, bottom: 4.h),
                       child: IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.white),
+                        icon: Icon(Icons.arrow_back, color: colors.onImageColor),
                         style: IconButton.styleFrom(
-                          backgroundColor: Colors.black.withOpacity(0.3),
+                          backgroundColor: colors.overlayColor.withValues(alpha: 0.3),
                           shape: const CircleBorder(),
                         ),
                         onPressed: () => context.pop(),
@@ -154,9 +164,9 @@ class GroupDetailPage extends StatelessWidget {
                       Padding(
                         padding: EdgeInsets.only(right: 8.w, top: 4.h, bottom: 4.h),
                         child: IconButton(
-                          icon: const Icon(Icons.settings_outlined, color: Colors.white),
+                          icon: Icon(Icons.settings_outlined, color: colors.onImageColor),
                           style: IconButton.styleFrom(
-                            backgroundColor: Colors.black.withOpacity(0.3),
+                            backgroundColor: colors.overlayColor.withValues(alpha: 0.3),
                             shape: const CircleBorder(),
                           ),
                           onPressed: () => context.push('/group-detail/$groupId/settings'),
@@ -166,14 +176,11 @@ class GroupDetailPage extends StatelessWidget {
                     flexibleSpace: FlexibleSpaceBar(
                       collapseMode: CollapseMode.pin,
                       background: Container(
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           gradient: LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
-                            colors: [
-                              Color(0xFF8B4513),
-                              Color(0xFF5C2D0C),
-                            ],
+                            colors: [heroColor, heroColorDark],
                           ),
                         ),
                         padding: EdgeInsets.only(left: 16.w, right: 16.w, bottom: 16.h),
@@ -184,7 +191,7 @@ class GroupDetailPage extends StatelessWidget {
                             Text(
                               group.groupName,
                               style: context.textTheme.headlineMedium?.copyWith(
-                                color: Colors.white,
+                                color: colors.onImageColor,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -195,7 +202,7 @@ class GroupDetailPage extends StatelessWidget {
                                 child: Container(
                                   padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 6.h),
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.2),
+                                    color: colors.overlayColor.withValues(alpha: 0.2),
                                     borderRadius: BorderRadius.circular(20.r),
                                   ),
                                   child: Row(
@@ -204,13 +211,13 @@ class GroupDetailPage extends StatelessWidget {
                                       Icon(
                                         Icons.people_outline_rounded,
                                         size: 16.r,
-                                        color: Colors.white.withOpacity(0.9),
+                                        color: colors.onImageColor.withValues(alpha: 0.9),
                                       ),
                                       SizedBox(width: 6.w),
                                       Text(
                                         '$memberCount people +',
                                         style: TextStyle(
-                                          color: Colors.white.withOpacity(0.9),
+                                          color: colors.onImageColor.withValues(alpha: 0.9),
                                           fontSize: 12.sp,
                                           fontWeight: FontWeight.w600,
                                         ),
@@ -233,8 +240,8 @@ class GroupDetailPage extends StatelessWidget {
                             opacity: isCollapsed ? 1.0 : 0.0,
                             child: Text(
                               group.groupName,
-                              style: const TextStyle(
-                                color: Colors.white,
+                              style: TextStyle(
+                                color: colors.onImageColor,
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -258,10 +265,10 @@ class GroupDetailPage extends StatelessWidget {
                         scrollDirection: Axis.horizontal,
                         child: Row(
                           children: [
-                            _buildActionPill('Settle up'),
-                            _buildActionPill('Charts', icon: Icons.diamond_rounded),
-                            _buildActionPill('Balances'),
-                            _buildActionPill('Totals'),
+                            _buildActionPill(context, 'Settle up'),
+                            _buildActionPill(context, 'Charts', icon: Icons.diamond_rounded),
+                            _buildActionPill(context, 'Balances'),
+                            _buildActionPill(context, 'Totals'),
                           ],
                         ),
                       ),
@@ -276,7 +283,7 @@ class GroupDetailPage extends StatelessWidget {
                             Container(
                               padding: EdgeInsets.symmetric(vertical: 24.h, horizontal: 20.w),
                               decoration: BoxDecoration(
-                                color: const Color(0xFF2C2C2E),
+                                color: colors.elevatedSurface,
                                 borderRadius: BorderRadius.circular(16.r),
                               ),
                               child: Column(
@@ -284,7 +291,7 @@ class GroupDetailPage extends StatelessWidget {
                                   Text(
                                     "You're the only one here!",
                                     style: context.textTheme.titleMedium?.copyWith(
-                                      color: Colors.white,
+                                      color: colors.onImageColor,
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -292,14 +299,15 @@ class GroupDetailPage extends StatelessWidget {
                                   SizedBox(
                                     width: double.infinity,
                                     child: ElevatedButton.icon(
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: const Color(0xFF15B77E),
-                                        foregroundColor: Colors.white,
-                                        elevation: 0,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(24.r),
+                                      style: theme.elevatedButtonTheme.style?.copyWith(
+                                        shape: WidgetStatePropertyAll(
+                                          RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(24.r),
+                                          ),
                                         ),
-                                        padding: EdgeInsets.symmetric(vertical: 12.h),
+                                        padding: WidgetStatePropertyAll(
+                                          EdgeInsets.symmetric(vertical: 12.h),
+                                        ),
                                       ),
                                       onPressed: () => context.push('/group-detail/$groupId/add-members'),
                                       icon: const Icon(Icons.person_add_outlined),
@@ -311,14 +319,19 @@ class GroupDetailPage extends StatelessWidget {
                                     width: double.infinity,
                                     child: OutlinedButton(
                                       style: OutlinedButton.styleFrom(
-                                        side: const BorderSide(color: Colors.white24),
+                                        side: BorderSide(
+                                          color: colors.onImageColor.withValues(alpha: 0.24),
+                                        ),
                                         shape: RoundedRectangleBorder(
                                           borderRadius: BorderRadius.circular(24.r),
                                         ),
                                         padding: EdgeInsets.symmetric(vertical: 12.h),
                                       ),
                                       onPressed: () {},
-                                      child: const Text('Share group link', style: TextStyle(color: Colors.white)),
+                                      child: Text(
+                                        'Share group link',
+                                        style: TextStyle(color: colors.onImageColor),
+                                      ),
                                     ),
                                   ),
                                 ],
@@ -335,7 +348,7 @@ class GroupDetailPage extends StatelessWidget {
                                     'No expenses here yet.',
                                     style: context.textTheme.titleMedium?.copyWith(
                                       fontWeight: FontWeight.bold,
-                                      color: Colors.white,
+                                      color: theme.colorScheme.onSurface,
                                     ),
                                     textAlign: TextAlign.center,
                                   ),
@@ -343,7 +356,7 @@ class GroupDetailPage extends StatelessWidget {
                                   Text(
                                     'Add an expense to get this party started.',
                                     style: context.textTheme.bodyMedium?.copyWith(
-                                      color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
+                                      color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
                                     ),
                                     textAlign: TextAlign.center,
                                   ),
@@ -353,7 +366,7 @@ class GroupDetailPage extends StatelessWidget {
                                     child: Icon(
                                       Icons.double_arrow_rounded,
                                       size: 80.r,
-                                      color: Colors.pinkAccent.withOpacity(0.5),
+                                      color: theme.colorScheme.secondary.withValues(alpha: 0.5),
                                     ),
                                   ),
                                 ],
@@ -374,21 +387,21 @@ class GroupDetailPage extends StatelessWidget {
                 FloatingActionButton(
                   heroTag: null,
                   elevation: 4,
-                  backgroundColor: const Color(0xFF2C2C2E),
-                  hoverColor: const Color(0xFF3A3A3C),
+                  backgroundColor: colors.elevatedSurface,
+                  hoverColor: colors.elevatedSurfaceHover,
                   onPressed: () {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Receipt scanning coming soon!')),
                     );
                   },
-                  child: const Icon(Icons.photo_camera_outlined, color: Colors.white),
+                  child: Icon(Icons.photo_camera_outlined, color: colors.onImageColor),
                 ),
                 SizedBox(height: 12.h),
                 FloatingActionButton(
                   heroTag: null,
                   elevation: 4,
-                  backgroundColor: const Color(0xFF15B77E),
-                  hoverColor: const Color(0xFF1AD392),
+                  backgroundColor: theme.colorScheme.primary,
+                  hoverColor: AppColors.primaryHoverDark,
                   onPressed: () {
                     if (isSingleMember) {
                       _showAddExpenseDialog(context, groupId);
@@ -398,7 +411,7 @@ class GroupDetailPage extends StatelessWidget {
                       );
                     }
                   },
-                  child: const Icon(Icons.receipt, color: Colors.white),
+                  child: Icon(Icons.receipt, color: theme.colorScheme.onPrimary),
                 ),
               ],
             ),

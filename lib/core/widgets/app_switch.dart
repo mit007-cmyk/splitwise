@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../constants/app_constants.dart';
-import '../theme/app_colors.dart';
 import '../utils/context_extension.dart';
 
 /// Splitwise-style toggle matching Security settings:
@@ -11,16 +10,6 @@ class AppSwitch extends StatelessWidget {
   static const double _height = 31;
   static const double _thumbSize = 27;
   static const double _padding = 2;
-
-  // Dark theme — matches Security screen reference
-  static const Color _onTrackDark = Color(0xFF2A4F47);
-  static const Color _onThumbDark = Color(0xFF1CC29F);
-  static const Color _offTrackDark = Color(0xFF48484A);
-  static const Color _offThumbDark = Color(0xFFFFFFFF);
-
-  // Light theme
-  static const Color _onTrackLight = Color(0xFFB8E6D5);
-  static const Color _offTrackLight = Color(0xFFE9E9EA);
 
   final bool value;
   final ValueChanged<bool>? onChanged;
@@ -33,17 +22,17 @@ class AppSwitch extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = context.theme.brightness == Brightness.dark;
+    final colors = context.appColors;
 
     final Color trackColor;
     final Color thumbColor;
 
     if (value) {
-      trackColor = isDark ? _onTrackDark : _onTrackLight;
-      thumbColor = isDark ? _onThumbDark : AppColors.primaryLight;
+      trackColor = colors.switchOnTrack;
+      thumbColor = colors.switchOnThumb;
     } else {
-      trackColor = isDark ? _offTrackDark : _offTrackLight;
-      thumbColor = isDark ? _offThumbDark : Colors.white;
+      trackColor = colors.switchOffTrack;
+      thumbColor = colors.switchOffThumb;
     }
 
     return Semantics(

@@ -326,7 +326,8 @@ class _HomePageState extends State<HomePage> {
                 heroTag: 'scan_fab',
                 icon: Icons.photo_camera_outlined,
                 label: 'Scan',
-                backgroundColor: const Color(0xFF2C2C2E),
+                backgroundColor: context.appColors.elevatedSurface,
+                foregroundColor: context.appColors.onImageColor,
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Receipt scanning coming soon!')),
@@ -340,6 +341,7 @@ class _HomePageState extends State<HomePage> {
                 icon: Icons.receipt,
                 label: 'Add expense',
                 backgroundColor: theme.colorScheme.primary,
+                foregroundColor: theme.colorScheme.onPrimary,
                 onPressed: () {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Add Expense is coming soon!')),
@@ -359,11 +361,13 @@ class _HomePageState extends State<HomePage> {
     required IconData icon,
     required String label,
     required Color backgroundColor,
+    Color? foregroundColor,
     required VoidCallback onPressed,
   }) {
     final textWidth = label.length * 8.0.w;
     final width = isFabExtended ? (48.0.w + textWidth + 8.w) : 48.0.w;
     const durationTimeInMilliSeconds = 500;
+    final contentColor = foregroundColor ?? context.appColors.onImageColor;
 
     return Hero(
       tag: heroTag,
@@ -386,7 +390,7 @@ class _HomePageState extends State<HomePage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(icon, color: Colors.white, size: 22.0.r),
+                  Icon(icon, color: contentColor, size: 22.0.r),
                   AnimatedContainer(
                     duration: const Duration(
                       milliseconds: durationTimeInMilliSeconds,
@@ -409,7 +413,7 @@ class _HomePageState extends State<HomePage> {
                       child: Text(
                         label,
                         style: TextStyle(
-                          color: Colors.white,
+                          color: contentColor,
                           fontSize: 14.0.sp,
                           fontWeight: FontWeight.bold,
                         ),
