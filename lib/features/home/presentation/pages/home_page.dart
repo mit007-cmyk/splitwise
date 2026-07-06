@@ -337,7 +337,7 @@ class _HomePageState extends State<HomePage> {
               _buildAnimatedFab(
                 isFabExtended: isFabExtended,
                 heroTag: 'add_expense_fab',
-                icon: Icons.receipt_long_rounded,
+                icon: Icons.receipt,
                 label: 'Add expense',
                 backgroundColor: theme.colorScheme.primary,
                 onPressed: () {
@@ -361,7 +361,8 @@ class _HomePageState extends State<HomePage> {
     required Color backgroundColor,
     required VoidCallback onPressed,
   }) {
-    final width = isFabExtended ? 140.0.w : 48.0.w;
+    final textWidth = label.length * 8.0.w;
+    final width = isFabExtended ? (48.0.w + textWidth + 8.w) : 48.0.w;
     const durationTimeInMilliSeconds = 500;
 
     return Hero(
@@ -398,7 +399,7 @@ class _HomePageState extends State<HomePage> {
                       milliseconds: durationTimeInMilliSeconds,
                     ),
                     curve: Curves.easeInOut,
-                    width: isFabExtended ? 80.0.w : 0.0,
+                    width: isFabExtended ? textWidth : 0.0,
                     child: AnimatedOpacity(
                       duration: const Duration(
                         milliseconds: durationTimeInMilliSeconds,
