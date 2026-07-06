@@ -27,7 +27,8 @@ abstract class HomeRepository {
 
   Future<Result<void>> addContact({
     required String name,
-    required String emailOrPhone,
+    String? phone,
+    String? email,
   });
 
   Future<Result<void>> addGroupMembers({

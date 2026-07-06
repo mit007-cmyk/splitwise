@@ -16,6 +16,8 @@ import 'package:splitwise/features/groups/presentation/pages/edit_group_page.dar
 import 'package:splitwise/features/friends/presentation/pages/friends_page.dart';
 import 'package:splitwise/features/activity/presentation/pages/activity_page.dart';
 import 'package:splitwise/features/account/presentation/pages/account_page.dart';
+import 'package:splitwise/features/account/presentation/pages/account_settings_page.dart';
+import 'package:splitwise/features/account/presentation/pages/email_settings_page.dart';
 import 'route_constants.dart';
 import 'placeholder_screens.dart';
 
@@ -183,6 +185,16 @@ class AppRouter {
           final groupId = state.pathParameters['groupId'] ?? '';
           return EditGroupPage(groupId: groupId);
         },
+      ),
+      GoRoute(
+        path: RouteConstants.accountSettingsPath,
+        name: RouteConstants.accountSettingsName,
+        builder: (context, state) => const AccountSettingsPage(),
+      ),
+      GoRoute(
+        path: RouteConstants.emailSettingsPath,
+        name: RouteConstants.emailSettingsName,
+        builder: (context, state) => const EmailSettingsPage(),
       ),
       GoRoute(
         path: RouteConstants.unknownPath,

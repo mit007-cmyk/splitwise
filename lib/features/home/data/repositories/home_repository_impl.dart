@@ -130,14 +130,15 @@ class HomeRepositoryImpl implements HomeRepository {
   @override
   Future<Result<void>> addContact({
     required String name,
-    required String emailOrPhone,
+    String? phone,
+    String? email,
   }) async {
     try {
       final isOnline = await _connectivityService.isConnected;
       if (!isOnline) {
         return Result.failure(const NetworkFailure('Cannot add friend while offline.'));
       }
-      await _remoteDataSource.addContact(name: name, emailOrPhone: emailOrPhone);
+      await _remoteDataSource.addContact(name: name, phone: phone, email: email);
       return Result.success(null);
     } catch (e) {
       return Result.failure(ServerFailure('Failed to add contact: $e'));

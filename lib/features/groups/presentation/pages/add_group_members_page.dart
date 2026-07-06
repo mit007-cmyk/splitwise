@@ -190,8 +190,17 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
 
     return BlocProvider<AddGroupMembersCubit>(
       create: (context) => AddGroupMembersCubit(getIt<HomeRepository>())..init(existingMemberIds),
-      child: BlocBuilder<AddGroupMembersCubit, AddGroupMembersState>(
-        builder: (context, state) {
+      child: BlocListener<HomeBloc, HomeState>(
+        listener: (context, homeState) {
+          if (homeState is HomeLoaded) {
+            final matchingGroups = homeState.summary.groups.where((g) => g.groupId == widget.groupId);
+            if (matchingGroups.isNotEmpty) {
+              context.read<AddGroupMembersCubit>().updateExistingMemberIds(matchingGroups.first.memberIds);
+            }
+          }
+        },
+        child: BlocBuilder<AddGroupMembersCubit, AddGroupMembersState>(
+          builder: (context, state) {
           final cubit = context.read<AddGroupMembersCubit>();
 
           return Scaffold(
@@ -364,6 +373,7 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
           );
         },
       ),
-    );
+    ),
+  );
   }
 }

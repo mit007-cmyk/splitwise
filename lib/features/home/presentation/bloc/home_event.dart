@@ -50,15 +50,17 @@ class CreateGroupRequested extends HomeEvent {
 
 class AddContactRequested extends HomeEvent {
   final String name;
-  final String emailOrPhone;
+  final String? phone;
+  final String? email;
 
   const AddContactRequested({
     required this.name,
-    required this.emailOrPhone,
+    this.phone,
+    this.email,
   });
 
   @override
-  List<Object?> get props => [name, emailOrPhone];
+  List<Object?> get props => [name, phone, email];
 }
 
 class AddGroupMembersRequested extends HomeEvent {

@@ -90,4 +90,8 @@ class AddGroupMembersCubit extends Cubit<AddGroupMembersState> {
     selected.removeWhere((u) => u.id == userId);
     emit(state.copyWith(selectedUsers: selected));
   }
+
+  void updateExistingMemberIds(List<String> existingMemberIds) {
+    emit(state.copyWith(existingMemberIds: existingMemberIds));
+  }
 }

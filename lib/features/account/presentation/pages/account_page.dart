@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/routing/route_constants.dart';
 import '../../../../core/utils/context_extension.dart';
-import '../../../../core/constants/app_constants.dart';
-import '../../../../core/widgets/app_button.dart';
-import '../../../../core/widgets/glass_card.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_event.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -11,69 +12,280 @@ import '../../../auth/presentation/bloc/auth_state.dart';
 class AccountPage extends StatelessWidget {
   const AccountPage({super.key});
 
+  static const _platform = MethodChannel('com.example.splitwise/settings');
+
+  Future<void> _openNotificationSettings(BuildContext context) async {
+    try {
+      await _platform.invokeMethod('openNotificationSettings');
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open notifications settings: $e')),
+        );
+      }
+    }
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: EdgeInsets.only(top: 24.h, bottom: 8.h, left: 16.w, right: 16.w),
+      child: Text(
+        title,
+        style: TextStyle(
+          fontSize: 14.sp,
+          fontWeight: FontWeight.bold,
+          color: Colors.grey[500],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMenuItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+    Color? iconColor,
+    Color? textColor,
+    Widget? trailing,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: iconColor ?? Colors.grey[600], size: 24.sp),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 16.sp,
+          color: textColor,
+        ),
+      ),
+      trailing: trailing ?? Icon(Icons.chevron_right, color: Colors.grey[400], size: 20.sp),
+      onTap: onTap,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final theme = context.theme;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Account')),
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(AppDimensions.xl),
-          child: BlocBuilder<AuthBloc, AuthState>(
-            builder: (context, state) {
-              String name = 'Guest';
-              String email = 'No session';
-
-              if (state is Authenticated) {
-                name = state.user.name;
-                email = state.user.email;
-              }
-
-              return GlassCard(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    CircleAvatar(
-                      radius: AppDimensions.avatarSizeLg / 2,
-                      backgroundColor: context.colorScheme.primary,
-                      child: Text(
-                        name.isNotEmpty
-                            ? name.substring(0, 1).toUpperCase()
-                            : 'G',
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      name,
-                      style: context.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      email,
-                      style: context.textTheme.bodyMedium?.copyWith(
-                        color: context.colorScheme.onSurface.withValues(alpha: 0.7),
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 24),
-                    AppButton.secondary(
-                      text: 'Log Out',
-                      onPressed: () {
-                        context.read<AuthBloc>().add(const LogoutRequested());
-                      },
-                    ),
-                  ],
-                ),
-              );
-            },
+      backgroundColor: theme.colorScheme.surface,
+      appBar: AppBar(
+        title: Text(
+          'Account',
+          style: context.textTheme.headlineSmall?.copyWith(
+            fontWeight: FontWeight.bold,
           ),
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {},
+          ),
+        ],
+        centerTitle: false,
+        elevation: 0,
+      ),
+      body: SafeArea(
+        child: BlocBuilder<AuthBloc, AuthState>(
+          builder: (context, state) {
+            String name = 'Guest';
+            String email = 'No session';
+
+            if (state is Authenticated) {
+              name = state.user.name;
+              email = state.user.email;
+            }
+
+            return SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  // User Profile Section
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
+                    child: Row(
+                      children: [
+                        Stack(
+                          children: [
+                            CircleAvatar(
+                              radius: 36.r,
+                              backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.2),
+                              child: Text(
+                                name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'G',
+                                style: TextStyle(
+                                  fontSize: 28.sp,
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
+                            ),
+                            Positioned(
+                              bottom: 0,
+                              right: 0,
+                              child: Container(
+                                padding: EdgeInsets.all(4.r),
+                                decoration: BoxDecoration(
+                                  color: theme.colorScheme.surface,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.grey[300]!, width: 1),
+                                ),
+                                child: Icon(Icons.camera_alt, size: 14.sp, color: Colors.grey[600]),
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(width: 16.w),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                name,
+                                style: TextStyle(
+                                  fontSize: 20.sp,
+                                  fontWeight: FontWeight.bold,
+                                  color: theme.colorScheme.onSurface,
+                                ),
+                              ),
+                              SizedBox(height: 4.h),
+                              Text(
+                                email,
+                                style: TextStyle(
+                                  fontSize: 14.sp,
+                                  color: Colors.grey[500],
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: () => context.push(RouteConstants.accountSettingsPath),
+                          child: Text(
+                            'Edit',
+                            style: TextStyle(
+                              fontSize: 16.sp,
+                              color: theme.colorScheme.primary,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Menu lists
+                  _buildMenuItem(
+                    icon: Icons.qr_code_scanner,
+                    title: 'Scan code',
+                    onTap: () {},
+                  ),
+
+                  _buildSectionHeader('Preferences'),
+                  _buildMenuItem(
+                    icon: Icons.mail_outline,
+                    title: 'Email settings',
+                    onTap: () => context.push(RouteConstants.emailSettingsPath),
+                  ),
+                  _buildMenuItem(
+                    icon: Icons.notifications_none,
+                    title: 'Device and push notification settings',
+                    onTap: () => _openNotificationSettings(context),
+                  ),
+                  _buildMenuItem(
+                    icon: Icons.lock_outline,
+                    title: 'Security',
+                    onTap: () {},
+                  ),
+                  _buildMenuItem(
+                    icon: Icons.palette_outlined,
+                    title: 'Appearance',
+                    onTap: () {},
+                  ),
+
+                  _buildSectionHeader('Feedback'),
+                  _buildMenuItem(
+                    icon: Icons.star_outline,
+                    title: 'Rate Splitwise',
+                    onTap: () {},
+                  ),
+                  _buildMenuItem(
+                    icon: Icons.help_outline,
+                    title: 'Contact Splitwise support',
+                    onTap: () {},
+                  ),
+
+                  SizedBox(height: 16.h),
+                  _buildMenuItem(
+                    icon: Icons.exit_to_app,
+                    title: 'Log out',
+                    iconColor: const Color(0xFF1CC29F), // Primary-teal brand tone
+                    textColor: const Color(0xFF1CC29F),
+                    trailing: const SizedBox.shrink(),
+                    onTap: () {
+                      context.read<AuthBloc>().add(const LogoutRequested());
+                    },
+                  ),
+
+                  // Footer Branding
+                  SizedBox(height: 32.h),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 16.w),
+                    child: Column(
+                      children: [
+                        Text(
+                          'Made with ✨ in Providence, RI, USA',
+                          style: TextStyle(fontSize: 12.sp, color: Colors.grey[500]),
+                          textAlign: TextAlign.center,
+                        ),
+                        SizedBox(height: 4.h),
+                        Text(
+                          'Copyright © 2026 Splitwise, Inc.',
+                          style: TextStyle(fontSize: 12.sp, color: Colors.grey[500]),
+                          textAlign: TextAlign.center,
+                        ),
+                        SizedBox(height: 2.h),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              'P.S. ',
+                              style: TextStyle(fontSize: 12.sp, color: Colors.grey[500]),
+                            ),
+                            Text(
+                              'Bunnies!',
+                              style: TextStyle(
+                                fontSize: 12.sp,
+                                color: const Color(0xFF1CC29F),
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 8.h),
+                        Text(
+                          'Privacy Policy',
+                          style: TextStyle(
+                            fontSize: 12.sp,
+                            color: Colors.grey[500],
+                            decoration: TextDecoration.underline,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        SizedBox(height: 12.h),
+                        Text(
+                          'v26.6.3/945',
+                          style: TextStyle(fontSize: 12.sp, color: Colors.grey[400]),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 48.h),
+                ],
+              ),
+            );
+          },
         ),
       ),
     );

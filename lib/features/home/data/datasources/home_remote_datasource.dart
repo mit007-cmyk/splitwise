@@ -12,7 +12,11 @@ abstract class HomeRemoteDataSource {
   Future<HomeSummaryModel> getHomeSummary(String userId);
   Future<void> createGroup({required String groupId, required Map<String, dynamic> data});
   Future<List<UserModel>> getAllUsers();
-  Future<void> addContact({required String name, required String emailOrPhone});
+  Future<void> addContact({
+    required String name,
+    String? phone,
+    String? email,
+  });
   Future<void> addGroupMembers({required String groupId, required List<String> memberIds});
   Future<void> editGroup({required String groupId, required String name, required String type});
   Future<void> leaveGroup({required String groupId, required String userId});
@@ -50,7 +54,7 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
         if (uData != null) {
           list.add(UserModel(
             id: uId,
-            email: uData['email'] as String? ?? '',
+            email: uData['email'] as String? ?? uData['phone'] as String? ?? '',
             name: uData['name'] as String? ?? uId.split('@')[0],
             photoUrl: uData['photoUrl'] as String?,
           ));
@@ -63,12 +67,17 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
   }
 
   @override
-  Future<void> addContact({required String name, required String emailOrPhone}) async {
+  Future<void> addContact({
+    required String name,
+    String? phone,
+    String? email,
+  }) async {
     final friendId = const Uuid().v4();
     final friendData = {
       'id': friendId,
       'name': name.trim(),
-      'email': emailOrPhone.trim(),
+      if (phone != null && phone.isNotEmpty) 'phone': phone.trim(),
+      if (email != null && email.isNotEmpty) 'email': email.trim(),
       'photoUrl': null,
       'updatedAt': FieldValue.serverTimestamp(),
     };

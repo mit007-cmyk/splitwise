@@ -19,6 +19,13 @@ class AppConstants {
   static const String rcBannerText = 'banner_text';
 }
 
+class FirestorePaths {
+  FirestorePaths._();
+  static const String root = 'Splitwise';
+  static const String app = 'app';
+  static const String emailConfiguration = 'email_configuration';
+}
+
 class AppDimensions {
   AppDimensions._();
 

@@ -41,4 +41,10 @@ class RouteConstants {
 
   static const String editGroupPath = '/group-detail/:groupId/edit';
   static const String editGroupName = 'edit-group';
+
+  static const String accountSettingsPath = '/account/settings';
+  static const String accountSettingsName = 'account-settings';
+
+  static const String emailSettingsPath = '/account/email-settings';
+  static const String emailSettingsName = 'account-email-settings';
 }

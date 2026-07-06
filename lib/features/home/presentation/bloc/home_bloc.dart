@@ -87,7 +87,8 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     emit(const HomeLoading());
     final result = await _homeRepository.addContact(
       name: event.name,
-      emailOrPhone: event.emailOrPhone,
+      phone: event.phone,
+      email: event.email,
     );
 
     if (result is SuccessResult<void>) {
