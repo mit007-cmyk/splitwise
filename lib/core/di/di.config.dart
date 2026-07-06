@@ -47,6 +47,7 @@ import '../services/image_picker_service.dart' as _i644;
 import '../services/notification_service.dart' as _i941;
 import '../services/remote_config_service.dart' as _i858;
 import '../services/storage_service.dart' as _i306;
+import '../services/support_email_service.dart' as _i820;
 import '../theme/theme_cubit.dart' as _i611;
 
 extension GetItInjectableX on _i174.GetIt {
@@ -98,6 +99,10 @@ extension GetItInjectableX on _i174.GetIt {
               gh<_i1047.HiveService>(),
               gh<_i1019.AppLogger>(),
             ));
+    gh.lazySingleton<_i820.SupportEmailService>(() => _i820.SupportEmailService(
+          gh<_i1047.HiveService>(),
+          gh<_i1019.AppLogger>(),
+        ));
     gh.lazySingleton<_i0.HomeRepository>(() => _i76.HomeRepositoryImpl(
           gh<_i278.HomeRemoteDataSource>(),
           gh<_i314.HomeLocalDataSource>(),

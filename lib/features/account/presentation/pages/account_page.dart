@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/di/di.dart';
 import '../../../../core/routing/route_constants.dart';
+import '../../../../core/services/support_email_service.dart';
 import '../../../../core/utils/context_extension.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_event.dart';
@@ -21,6 +23,26 @@ class AccountPage extends StatelessWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Could not open notifications settings: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _contactSupport(BuildContext context) async {
+    final authState = context.read<AuthBloc>().state;
+    final userEmail =
+        authState is Authenticated ? authState.user.email : 'Unknown';
+    final userId = authState is Authenticated ? authState.user.id : '';
+
+    try {
+      await getIt<SupportEmailService>().composeSupportEmail(
+        userEmail: userEmail,
+        userId: userId,
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not open email app: $e')),
         );
       }
     }
@@ -222,7 +244,7 @@ class AccountPage extends StatelessWidget {
                     context,
                     icon: Icons.help_outline,
                     title: 'Contact Splitwise support',
-                    onTap: () {},
+                    onTap: () => _contactSupport(context),
                   ),
 
                   SizedBox(height: 16.h),

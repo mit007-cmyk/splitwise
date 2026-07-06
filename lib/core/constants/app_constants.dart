@@ -3,10 +3,12 @@ class AppConstants {
 
   static const String appName = 'Splitwise';
   static const String appVersion = '1.0.0';
+  static const String supportEmail = 'support@splitwise.com';
   
   // Hive box names
   static const String hiveUserBox = 'user_box';
   static const String hiveSettingsBox = 'settings_box';
+  static const String hiveSupportCodeKey = 'support_code';
   static const String hiveCacheBox = 'cache_box';
   static const String hiveThemeBox = 'theme_box';
   static const String hiveThemeModeKey = 'theme_mode';
