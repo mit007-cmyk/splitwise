@@ -11,11 +11,15 @@ class UserModel extends UserEntity {
     required String email,
     required String name,
     String? photoUrl,
+    String? friendCode,
+    int? friendCodeVersion,
   }) : super(
           id: id,
           email: email,
           name: name,
           photoUrl: photoUrl,
+          friendCode: friendCode,
+          friendCodeVersion: friendCodeVersion,
         );
 
   factory UserModel.fromJson(Map<String, dynamic> json) => _$UserModelFromJson(json);
@@ -31,6 +35,26 @@ class UserModel extends UserEntity {
       email: entity.email,
       name: entity.name,
       photoUrl: entity.photoUrl,
+      friendCode: entity.friendCode,
+      friendCodeVersion: entity.friendCodeVersion,
+    );
+  }
+
+  UserModel copyWith({
+    String? id,
+    String? email,
+    String? name,
+    String? photoUrl,
+    String? friendCode,
+    int? friendCodeVersion,
+  }) {
+    return UserModel(
+      id: id ?? this.id,
+      email: email ?? this.email,
+      name: name ?? this.name,
+      photoUrl: photoUrl ?? this.photoUrl,
+      friendCode: friendCode ?? this.friendCode,
+      friendCodeVersion: friendCodeVersion ?? this.friendCodeVersion,
     );
   }
 }

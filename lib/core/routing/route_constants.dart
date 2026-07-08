@@ -36,6 +36,12 @@ class RouteConstants {
   static const String addFriendPath = '/add-friend';
   static const String addFriendName = 'add-friend';
 
+  static const String addFriendSearchPath = '/add-friend/search';
+  static const String addFriendSearchName = 'add-friend-search';
+
+  static const String addFriendNewPath = '/add-friend/new';
+  static const String addFriendNewName = 'add-friend-new';
+
   static const String groupSettingsPath = '/group-detail/:groupId/settings';
   static const String groupSettingsName = 'group-settings';
 
@@ -56,4 +62,13 @@ class RouteConstants {
 
   static const String appearancePath = '/account/appearance';
   static const String appearanceName = 'account-appearance';
+
+  static const String friendCodePath = '/friend-code';
+  static const String friendCodeName = 'friend-code';
+
+  static const String friendDetailPath = '/friend-detail/:friendId';
+  static const String friendDetailName = 'friend-detail';
+
+  static const String friendSettingsPath = '/friend-detail/:friendId/settings';
+  static const String friendSettingsName = 'friend-settings';
 }

@@ -9,6 +9,8 @@ import '../../../../core/errors/exceptions.dart';
 import '../../../../core/services/app_logger.dart';
 import '../../../../core/services/hive_service.dart';
 import '../../../../core/services/firestore_service.dart';
+import '../../../friends/data/datasources/friends_remote_datasource.dart';
+import '../../../../core/utils/friend_code_generator.dart';
 import '../models/user_model.dart';
 
 abstract class AuthRemoteDataSource {
@@ -40,6 +42,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final HiveService _hiveService;
   final AppLogger _logger;
   final FirestoreService _firestoreService;
+  final FriendsRemoteDataSource _friendsRemoteDataSource;
 
   // Use a lazy getter to prevent startup crashes when Firebase is not active
   FirebaseAuth get _auth => FirebaseAuth.instance;
@@ -52,7 +55,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   final StreamController<UserModel?> _mockAuthStateController = StreamController<UserModel?>.broadcast();
   UserModel? _currentMockUser;
 
-  AuthRemoteDataSourceImpl(this._hiveService, this._logger, this._firestoreService);
+  AuthRemoteDataSourceImpl(
+    this._hiveService,
+    this._logger,
+    this._firestoreService,
+    this._friendsRemoteDataSource,
+  );
 
   bool get _isFirebaseActive {
     try {
@@ -99,7 +107,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           merge: true,
         );
 
-        return userModel;
+        await _friendsRemoteDataSource.linkPendingContactsForUser(
+          userId: userModel.id,
+          email: userModel.email,
+        );
+
+        return _friendsRemoteDataSource.ensureFriendCodeForUser(userModel);
       } on FirebaseAuthException catch (e) {
         _logger.e('FirebaseAuth login failed', e);
         throw AuthException(message: e.message ?? 'Login failed', code: e.code);
@@ -116,7 +129,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         throw const AuthException(message: 'Invalid email or password.');
       }
       
-      final user = UserModel.fromJson(Map<String, dynamic>.from(userMap));
+      final user = await _ensureMockFriendCode(
+        UserModel.fromJson(Map<String, dynamic>.from(userMap)),
+        cleanEmail,
+        users,
+        userMap['password'] as String,
+      );
       _currentMockUser = user;
       _mockAuthStateController.add(user);
       return user;
@@ -166,8 +184,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           },
           merge: true,
         );
+
+        await _friendsRemoteDataSource.linkPendingContactsForUser(
+          userId: userModel.id,
+          email: userModel.email,
+        );
         
-        return userModel;
+        return _friendsRemoteDataSource.ensureFriendCodeForUser(userModel);
       } on FirebaseAuthException catch (e) {
         _logger.e('FirebaseAuth Google login failed', e);
         throw AuthException(message: e.message ?? 'Google Sign-in failed', code: e.code);
@@ -225,7 +248,12 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           merge: true,
         );
 
-        return userModel;
+        await _friendsRemoteDataSource.linkPendingContactsForUser(
+          userId: userModel.id,
+          email: userModel.email,
+        );
+
+        return _friendsRemoteDataSource.ensureFriendCodeForUser(userModel);
       } on FirebaseAuthException catch (e) {
         _logger.e('FirebaseAuth sign up failed', e);
         throw AuthException(message: e.message ?? 'Sign up failed', code: e.code);
@@ -241,10 +269,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       }
       
       final uid = const Uuid().v4();
+      final code = FriendCodeGenerator.generate();
       final newUser = UserModel(
         id: uid,
         email: cleanEmail,
         name: name.trim(),
+        friendCode: code,
+        friendCodeVersion: 1,
       );
       
       // Save mock user credentials
@@ -314,5 +345,26 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     final raw = _hiveService.get<Map<dynamic, dynamic>>(_mockDbBox, _mockUsersKey);
     if (raw == null) return {};
     return raw.map((k, v) => MapEntry(k.toString(), Map<String, dynamic>.from(v as Map)));
+  }
+
+  Future<UserModel> _ensureMockFriendCode(
+    UserModel user,
+    String emailKey,
+    Map<String, dynamic> users,
+    String password,
+  ) async {
+    if (user.friendCode != null && user.friendCode!.isNotEmpty) {
+      return user;
+    }
+
+    final enriched = user.copyWith(
+      friendCode: FriendCodeGenerator.generate(),
+      friendCodeVersion: 1,
+    );
+    final stored = enriched.toJson();
+    stored['password'] = password;
+    users[emailKey] = stored;
+    await _hiveService.put(_mockDbBox, _mockUsersKey, users);
+    return enriched;
   }
 }

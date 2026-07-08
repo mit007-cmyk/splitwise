@@ -11,6 +11,7 @@ import 'package:splitwise/features/navigation/presentation/pages/main_navigation
 import 'package:splitwise/features/groups/presentation/pages/group_detail_page.dart';
 import 'package:splitwise/features/groups/presentation/pages/add_group_members_page.dart';
 import 'package:splitwise/features/friends/presentation/pages/add_friend_page.dart';
+import 'package:splitwise/features/friends/presentation/pages/add_friend_search_page.dart';
 import 'package:splitwise/features/groups/presentation/pages/group_settings_page.dart';
 import 'package:splitwise/features/groups/presentation/pages/edit_group_page.dart';
 import 'package:splitwise/features/friends/presentation/pages/friends_page.dart';
@@ -20,6 +21,10 @@ import 'package:splitwise/features/account/presentation/pages/account_settings_p
 import 'package:splitwise/features/account/presentation/pages/email_settings_page.dart';
 import 'package:splitwise/features/account/presentation/pages/security_page.dart';
 import 'package:splitwise/features/account/presentation/pages/appearance_page.dart';
+import 'package:splitwise/features/friends/presentation/pages/friend_invite_page.dart';
+import 'package:splitwise/features/friends/presentation/pages/friend_detail_page.dart';
+import 'package:splitwise/features/friends/presentation/pages/friend_settings_page.dart';
+import 'package:splitwise/features/friends/presentation/pages/friend_code_page.dart';
 import 'package:splitwise/features/account/presentation/pages/use_biometrics_page.dart';
 import 'route_constants.dart';
 import 'placeholder_screens.dart';
@@ -171,7 +176,35 @@ class AppRouter {
       GoRoute(
         path: RouteConstants.addFriendPath,
         name: RouteConstants.addFriendName,
-        builder: (context, state) => const AddFriendPage(),
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final code = state.uri.queryParameters['code'];
+          if (code != null && code.trim().isNotEmpty) {
+            return FriendInvitePage(friendCode: code.trim());
+          }
+          return const AddFriendSearchPage();
+        },
+      ),
+      GoRoute(
+        path: RouteConstants.addFriendSearchPath,
+        name: RouteConstants.addFriendSearchName,
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const AddFriendSearchPage(),
+      ),
+      GoRoute(
+        path: RouteConstants.addFriendNewPath,
+        name: RouteConstants.addFriendNewName,
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final name = state.uri.queryParameters['name'];
+          final phone = state.uri.queryParameters['phone'];
+          final email = state.uri.queryParameters['email'];
+          return AddFriendPage(
+            initialName: name,
+            initialPhone: phone,
+            initialEmail: email,
+          );
+        },
       ),
       GoRoute(
         path: RouteConstants.groupSettingsPath,
@@ -210,9 +243,38 @@ class AppRouter {
         builder: (context, state) => const UseBiometricsPage(),
       ),
       GoRoute(
+        path: '/account/friend-code',
+        redirect: (context, state) => RouteConstants.friendCodePath,
+      ),
+      GoRoute(
         path: RouteConstants.appearancePath,
         name: RouteConstants.appearanceName,
+        parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const AppearancePage(),
+      ),
+      GoRoute(
+        path: RouteConstants.friendCodePath,
+        name: RouteConstants.friendCodeName,
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const FriendCodePage(),
+      ),
+      GoRoute(
+        path: RouteConstants.friendDetailPath,
+        name: RouteConstants.friendDetailName,
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final friendId = state.pathParameters['friendId'] ?? '';
+          return FriendDetailPage(friendId: friendId);
+        },
+      ),
+      GoRoute(
+        path: RouteConstants.friendSettingsPath,
+        name: RouteConstants.friendSettingsName,
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final friendId = state.pathParameters['friendId'] ?? '';
+          return FriendSettingsPage(friendId: friendId);
+        },
       ),
       GoRoute(
         path: RouteConstants.unknownPath,

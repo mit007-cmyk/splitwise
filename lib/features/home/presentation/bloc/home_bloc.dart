@@ -26,6 +26,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     on<AddGroupMembersRequested>(_onAddGroupMembersRequested);
     on<EditGroupRequested>(_onEditGroupRequested);
     on<LeaveGroupRequested>(_onLeaveGroupRequested);
+    on<RemoveGroupMemberRequested>(_onRemoveGroupMemberRequested);
     on<ChangeFilter>(_onChangeFilter);
     on<ChangeFabExtension>(_onChangeFabExtension);
   }
@@ -149,6 +150,24 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     final result = await _homeRepository.leaveGroup(
       groupId: event.groupId,
       userId: userId,
+    );
+
+    if (result is SuccessResult<void>) {
+      await _fetchHomeSummary(emit, forceRefresh: true);
+    } else if (result is FailureResult<void>) {
+      emit(HomeError(result.failure.message));
+    }
+  }
+
+  Future<void> _onRemoveGroupMemberRequested(
+    RemoveGroupMemberRequested event,
+    Emitter<HomeState> emit,
+  ) async {
+    emit(const HomeLoading());
+
+    final result = await _homeRepository.leaveGroup(
+      groupId: event.groupId,
+      userId: event.memberId,
     );
 
     if (result is SuccessResult<void>) {

@@ -102,6 +102,19 @@ class LeaveGroupRequested extends HomeEvent {
   List<Object?> get props => [groupId];
 }
 
+class RemoveGroupMemberRequested extends HomeEvent {
+  final String groupId;
+  final String memberId;
+
+  const RemoveGroupMemberRequested({
+    required this.groupId,
+    required this.memberId,
+  });
+
+  @override
+  List<Object?> get props => [groupId, memberId];
+}
+
 class ChangeFilter extends HomeEvent {
   final String filter;
   const ChangeFilter(this.filter);

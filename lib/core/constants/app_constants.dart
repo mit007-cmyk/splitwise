@@ -25,6 +25,12 @@ class AppConstants {
 class FirestorePaths {
   FirestorePaths._();
   static const String root = 'Splitwise';
+  static const String users = 'users';
+  static const String groups = 'groups';
+  static const String friendCodes = 'friend_codes';
+  static const String friends = 'friends';
+  static const String friendRequests = 'friend_requests';
+  static const String pendingContacts = 'pending_contacts';
   static const String app = 'app';
   static const String emailConfiguration = 'email_configuration';
   static const String securityDetails = 'security_details';

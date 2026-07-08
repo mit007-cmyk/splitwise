@@ -3,12 +3,15 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/di.dart';
+import '../../../../core/routing/route_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/context_extension.dart';
 import '../../../../core/widgets/app_switch.dart';
 import '../../../auth/data/models/user_model.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import 'package:splitwise/features/home/domain/entities/balance_summary.dart';
+import 'package:splitwise/features/home/domain/entities/group_summary.dart';
 import 'package:splitwise/features/home/domain/repositories/home_repository.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_bloc.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_event.dart';
@@ -65,6 +68,193 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
           color: context.appColors.onImageColor,
           fontWeight: FontWeight.bold,
         ),
+      ),
+    );
+  }
+
+  void _showMemberActionsSheet(
+    BuildContext context, {
+    required String groupId,
+    required UserModel member,
+    required bool isSettled,
+    required String balanceLabel,
+    required Color balanceColor,
+  }) {
+    final theme = context.theme;
+    final homeBloc = context.read<HomeBloc>();
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: theme.colorScheme.surfaceContainerHigh,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
+      ),
+      builder: (sheetContext) {
+        return SafeArea(
+          child: Padding(
+            padding: EdgeInsets.only(top: 8.h, bottom: 8.h),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40.w,
+                  height: 4.h,
+                  margin: EdgeInsets.only(bottom: 16.h),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.onSurfaceVariant.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2.r),
+                  ),
+                ),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16.w),
+                  child: Row(
+                    children: [
+                      _buildUserAvatar(context, member.name),
+                      SizedBox(width: 12.w),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              member.name,
+                              style: context.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (member.email.isNotEmpty)
+                              Text(
+                                member.email,
+                                style: TextStyle(
+                                  color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      Text(
+                        balanceLabel,
+                        style: TextStyle(
+                          color: balanceColor,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 12.sp,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(height: 16.h),
+                const Divider(height: 1),
+                ListTile(
+                  leading: Icon(Icons.person_outline, color: theme.colorScheme.onSurface),
+                  title: Text(
+                    'View settings',
+                    style: context.textTheme.bodyLarge?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  onTap: () {
+                    Navigator.of(sheetContext).pop();
+                    context.pushNamed(
+                      RouteConstants.friendSettingsName,
+                      pathParameters: {'friendId': member.id},
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: Icon(
+                    Icons.logout_rounded,
+                    color: isSettled
+                        ? theme.colorScheme.error
+                        : theme.colorScheme.onSurfaceVariant.withOpacity(0.4),
+                  ),
+                  title: Text(
+                    'Remove from group',
+                    style: TextStyle(
+                      color: isSettled
+                          ? theme.colorScheme.error
+                          : theme.colorScheme.onSurfaceVariant.withOpacity(0.4),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  subtitle: isSettled
+                      ? null
+                      : Text(
+                          "You can't remove this person until their debts are settled up.",
+                          style: TextStyle(
+                            color: theme.colorScheme.onSurfaceVariant.withOpacity(0.5),
+                            fontSize: 12.sp,
+                          ),
+                        ),
+                  onTap: isSettled
+                      ? () {
+                          Navigator.of(sheetContext).pop();
+                          _confirmRemoveGroupMember(
+                            homeBloc: homeBloc,
+                            groupId: groupId,
+                            member: member,
+                          );
+                        }
+                      : null,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _confirmRemoveGroupMember({
+    required HomeBloc homeBloc,
+    required String groupId,
+    required UserModel member,
+  }) {
+    final theme = context.theme;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: theme.colorScheme.surfaceContainerHigh,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16.r),
+        ),
+        title: Text(
+          'Remove group member',
+          style: context.textTheme.titleLarge,
+        ),
+        content: Text(
+          'Are you sure you want to remove this person from this group?',
+          style: context.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(dialogContext).pop();
+              homeBloc.add(
+                RemoveGroupMemberRequested(groupId: groupId, memberId: member.id),
+              );
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('${member.name} removed from group.')),
+              );
+            },
+            child: Text(
+              'OK',
+              style: TextStyle(
+                color: theme.colorScheme.error,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -217,6 +407,27 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
                     final bool isMe = user.id == currentUserId;
                     final displayName = isMe ? '${user.name} (you)' : user.name;
 
+                    MemberBalance? balanceEntry;
+                    for (final balance in group.memberBalances) {
+                      if (balance.userId == mId) {
+                        balanceEntry = balance;
+                        break;
+                      }
+                    }
+
+                    final String balanceLabel;
+                    final Color balanceColor;
+                    if (balanceEntry == null) {
+                      balanceLabel = 'settled up';
+                      balanceColor = context.appColors.settledBalanceColor;
+                    } else if (balanceEntry.type == BalanceType.owed) {
+                      balanceLabel = 'owes ₹${balanceEntry.amount.toStringAsFixed(2)}';
+                      balanceColor = context.appColors.positiveBalanceColor;
+                    } else {
+                      balanceLabel = 'you owe ₹${balanceEntry.amount.toStringAsFixed(2)}';
+                      balanceColor = context.appColors.negativeBalanceColor;
+                    }
+
                     return ListTile(
                       leading: _buildUserAvatar(context, user.name),
                       title: Text(
@@ -233,7 +444,27 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
                               ),
                             )
                           : null,
+                      trailing: isMe
+                          ? null
+                          : Text(
+                              balanceLabel,
+                              style: TextStyle(
+                                color: balanceColor,
+                                fontWeight: FontWeight.w500,
+                                fontSize: 12.sp,
+                              ),
+                            ),
                       contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 4.h),
+                      onTap: isMe
+                          ? null
+                          : () => _showMemberActionsSheet(
+                                context,
+                                groupId: widget.groupId,
+                                member: user,
+                                isSettled: balanceEntry == null,
+                                balanceLabel: balanceLabel,
+                                balanceColor: balanceColor,
+                              ),
                     );
                   }),
 

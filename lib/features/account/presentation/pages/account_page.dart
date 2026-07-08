@@ -205,7 +205,7 @@ class AccountPage extends StatelessWidget {
                     context,
                     icon: Icons.qr_code_scanner,
                     title: 'Scan code',
-                    onTap: () {},
+                    onTap: () => context.pushNamed(RouteConstants.friendCodeName),
                   ),
 
                   _buildSectionHeader(context, 'Preferences'),

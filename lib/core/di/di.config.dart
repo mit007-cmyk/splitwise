@@ -28,6 +28,21 @@ import '../../features/auth/domain/usecases/register_usecase.dart' as _i941;
 import '../../features/auth/domain/usecases/watch_auth_status_usecase.dart'
     as _i281;
 import '../../features/auth/presentation/bloc/auth_bloc.dart' as _i797;
+import '../../features/friends/data/datasources/friends_remote_datasource.dart'
+    as _i252;
+import '../../features/friends/data/datasources/friends_remote_datasource_impl.dart'
+    as _i808;
+import '../../features/friends/data/repositories/friends_repository_impl.dart'
+    as _i120;
+import '../../features/friends/domain/repositories/friends_repository.dart'
+    as _i30;
+import '../../features/friends/presentation/bloc/add_friend_search_cubit.dart'
+    as _i437;
+import '../../features/friends/presentation/bloc/friend_invite_cubit.dart'
+    as _i427;
+import '../../features/friends/presentation/bloc/friends_list_cubit.dart'
+    as _i787;
+import '../../features/friends/presentation/bloc/my_code_cubit.dart' as _i938;
 import '../../features/home/data/datasources/home_local_datasource.dart'
     as _i314;
 import '../../features/home/data/datasources/home_remote_datasource.dart'
@@ -41,6 +56,7 @@ import '../services/analytics_service.dart' as _i222;
 import '../services/app_logger.dart' as _i1019;
 import '../services/biometric_lock_service.dart' as _i600;
 import '../services/connectivity_service.dart' as _i47;
+import '../services/contacts_service.dart' as _i1008;
 import '../services/firestore_service.dart' as _i52;
 import '../services/hive_service.dart' as _i1047;
 import '../services/image_picker_service.dart' as _i644;
@@ -80,17 +96,27 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i858.RemoteConfigService(gh<_i1019.AppLogger>()));
     gh.singleton<_i306.StorageService>(
         () => _i306.StorageService(gh<_i1019.AppLogger>()));
+    gh.lazySingleton<_i1008.ContactsService>(
+        () => _i1008.ContactsService(gh<_i1019.AppLogger>()));
     gh.lazySingleton<_i314.HomeLocalDataSource>(
         () => _i314.HomeLocalDataSourceImpl(gh<_i1047.HiveService>()));
+    gh.lazySingleton<_i252.FriendsRemoteDataSource>(
+        () => _i808.FriendsRemoteDataSourceImpl(
+              gh<_i52.FirestoreService>(),
+              gh<_i1019.AppLogger>(),
+            ));
     gh.lazySingleton<_i992.AuthLocalDataSource>(
         () => _i992.AuthLocalDataSourceImpl(gh<_i1047.HiveService>()));
     gh.lazySingleton<_i611.ThemeCubit>(
         () => _i611.ThemeCubit(gh<_i1047.HiveService>()));
+    gh.lazySingleton<_i30.FriendsRepository>(
+        () => _i120.FriendsRepositoryImpl(gh<_i252.FriendsRemoteDataSource>()));
     gh.lazySingleton<_i161.AuthRemoteDataSource>(
         () => _i161.AuthRemoteDataSourceImpl(
               gh<_i1047.HiveService>(),
               gh<_i1019.AppLogger>(),
               gh<_i52.FirestoreService>(),
+              gh<_i252.FriendsRemoteDataSource>(),
             ));
     gh.lazySingleton<_i278.HomeRemoteDataSource>(
         () => _i278.HomeRemoteDataSourceImpl(gh<_i52.FirestoreService>()));
@@ -103,6 +129,8 @@ extension GetItInjectableX on _i174.GetIt {
           gh<_i1047.HiveService>(),
           gh<_i1019.AppLogger>(),
         ));
+    gh.factory<_i437.AddFriendSearchCubit>(
+        () => _i437.AddFriendSearchCubit(gh<_i1008.ContactsService>()));
     gh.lazySingleton<_i0.HomeRepository>(() => _i76.HomeRepositoryImpl(
           gh<_i278.HomeRemoteDataSource>(),
           gh<_i314.HomeLocalDataSource>(),
@@ -112,6 +140,12 @@ extension GetItInjectableX on _i174.GetIt {
           gh<_i161.AuthRemoteDataSource>(),
           gh<_i992.AuthLocalDataSource>(),
         ));
+    gh.factory<_i787.FriendsListCubit>(
+        () => _i787.FriendsListCubit(gh<_i30.FriendsRepository>()));
+    gh.factory<_i427.FriendInviteCubit>(
+        () => _i427.FriendInviteCubit(gh<_i30.FriendsRepository>()));
+    gh.factory<_i938.MyCodeCubit>(
+        () => _i938.MyCodeCubit(gh<_i30.FriendsRepository>()));
     gh.factory<_i202.HomeBloc>(() => _i202.HomeBloc(
           gh<_i0.HomeRepository>(),
           gh<_i787.AuthRepository>(),
