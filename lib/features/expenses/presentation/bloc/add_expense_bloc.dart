@@ -66,6 +66,7 @@ class AddExpenseBloc extends Bloc<AddExpenseEvent, AddExpenseState> {
     );
     on<PayerAmountChanged>(_onPayerAmountChanged);
     on<SaveExpenseRequested>(_onSaveRequested);
+    on<DeleteExpenseRequested>(_onDeleteRequested);
     on<QuickSplitPresetApplied>(_onQuickSplitPresetApplied);
   }
 
@@ -99,6 +100,11 @@ class AddExpenseBloc extends Bloc<AddExpenseEvent, AddExpenseState> {
       status: AddExpenseStatus.ready,
       availableGroups: groups,
     ));
+
+    if (event.existingExpense != null) {
+      _applyExistingExpense(event.existingExpense!, groups, emit);
+      return;
+    }
 
     if (event.friendId != null) {
       await _applyFriendMode(event.friendId!, emit);
@@ -195,6 +201,102 @@ class AddExpenseBloc extends Bloc<AddExpenseEvent, AddExpenseState> {
     ));
   }
 
+  void _applyExistingExpense(
+    Expense expense,
+    List<GroupSummary> groups,
+    Emitter<AddExpenseState> emit,
+  ) {
+    final matchingGroup = groups.where((g) => g.groupId == expense.groupId).toList();
+
+    List<ExpenseParticipant> members;
+    String groupName;
+    if (matchingGroup.isNotEmpty) {
+      final g = matchingGroup.first;
+      groupName = g.groupName;
+      members = g.memberIds
+          .map((id) => ExpenseParticipant(
+                id: id,
+                name: id == state.currentUserId ? 'You' : (_userNames[id] ?? 'Splitwise user'),
+                photoUrl: id == state.currentUserId ? null : _userPhotos[id],
+              ))
+          .toList();
+    } else {
+      groupName = 'Group';
+      members = expense.participantIds
+          .map((id) => ExpenseParticipant(
+                id: id,
+                name: id == state.currentUserId ? 'You' : (_userNames[id] ?? 'Splitwise user'),
+                photoUrl: id == state.currentUserId ? null : _userPhotos[id],
+              ))
+          .toList();
+    }
+
+    final amountText = expense.amount.toStringAsFixed(2);
+    final splitValueTexts = _splitTextsFromExpense(expense);
+    final isMultiplePayers = expense.paidBy.length > 1;
+    final payerAmountTexts = isMultiplePayers
+        ? {
+            for (final entry in expense.paidBy.entries)
+              entry.key: entry.value.toStringAsFixed(2),
+          }
+        : <String, String>{};
+    final singlePayerId = isMultiplePayers
+        ? null
+        : (expense.paidBy.isNotEmpty ? expense.paidBy.keys.first : state.currentUserId);
+
+    emit(state.copyWith(
+      status: AddExpenseStatus.ready,
+      errorMessage: null,
+      groupId: expense.groupId,
+      groupName: groupName,
+      isDirectExpense: false,
+      friendId: null,
+      members: members,
+      selectedParticipantIds: expense.participantIds.toSet(),
+      title: expense.title,
+      amountText: amountText,
+      category: expense.category,
+      notes: expense.notes ?? '',
+      date: expense.date,
+      currency: state.filteredCurrencies.firstWhere(
+        (c) => c.code == expense.currencyCode,
+        orElse: () => state.currency,
+      ),
+      isMultiplePayers: isMultiplePayers,
+      singlePayerId: singlePayerId,
+      payerAmountTexts: payerAmountTexts,
+      splitType: expense.splitType,
+      splitValueTexts: splitValueTexts,
+      editingExpenseId: expense.id,
+      expenseCreatedBy: expense.createdBy,
+      lastAction: AddExpenseAction.none,
+    ));
+  }
+
+  Map<String, String> _splitTextsFromExpense(Expense expense) {
+    switch (expense.splitType) {
+      case SplitType.equally:
+        return const {};
+      case SplitType.unequally:
+      case SplitType.adjustment:
+        return {
+          for (final entry in expense.splits.entries)
+            entry.key: entry.value.toStringAsFixed(2),
+        };
+      case SplitType.percentage:
+        if (expense.amount <= 0) return const {};
+        return {
+          for (final entry in expense.splits.entries)
+            entry.key: ((entry.value / expense.amount) * 100).toStringAsFixed(2),
+        };
+      case SplitType.shares:
+        return {
+          for (final entry in expense.splits.entries)
+            entry.key: entry.value.round().toString(),
+        };
+    }
+  }
+
   void _onQuickSplitPresetApplied(
     QuickSplitPresetApplied event,
     Emitter<AddExpenseState> emit,
@@ -277,7 +379,7 @@ class AddExpenseBloc extends Bloc<AddExpenseEvent, AddExpenseState> {
     }
 
     final expense = Expense(
-      id: _uuid.v4(),
+      id: state.editingExpenseId ?? _uuid.v4(),
       groupId: state.groupId!,
       title: state.title.trim(),
       category: state.category,
@@ -290,17 +392,53 @@ class AddExpenseBloc extends Bloc<AddExpenseEvent, AddExpenseState> {
       splits: state.computedSplits,
       splitType: state.splitType,
       participantIds: state.selectedParticipantIds.toList(),
-      createdBy: state.currentUserId,
+      createdBy: state.expenseCreatedBy ?? state.currentUserId,
     );
 
-    final Result<void> result = await _expenseRepository.createExpense(expense);
+    final Result<void> result = state.isEditMode
+        ? await _expenseRepository.updateExpense(
+            expense: expense,
+            actorUserId: state.currentUserId,
+          )
+        : await _expenseRepository.createExpense(expense);
 
     if (result.isSuccess) {
-      emit(state.copyWith(status: AddExpenseStatus.success));
+      emit(state.copyWith(
+        status: AddExpenseStatus.success,
+        lastAction: AddExpenseAction.save,
+      ));
     } else {
       emit(state.copyWith(
         status: AddExpenseStatus.ready,
-        errorMessage: 'Could not save the expense. Please try again.',
+        errorMessage: state.isEditMode
+            ? 'Could not update the expense. Please try again.'
+            : 'Could not save the expense. Please try again.',
+      ));
+    }
+  }
+
+  Future<void> _onDeleteRequested(
+    DeleteExpenseRequested event,
+    Emitter<AddExpenseState> emit,
+  ) async {
+    if (!state.isEditMode || !state.canModifyExpense) {
+      emit(state.copyWith(errorMessage: 'You do not have permission to delete this expense.'));
+      return;
+    }
+    emit(state.copyWith(status: AddExpenseStatus.saving, errorMessage: null));
+    final result = await _expenseRepository.deleteExpense(
+      expenseId: state.editingExpenseId!,
+      actorUserId: state.currentUserId,
+    );
+    if (result.isSuccess) {
+      emit(state.copyWith(
+        status: AddExpenseStatus.success,
+        lastAction: AddExpenseAction.delete,
+      ));
+    } else {
+      emit(state.copyWith(
+        status: AddExpenseStatus.ready,
+        errorMessage: 'Could not delete the expense. Please try again.',
       ));
     }
   }

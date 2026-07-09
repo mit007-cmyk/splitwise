@@ -273,6 +273,8 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
         for (final entry in expensesData.entries) {
           if (entry.value is! Map) continue;
           final mapped = Map<String, dynamic>.from(entry.value as Map);
+          final isDeleted = (mapped['isDeleted'] as bool?) ?? false;
+          if (isDeleted || mapped['deletedAt'] != null) continue;
           final groupId = mapped['groupId'] as String?;
           if (groupId == null || groupId.isEmpty) continue;
           mapped['id'] = entry.key;
@@ -287,6 +289,8 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
       final expenseDocs = await _firestoreService.getCollection(FirestorePaths.expenses);
       for (final doc in expenseDocs.docs) {
         final data = doc.data();
+        final isDeleted = (data['isDeleted'] as bool?) ?? false;
+        if (isDeleted || data['deletedAt'] != null) continue;
         final groupId = data['groupId'] as String?;
         if (groupId == null || groupId.isEmpty) continue;
         final mapped = Map<String, dynamic>.from(data);
@@ -316,7 +320,8 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
       // Get member names
       final Map<String, String> memberNames = {};
       for (final mId in memberIds) {
-        memberNames[mId] = allUserNames[mId] ?? mId.substring(0, 5);
+        memberNames[mId] =
+            allUserNames[mId] ?? (mId.length > 5 ? mId.substring(0, 5) : mId);
       }
 
       // Map expenses.
@@ -331,6 +336,8 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
         for (final expEntry in expensesMap.entries) {
           final expId = expEntry.key as String;
           final expData = Map<String, dynamic>.from(expEntry.value as Map);
+          final isDeleted = (expData['isDeleted'] as bool?) ?? false;
+          if (isDeleted || expData['deletedAt'] != null) continue;
           expData['id'] = expId;
           // Top-level doc wins for same id; use legacy only when missing.
           expensesById.putIfAbsent(expId, () => expData);
@@ -359,7 +366,9 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
         final Map<String, double> owedByUser = {};
         if (expense['splits'] is Map) {
           (expense['splits'] as Map).forEach((key, value) {
-            owedByUser[key as String] = (value as num?)?.toDouble() ?? 0.0;
+            final id = key.toString().trim();
+            if (id.isEmpty) return;
+            owedByUser[id] = (value as num?)?.toDouble() ?? 0.0;
           });
         } else if (memberIds.isNotEmpty) {
           final equalShare = totalAmount / memberIds.length;
@@ -373,7 +382,9 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
         final Map<String, double> paidByUser = {};
         if (expense['paidBy'] is Map) {
           (expense['paidBy'] as Map).forEach((key, value) {
-            paidByUser[key as String] = (value as num?)?.toDouble() ?? 0.0;
+            final id = key.toString().trim();
+            if (id.isEmpty) return;
+            paidByUser[id] = (value as num?)?.toDouble() ?? 0.0;
           });
         } else {
           final legacyPaidById = expense['paidById'] as String?;
@@ -406,11 +417,13 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
       double groupTotalBalance = 0.0;
 
       netBalances.forEach((otherId, balance) {
+        if (otherId.trim().isEmpty) return;
         if (balance.abs() > 0.01) {
           groupTotalBalance += balance;
           memberBalances.add(MemberBalanceModel(
             userId: otherId,
-            userName: memberNames[otherId] ?? otherId.substring(0, 5),
+            userName: memberNames[otherId] ??
+                (otherId.length > 5 ? otherId.substring(0, 5) : otherId),
             amount: balance.abs(),
             type: balance > 0 ? BalanceType.owed : BalanceType.owe,
           ));

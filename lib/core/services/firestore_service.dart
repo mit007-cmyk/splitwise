@@ -5,6 +5,7 @@ import 'app_logger.dart';
 @singleton
 class FirestoreService {
   FirebaseFirestore get _firestore => FirebaseFirestore.instance;
+  FirebaseFirestore get firestore => _firestore;
   final AppLogger _logger;
 
   FirestoreService(this._logger);

@@ -7,6 +7,7 @@ import '../../domain/services/split_calculator.dart';
 import '../../data/datasources/currency_catalog.dart';
 
 enum AddExpenseStatus { loading, ready, saving, success, failure }
+enum AddExpenseAction { none, save, delete }
 
 /// Sentinel used to distinguish "leave [errorMessage] unchanged" from
 /// "explicitly clear [errorMessage]" inside [AddExpenseState.copyWith].
@@ -22,6 +23,9 @@ class AddExpenseState extends Equatable {
 
   final String currentUserId;
   final String currentUserName;
+  final String? editingExpenseId;
+  final String? expenseCreatedBy;
+  final AddExpenseAction lastAction;
 
   final List<GroupSummary> availableGroups;
   final String? groupId;
@@ -56,6 +60,9 @@ class AddExpenseState extends Equatable {
     this.errorMessage,
     required this.currentUserId,
     required this.currentUserName,
+    this.editingExpenseId,
+    this.expenseCreatedBy,
+    this.lastAction = AddExpenseAction.none,
     this.availableGroups = const [],
     this.groupId,
     this.groupName = '',
@@ -85,10 +92,15 @@ class AddExpenseState extends Equatable {
       status: AddExpenseStatus.loading,
       currentUserId: currentUserId,
       currentUserName: currentUserName,
+      lastAction: AddExpenseAction.none,
       date: DateTime.now(),
       singlePayerId: currentUserId,
     );
   }
+
+  bool get isEditMode => editingExpenseId != null && editingExpenseId!.isNotEmpty;
+
+  bool get canModifyExpense => !isEditMode || expenseCreatedBy == currentUserId;
 
   double get amount => double.tryParse(amountText.trim().replaceAll(',', '')) ?? 0.0;
 
@@ -224,6 +236,7 @@ class AddExpenseState extends Equatable {
 
   bool get canSave =>
       status != AddExpenseStatus.saving &&
+      canModifyExpense &&
       titleError == null &&
       amountError == null &&
       groupError == null &&
@@ -243,6 +256,7 @@ class AddExpenseState extends Equatable {
     Set<String>? selectedParticipantIds,
     String? title,
     String? amountText,
+    String? currentUserName,
     Currency? currency,
     String? currencyQuery,
     String? category,
@@ -253,12 +267,18 @@ class AddExpenseState extends Equatable {
     Map<String, String>? payerAmountTexts,
     SplitType? splitType,
     Map<String, String>? splitValueTexts,
+    String? editingExpenseId,
+    String? expenseCreatedBy,
+    AddExpenseAction? lastAction,
   }) {
     return AddExpenseState(
       status: status ?? this.status,
       errorMessage: identical(errorMessage, _unset) ? this.errorMessage : errorMessage as String?,
       currentUserId: currentUserId,
-      currentUserName: currentUserName,
+      currentUserName: currentUserName ?? this.currentUserName,
+      editingExpenseId: editingExpenseId ?? this.editingExpenseId,
+      expenseCreatedBy: expenseCreatedBy ?? this.expenseCreatedBy,
+      lastAction: lastAction ?? this.lastAction,
       availableGroups: availableGroups ?? this.availableGroups,
       groupId: identical(groupId, _unset) ? this.groupId : groupId as String?,
       groupName: groupName ?? this.groupName,
@@ -288,6 +308,9 @@ class AddExpenseState extends Equatable {
         errorMessage,
         currentUserId,
         currentUserName,
+        editingExpenseId,
+        expenseCreatedBy,
+        lastAction,
         availableGroups,
         groupId,
         groupName,

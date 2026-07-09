@@ -18,6 +18,11 @@ class ExpenseModel extends Expense {
     required super.splitType,
     required super.participantIds,
     required super.createdBy,
+    super.updatedBy,
+    super.deletedAt,
+    super.deletedBy,
+    super.isDeleted,
+    super.receiptUrl,
   });
 
   factory ExpenseModel.fromEntity(Expense expense) {
@@ -36,6 +41,11 @@ class ExpenseModel extends Expense {
       splitType: expense.splitType,
       participantIds: expense.participantIds,
       createdBy: expense.createdBy,
+      updatedBy: expense.updatedBy,
+      deletedAt: expense.deletedAt,
+      deletedBy: expense.deletedBy,
+      isDeleted: expense.isDeleted,
+      receiptUrl: expense.receiptUrl,
     );
   }
 
@@ -49,6 +59,8 @@ class ExpenseModel extends Expense {
   factory ExpenseModel.fromMap(String id, String groupId, Map<String, dynamic> map) {
     final rawDate = map['date'];
     final date = rawDate is Timestamp ? rawDate.toDate() : DateTime.now();
+    final rawDeletedAt = map['deletedAt'];
+    final deletedAt = rawDeletedAt is Timestamp ? rawDeletedAt.toDate() : null;
 
     final amount = (map['amount'] as num?)?.toDouble() ?? 0.0;
 
@@ -97,6 +109,11 @@ class ExpenseModel extends Expense {
       splitType: splitType,
       participantIds: participantIds,
       createdBy: (map['createdBy'] as String?) ?? (paidBy.isNotEmpty ? paidBy.keys.first : ''),
+      updatedBy: map['updatedBy'] as String?,
+      deletedAt: deletedAt,
+      deletedBy: map['deletedBy'] as String?,
+      isDeleted: (map['isDeleted'] as bool?) ?? (deletedAt != null),
+      receiptUrl: map['receiptUrl'] as String?,
     );
   }
 
@@ -105,7 +122,26 @@ class ExpenseModel extends Expense {
   /// `groupId` is persisted so callers can query expenses by group.
   /// `paidBy`/`splits` stay as maps so readers can keep handling legacy
   /// single-payer expenses (`paidById`) alongside these.
-  Map<String, dynamic> toMap() {
+  Map<String, dynamic> toMap({bool includeCreateAudit = true, String? updatedBy}) {
+    final sanitizedPaidBy = <String, double>{};
+    paidBy.forEach((key, value) {
+      final id = key.trim();
+      if (id.isEmpty) return;
+      sanitizedPaidBy[id] = value;
+    });
+
+    final sanitizedSplits = <String, double>{};
+    splits.forEach((key, value) {
+      final id = key.trim();
+      if (id.isEmpty) return;
+      sanitizedSplits[id] = value;
+    });
+
+    final sanitizedParticipants = participantIds
+        .map((id) => id.trim())
+        .where((id) => id.isNotEmpty)
+        .toList();
+
     return {
       'id': id,
       'groupId': groupId,
@@ -116,13 +152,18 @@ class ExpenseModel extends Expense {
       'currencySymbol': currencySymbol,
       'date': Timestamp.fromDate(date),
       if (notes != null && notes!.trim().isNotEmpty) 'notes': notes!.trim(),
-      'paidBy': paidBy,
-      'splits': splits,
+      if (receiptUrl != null && receiptUrl!.trim().isNotEmpty) 'receiptUrl': receiptUrl!.trim(),
+      'paidBy': sanitizedPaidBy,
+      'splits': sanitizedSplits,
       'splitType': splitType.name,
-      'participantIds': participantIds,
+      'participantIds': sanitizedParticipants,
       'createdBy': createdBy,
-      'createdAt': FieldValue.serverTimestamp(),
+      if (includeCreateAudit) 'createdAt': FieldValue.serverTimestamp(),
       'updatedAt': FieldValue.serverTimestamp(),
+      'updatedBy': updatedBy,
+      'isDeleted': false,
+      'deletedAt': FieldValue.delete(),
+      'deletedBy': FieldValue.delete(),
     };
   }
 }

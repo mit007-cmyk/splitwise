@@ -23,7 +23,22 @@ class ExpenseRepositoryImpl extends BaseRepository implements ExpenseRepository 
       () => _remoteDataSource.createExpense(
         groupId: expense.groupId,
         expenseId: expenseId,
-        data: model.toMap(),
+        data: model.toMap(updatedBy: expense.createdBy),
+      ),
+    );
+  }
+
+  @override
+  Future<Result<void>> updateExpense({
+    required Expense expense,
+    required String actorUserId,
+  }) {
+    final model = ExpenseModel.fromEntity(expense);
+    return safeCall(
+      () => _remoteDataSource.updateExpense(
+        expenseId: expense.id,
+        data: model.toMap(includeCreateAudit: false, updatedBy: actorUserId),
+        actorUserId: actorUserId,
       ),
     );
   }
@@ -31,5 +46,23 @@ class ExpenseRepositoryImpl extends BaseRepository implements ExpenseRepository 
   @override
   Future<Result<List<Expense>>> getGroupExpenses(String groupId) {
     return safeCall(() => _remoteDataSource.getGroupExpenses(groupId));
+  }
+
+  @override
+  Future<Result<Expense?>> getExpenseById(String expenseId) {
+    return safeCall(() => _remoteDataSource.getExpenseById(expenseId));
+  }
+
+  @override
+  Future<Result<void>> deleteExpense({
+    required String expenseId,
+    required String actorUserId,
+  }) {
+    return safeCall(
+      () => _remoteDataSource.deleteExpense(
+        expenseId: expenseId,
+        actorUserId: actorUserId,
+      ),
+    );
   }
 }

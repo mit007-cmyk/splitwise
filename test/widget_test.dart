@@ -12,7 +12,28 @@ import 'package:splitwise/features/auth/domain/usecases/get_current_user_usecase
 import 'package:splitwise/features/auth/domain/usecases/watch_auth_status_usecase.dart';
 import 'package:splitwise/features/auth/domain/usecases/login_with_google_usecase.dart';
 import 'package:splitwise/features/auth/presentation/bloc/auth_bloc.dart';
+import 'package:splitwise/core/services/hive_service.dart';
+import 'package:splitwise/core/services/biometric_lock_service.dart';
+import 'package:splitwise/core/theme/theme_cubit.dart';
 import 'package:splitwise/main.dart';
+
+class MockHiveService extends HiveService {
+  MockHiveService() : super(MockLogger());
+
+  @override
+  T? get<T>(String boxName, String key, {T? defaultValue}) {
+    return defaultValue;
+  }
+
+  @override
+  Future<void> put<T>(String boxName, String key, T value) async {}
+
+  @override
+  Future<void> delete(String boxName, String key) async {}
+
+  @override
+  Future<void> clear(String boxName) async {}
+}
 
 class MockLogger extends AppLogger {
   @override
@@ -65,6 +86,17 @@ void main() {
     }
     if (!getIt.isRegistered<ConnectivityService>()) {
       getIt.registerSingleton<ConnectivityService>(MockConnectivity());
+    }
+    if (!getIt.isRegistered<HiveService>()) {
+      getIt.registerSingleton<HiveService>(MockHiveService());
+    }
+    if (!getIt.isRegistered<ThemeCubit>()) {
+      getIt.registerSingleton<ThemeCubit>(ThemeCubit(getIt<HiveService>()));
+    }
+    if (!getIt.isRegistered<BiometricLockService>()) {
+      getIt.registerSingleton<BiometricLockService>(
+        BiometricLockService(getIt<HiveService>(), getIt<AppLogger>()),
+      );
     }
     if (!getIt.isRegistered<AuthRepository>()) {
       final authRepo = MockAuthRepository();

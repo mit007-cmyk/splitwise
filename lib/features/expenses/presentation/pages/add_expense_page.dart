@@ -11,6 +11,7 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../friends/domain/repositories/friends_repository.dart';
 import '../../../home/domain/repositories/home_repository.dart';
+import '../../domain/entities/expense.dart';
 import '../../domain/entities/split_type.dart';
 import '../../domain/repositories/expense_repository.dart';
 import '../bloc/add_expense_bloc.dart';
@@ -30,14 +31,21 @@ class AddExpensePage extends StatefulWidget {
   /// pre-selected as the only other participant/payer instead of asking the
   /// user to choose a group first.
   final String? friendId;
+  final Expense? existingExpense;
 
-  const AddExpensePage({super.key, this.groupId, this.friendId});
+  const AddExpensePage({
+    super.key,
+    this.groupId,
+    this.friendId,
+    this.existingExpense,
+  });
 
   @override
   State<AddExpensePage> createState() => _AddExpensePageState();
 }
 
 class _AddExpensePageState extends State<AddExpensePage> {
+  bool _didPrefill = false;
   late final AddExpenseBloc _bloc;
   late final TextEditingController _titleController;
   late final TextEditingController _amountController;
@@ -61,7 +69,13 @@ class _AddExpensePageState extends State<AddExpensePage> {
       friendsRepository: getIt<FriendsRepository>(),
       currentUserId: currentUserId,
       currentUserName: currentUserName,
-    )..add(InitAddExpense(groupId: widget.groupId, friendId: widget.friendId));
+    )..add(
+        InitAddExpense(
+          groupId: widget.groupId,
+          friendId: widget.friendId,
+          existingExpense: widget.existingExpense,
+        ),
+      );
 
     _titleController = TextEditingController();
     _amountController = TextEditingController();
@@ -100,10 +114,14 @@ class _AddExpensePageState extends State<AddExpensePage> {
             previous.status != current.status || previous.errorMessage != current.errorMessage,
         listener: (context, state) {
           if (state.status == AddExpenseStatus.success) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Expense added!')),
-            );
-            context.pop();
+            final message = switch (state.lastAction) {
+              AddExpenseAction.delete => 'Expense deleted!',
+              AddExpenseAction.save =>
+                state.isEditMode ? 'Expense updated!' : 'Expense added!',
+              AddExpenseAction.none => 'Saved successfully!',
+            };
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+            context.pop(true);
           } else if (state.errorMessage != null) {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text(state.errorMessage!)),
@@ -115,10 +133,10 @@ class _AddExpensePageState extends State<AddExpensePage> {
           appBar: AppBar(
             leading: IconButton(
               icon: const Icon(Icons.arrow_back),
-              onPressed: () => context.pop(),
+              onPressed: () => context.pop(false),
             ),
             title: Text(
-              'Add expense',
+              stateTitle(widget.existingExpense != null),
               style: context.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
             ),
             centerTitle: false,
@@ -145,6 +163,23 @@ class _AddExpensePageState extends State<AddExpensePage> {
                   );
                 },
               ),
+              BlocBuilder<AddExpenseBloc, AddExpenseState>(
+                buildWhen: (previous, current) =>
+                    previous.isEditMode != current.isEditMode ||
+                    previous.canModifyExpense != current.canModifyExpense ||
+                    previous.status != current.status,
+                builder: (context, state) {
+                  if (!state.isEditMode || !state.canModifyExpense) {
+                    return const SizedBox.shrink();
+                  }
+                  return IconButton(
+                    icon: Icon(Icons.delete_outline, color: scheme.error),
+                    onPressed: state.status == AddExpenseStatus.saving
+                        ? null
+                        : () => _confirmDelete(context),
+                  );
+                },
+              ),
               SizedBox(width: AppDimensions.sm.w),
             ],
           ),
@@ -153,6 +188,16 @@ class _AddExpensePageState extends State<AddExpensePage> {
               if (state.status == AddExpenseStatus.loading) {
                 return const Center(child: CircularProgressIndicator());
               }
+              if (!_didPrefill &&
+                  (state.isEditMode ||
+                      state.title.isNotEmpty ||
+                      state.amountText.isNotEmpty ||
+                      state.notes.isNotEmpty)) {
+                _didPrefill = true;
+                _titleController.text = state.title;
+                _amountController.text = state.amountText;
+                _notesController.text = state.notes;
+              }
               return _buildForm(context, state);
             },
           ),
@@ -160,6 +205,8 @@ class _AddExpensePageState extends State<AddExpensePage> {
       ),
     );
   }
+
+  String stateTitle(bool isEditing) => isEditing ? 'Edit expense' : 'Add expense';
 
   Widget _buildForm(BuildContext context, AddExpenseState state) {
     final scheme = context.colorScheme;
@@ -264,6 +311,8 @@ class _AddExpensePageState extends State<AddExpensePage> {
             onChanged: (value) => context.read<AddExpenseBloc>().add(NotesChanged(value)),
           ),
         ),
+        if (state.isEditMode && !state.canModifyExpense)
+          _buildInlineError(context, 'Only the creator can edit or delete this expense.'),
         if (state.amountError != null && state.amountText.isNotEmpty)
           _buildInlineError(context, state.amountError!),
         if (state.participantsError != null)
@@ -271,6 +320,32 @@ class _AddExpensePageState extends State<AddExpensePage> {
         SizedBox(height: AppDimensions.xxl.h),
       ],
     );
+  }
+
+  Future<void> _confirmDelete(BuildContext context) async {
+    final bloc = context.read<AddExpenseBloc>();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete expense?'),
+        content: const Text(
+          'This will remove this expense from balances for all participants.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && context.mounted) {
+      bloc.add(const DeleteExpenseRequested());
+    }
   }
 
   Widget _buildInlineError(BuildContext context, String message) {

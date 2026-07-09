@@ -27,6 +27,7 @@ import 'package:splitwise/features/friends/presentation/pages/friend_settings_pa
 import 'package:splitwise/features/friends/presentation/pages/friend_code_page.dart';
 import 'package:splitwise/features/account/presentation/pages/use_biometrics_page.dart';
 import 'package:splitwise/features/expenses/presentation/pages/add_expense_page.dart';
+import 'package:splitwise/features/friends/presentation/pages/friend_record_payment_page.dart';
 import 'route_constants.dart';
 import 'placeholder_screens.dart';
 
@@ -275,6 +276,24 @@ class AppRouter {
         builder: (context, state) {
           final friendId = state.pathParameters['friendId'] ?? '';
           return FriendSettingsPage(friendId: friendId);
+        },
+      ),
+      GoRoute(
+        path: RouteConstants.friendRecordPaymentPath,
+        name: RouteConstants.friendRecordPaymentName,
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) {
+          final friendId = state.pathParameters['friendId'] ?? '';
+          final q = state.uri.queryParameters;
+          return FriendRecordPaymentPage(
+            currentUserId: q['currentUserId'] ?? '',
+            friendId: friendId,
+            friendName: q['friendName'] ?? '',
+            friendEmail: q['friendEmail'],
+            friendPhotoUrl: q['friendPhotoUrl'],
+            balance: double.tryParse(q['balance'] ?? '0') ?? 0,
+            groupId: q['groupId'],
+          );
         },
       ),
       GoRoute(

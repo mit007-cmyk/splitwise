@@ -2,16 +2,19 @@ import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../expenses/domain/entities/expense.dart';
 import '../../../expenses/domain/repositories/expense_repository.dart';
+import '../../../home/domain/repositories/home_repository.dart';
 
 class GroupDetailState extends Equatable {
   final bool isLoadingExpenses;
   final List<Expense> expenses;
   final String? expenseError;
+  final Map<String, String> memberNames;
 
   const GroupDetailState({
     required this.isLoadingExpenses,
     this.expenses = const [],
     this.expenseError,
+    this.memberNames = const {},
   });
 
   factory GroupDetailState.initial() {
@@ -22,25 +25,38 @@ class GroupDetailState extends Equatable {
     bool? isLoadingExpenses,
     List<Expense>? expenses,
     String? expenseError,
+    Map<String, String>? memberNames,
   }) {
     return GroupDetailState(
       isLoadingExpenses: isLoadingExpenses ?? this.isLoadingExpenses,
       expenses: expenses ?? this.expenses,
       expenseError: expenseError,
+      memberNames: memberNames ?? this.memberNames,
     );
   }
 
   @override
-  List<Object?> get props => [isLoadingExpenses, expenses, expenseError];
+  List<Object?> get props => [isLoadingExpenses, expenses, expenseError, memberNames];
 }
 
 class GroupDetailCubit extends Cubit<GroupDetailState> {
   final ExpenseRepository _expenseRepository;
+  final HomeRepository _homeRepository;
 
-  GroupDetailCubit(this._expenseRepository) : super(GroupDetailState.initial());
+  GroupDetailCubit(this._expenseRepository, this._homeRepository) : super(GroupDetailState.initial());
 
   Future<void> loadExpenses(String groupId) async {
     emit(state.copyWith(isLoadingExpenses: true, expenseError: null));
+    
+    // Fetch users for resolving names
+    final usersResult = await _homeRepository.getAllUsers();
+    final names = <String, String>{};
+    if (usersResult.isSuccess) {
+      for (final u in usersResult.dataOrThrow) {
+        names[u.id] = u.name;
+      }
+    }
+
     final result = await _expenseRepository.getGroupExpenses(groupId);
     if (result.isSuccess) {
       final expenses = [...result.dataOrThrow]
@@ -49,6 +65,7 @@ class GroupDetailCubit extends Cubit<GroupDetailState> {
         isLoadingExpenses: false,
         expenses: expenses,
         expenseError: null,
+        memberNames: names,
       ));
       return;
     }

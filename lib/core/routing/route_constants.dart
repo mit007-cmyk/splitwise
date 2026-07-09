@@ -74,4 +74,11 @@ class RouteConstants {
 
   static const String addExpensePath = '/add-expense';
   static const String addExpenseName = 'add-expense';
+
+  static const String friendRecordPaymentPath =
+      '/friend-detail/:friendId/record-payment';
+  static const String friendRecordPaymentName = 'friend-record-payment';
+
+  static const String expenseDetailPath = '/expense-detail/:expenseId';
+  static const String expenseDetailName = 'expense-detail';
 }

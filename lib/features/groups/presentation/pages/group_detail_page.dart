@@ -10,9 +10,11 @@ import '../../../../core/utils/context_extension.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../expenses/domain/entities/expense.dart';
+import '../../../expenses/presentation/pages/expense_detail_page.dart';
 import '../../../home/domain/entities/balance_summary.dart';
 import '../../../home/domain/entities/group_summary.dart';
 import '../bloc/group_detail_cubit.dart';
+import 'group_settle_balances_page.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_bloc.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_event.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_state.dart';
@@ -28,12 +30,18 @@ class GroupDetailPage extends StatefulWidget {
 
 class _GroupDetailPageState extends State<GroupDetailPage> {
   late final GroupDetailCubit _cubit;
-  String _currentUserId = '';
+  String get _currentUserId {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated) {
+      return authState.user.id;
+    }
+    return '';
+  }
 
   @override
   void initState() {
     super.initState();
-    _cubit = GroupDetailCubit(getIt());
+    _cubit = GroupDetailCubit(getIt(), getIt());
     WidgetsBinding.instance.addPostFrameCallback((_) => _refreshData());
   }
 
@@ -44,10 +52,6 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
   }
 
   Future<void> _refreshData() async {
-    final authState = context.read<AuthBloc>().state;
-    if (authState is Authenticated) {
-      _currentUserId = authState.user.id;
-    }
     context.read<HomeBloc>().add(const RefreshHome());
     await _cubit.loadExpenses(widget.groupId);
   }
@@ -71,6 +75,21 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
     await context.push('/group-detail/${widget.groupId}/settings');
     if (!mounted) return;
     await _refreshData();
+  }
+
+  Future<void> _openSettleUp(BuildContext context, GroupSummary group) async {
+    final recorded = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => GroupSettleBalancesPage(
+          groupId: widget.groupId,
+          currentUserId: _currentUserId,
+          balances: group.memberBalances,
+        ),
+      ),
+    );
+    if (recorded == true && mounted) {
+      await _refreshData();
+    }
   }
 
   void _showAddExpenseDialog(BuildContext context) {
@@ -137,56 +156,132 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
     );
   }
 
-  Widget _buildActionPill(BuildContext context, String label, {IconData? icon}) {
+  Widget _buildActionPill(
+    BuildContext context,
+    String label, {
+    IconData? icon,
+    VoidCallback? onTap,
+  }) {
     final scheme = context.colorScheme;
-    return Container(
-      margin: EdgeInsets.only(right: 8.w),
-      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-      decoration: BoxDecoration(
-        border: Border.all(color: scheme.outline),
-        borderRadius: BorderRadius.circular(20.r),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 16.r, color: scheme.secondary),
-            SizedBox(width: 6.w),
-          ],
-          Text(
-            label,
-            style: context.textTheme.bodyMedium?.copyWith(
-              color: scheme.onSurface,
-              fontWeight: FontWeight.w500,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20.r),
+      child: Container(
+        margin: EdgeInsets.only(right: 8.w),
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+        decoration: BoxDecoration(
+          border: Border.all(color: scheme.outline),
+          borderRadius: BorderRadius.circular(20.r),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon, size: 16.r, color: scheme.secondary),
+              SizedBox(width: 6.w),
+            ],
+            Text(
+              label,
+              style: context.textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurface,
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
+  List<MemberBalance> _unsettledBalances(GroupSummary group) {
+    return group.memberBalances
+        .where((b) => b.userId.trim().isNotEmpty && b.amount.abs() > 0.01)
+        .toList();
+  }
+
   String _overallText(GroupSummary group) {
-    if (group.balanceType == BalanceType.settled || group.totalBalance.abs() < 0.01) {
-      return 'You are all settled up.';
+    final unsettled = _unsettledBalances(group);
+    if (unsettled.isEmpty) {
+      return 'You are all settled up in this group.';
     }
-    final value = '₹${group.totalBalance.toStringAsFixed(2)}';
-    return group.balanceType == BalanceType.owed
-        ? 'You are owed $value overall'
-        : 'You owe $value overall';
+    if (unsettled.length == 1) {
+      final balance = unsettled.first;
+      final value = '₹${balance.amount.toStringAsFixed(2)}';
+      return balance.type == BalanceType.owed
+          ? '${balance.userName} owes you $value'
+          : 'You owe ${balance.userName} $value';
+    }
+
+    double owedTotal = 0.0;
+    double oweTotal = 0.0;
+    for (final balance in unsettled) {
+      if (balance.type == BalanceType.owed) {
+        owedTotal += balance.amount;
+      } else if (balance.type == BalanceType.owe) {
+        oweTotal += balance.amount;
+      }
+    }
+
+    if (owedTotal > 0.01 && oweTotal > 0.01) {
+      return 'You are owed ₹${owedTotal.toStringAsFixed(2)} and owe ₹${oweTotal.toStringAsFixed(2)}';
+    }
+    if (owedTotal > 0.01) {
+      return 'You are owed ₹${owedTotal.toStringAsFixed(2)} overall';
+    }
+    return 'You owe ₹${oweTotal.toStringAsFixed(2)} overall';
   }
 
   Color _overallColor(BuildContext context, GroupSummary group) {
-    if (group.balanceType == BalanceType.settled || group.totalBalance.abs() < 0.01) {
+    final unsettled = _unsettledBalances(group);
+    if (unsettled.isEmpty) {
       return context.colorScheme.onSurfaceVariant;
     }
-    return group.balanceType == BalanceType.owed
-        ? context.appColors.positiveBalanceColor
-        : context.appColors.negativeBalanceColor;
+    if (unsettled.length == 1) {
+      return unsettled.first.type == BalanceType.owed
+          ? context.appColors.positiveBalanceColor
+          : context.appColors.negativeBalanceColor;
+    }
+    final hasOwed = unsettled.any((b) => b.type == BalanceType.owed);
+    final hasOwe = unsettled.any((b) => b.type == BalanceType.owe);
+    if (hasOwed && hasOwe) {
+      return context.colorScheme.onSurface;
+    }
+    return hasOwed ? context.appColors.positiveBalanceColor : context.appColors.negativeBalanceColor;
+  }
+
+  Widget _buildOverallStatus(BuildContext context, GroupSummary group) {
+    final unsettled = _unsettledBalances(group);
+    final textStyle = context.textTheme.titleMedium?.copyWith(
+      fontWeight: FontWeight.bold,
+      color: _overallColor(context, group),
+    );
+
+    if (unsettled.isEmpty) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.celebration_rounded,
+            size: 20.r,
+            color: context.appColors.positiveBalanceColor,
+          ),
+          SizedBox(width: 6.w),
+          Expanded(
+            child: Text(
+              'You are all settled up in this group.',
+              style: textStyle,
+            ),
+          ),
+        ],
+      );
+    }
+
+    return Text(_overallText(group), style: textStyle);
   }
 
   List<String> _balanceBreakdown(GroupSummary group) {
     final lines = <String>[];
-    for (final balance in group.memberBalances) {
+    for (final balance in _unsettledBalances(group)) {
       final amount = '₹${balance.amount.toStringAsFixed(2)}';
       lines.add(
         balance.type == BalanceType.owed
@@ -195,6 +290,11 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
       );
     }
     return lines;
+  }
+
+  String _displayName(String userId, Map<String, String> memberNames) {
+    if (userId == _currentUserId) return 'You';
+    return memberNames[userId] ?? 'Unknown';
   }
 
   String _leadingSubtitle(Expense expense, Map<String, String> memberNames) {
@@ -219,79 +319,98 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
     return 'You are not involved';
   }
 
-  Widget _buildExpenseTile(
-    BuildContext context,
-    Expense expense,
-    Map<String, String> memberNames,
-  ) {
+  Widget _buildExpenseTile(BuildContext context, Expense expense, Map<String, String> memberNames) {
     final scheme = context.colorScheme;
     final appColors = context.appColors;
-    final paidByMe = expense.paidBy[_currentUserId] ?? 0.0;
-    final owedByMe = expense.splits[_currentUserId] ?? 0.0;
-    final net = paidByMe - owedByMe;
 
-    return ListTile(
-      contentPadding: EdgeInsets.symmetric(horizontal: 16.w),
-      leading: SizedBox(
-        width: 74.w,
-        child: Row(
-          children: [
-            SizedBox(
-              width: 28.w,
-              child: Text(
-                DateFormat('d\nMMM').format(expense.date),
-                textAlign: TextAlign.center,
-                style: context.textTheme.labelSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  height: 1.1,
-                  color: scheme.onSurfaceVariant,
-                ),
-              ),
+    final isSettlement = expense.category.toLowerCase() == 'settlement';
+    final payerId = expense.paidBy.isNotEmpty ? expense.paidBy.keys.first : '';
+    final receiverId = expense.splits.isNotEmpty ? expense.splits.keys.first : '';
+    final payerName = _displayName(payerId, memberNames);
+    final receiverName = _displayName(receiverId, memberNames);
+
+    final net = (expense.paidBy[_currentUserId] ?? 0.0) - (expense.splits[_currentUserId] ?? 0.0);
+
+    return InkWell(
+      onTap: () async {
+        final deleted = await Navigator.of(context).push<bool>(
+          MaterialPageRoute(
+            builder: (_) => ExpenseDetailPage(
+              expense: expense,
+              memberNames: memberNames,
+              currentUserId: _currentUserId,
             ),
-            SizedBox(width: 8.w),
-            Container(
-              width: 34.w,
-              height: 34.w,
-              decoration: BoxDecoration(
-                color: _iconBackgroundForCategory(expense.category, scheme),
-                borderRadius: BorderRadius.circular(8.r),
-              ),
-              child: Icon(
-                _iconForCategory(expense.category),
-                size: 18.r,
-                color: scheme.onPrimaryContainer,
-              ),
-            ),
-          ],
-        ),
-      ),
-      title: Text(
-        expense.title,
-        style: context.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
-      ),
-      subtitle: Text(
-        _leadingSubtitle(expense, memberNames),
-        style: context.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-      ),
-      trailing: net.abs() < 0.01
-          ? null
-          : Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  net > 0 ? 'you lent' : 'you borrowed',
-                  style: context.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-                ),
-                Text(
-                  '${expense.currencySymbol}${net.abs().toStringAsFixed(2)}',
-                  style: context.textTheme.bodyMedium?.copyWith(
+          ),
+        );
+        if (deleted == true && mounted) {
+          await _refreshData();
+        }
+      },
+      child: ListTile(
+        contentPadding: EdgeInsets.symmetric(horizontal: 16.w),
+        leading: SizedBox(
+          width: 74.w,
+          child: Row(
+            children: [
+              SizedBox(
+                width: 28.w,
+                child: Text(
+                  DateFormat('d\nMMM').format(expense.date),
+                  textAlign: TextAlign.center,
+                  style: context.textTheme.labelSmall?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: net > 0 ? appColors.positiveBalanceColor : appColors.negativeBalanceColor,
+                    height: 1.1,
+                    color: scheme.onSurfaceVariant,
                   ),
                 ),
-              ],
-            ),
+              ),
+              SizedBox(width: 8.w),
+              Container(
+                width: 34.w,
+                height: 34.w,
+                decoration: BoxDecoration(
+                  color: isSettlement ? appColors.positiveBalanceColor : _iconBackgroundForCategory(expense.category, scheme),
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+                child: Icon(
+                  isSettlement ? Icons.payments_rounded : _iconForCategory(expense.category),
+                  size: 18.r,
+                  color: isSettlement ? scheme.onPrimary : scheme.onPrimaryContainer,
+                ),
+              ),
+            ],
+          ),
+        ),
+        title: Text(
+          isSettlement ? '$payerName paid $receiverName ${expense.currencySymbol}${expense.amount.toStringAsFixed(2)}' : expense.title,
+          style: context.textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
+        ),
+        subtitle: isSettlement
+            ? null
+            : Text(
+                _leadingSubtitle(expense, memberNames),
+                style: context.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+              ),
+        trailing: isSettlement || net.abs() < 0.01
+            ? null
+            : Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    net > 0 ? 'you lent' : 'you borrowed',
+                    style: context.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+                  ),
+                  Text(
+                    '${expense.currencySymbol}${net.abs().toStringAsFixed(2)}',
+                    style: context.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: net > 0 ? appColors.positiveBalanceColor : appColors.negativeBalanceColor,
+                    ),
+                  ),
+                ],
+              ),
+      ),
     );
   }
 
@@ -387,15 +506,14 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
         final heroColorDark = _heroColorDark(group.groupName);
         final memberCount = group.memberIds.length;
         final isSingleMember = memberCount <= 1;
-        final memberNameMap = <String, String>{
-          for (final balance in group.memberBalances) balance.userId: balance.userName,
-        };
 
         return Scaffold(
           body: RefreshIndicator(
             onRefresh: _refreshData,
             child: BlocBuilder<GroupDetailCubit, GroupDetailState>(
               builder: (context, detailState) {
+                final memberNameMap = detailState.memberNames;
+
                 return NestedScrollView(
               headerSliverBuilder: (context, innerBoxIsScrolled) {
                 return [
@@ -495,15 +613,9 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                 children: [
                   Padding(
                     padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 0),
-                    child: Text(
-                      _overallText(group),
-                      style: context.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: _overallColor(context, group),
-                      ),
-                    ),
+                    child: _buildOverallStatus(context, group),
                   ),
-                  if (group.memberBalances.isNotEmpty)
+                  if (_unsettledBalances(group).isNotEmpty)
                     Padding(
                       padding: EdgeInsets.fromLTRB(16.w, 6.h, 16.w, 0),
                       child: Builder(
@@ -539,7 +651,11 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                       scrollDirection: Axis.horizontal,
                       child: Row(
                         children: [
-                          _buildActionPill(context, 'Settle up'),
+                          _buildActionPill(
+                            context,
+                            'Settle up',
+                            onTap: () => _openSettleUp(context, group),
+                          ),
                           _buildActionPill(context, 'Convert to USD', icon: Icons.diamond_rounded),
                           _buildActionPill(context, 'Charts', icon: Icons.diamond_rounded),
                         ],
@@ -597,7 +713,17 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                       ),
                     )
                   else
-                    ..._buildExpenseFeed(context, detailState.expenses, memberNameMap),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 220),
+                      child: Column(
+                        key: ValueKey(
+                          detailState.expenses
+                              .map((e) => '${e.id}:${e.date.millisecondsSinceEpoch}')
+                              .join('|'),
+                        ),
+                        children: _buildExpenseFeed(context, detailState.expenses, memberNameMap),
+                      ),
+                    ),
                 ],
               ),
             );

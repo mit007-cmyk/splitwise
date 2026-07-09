@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import '../../domain/entities/currency.dart';
+import '../../domain/entities/expense.dart';
 import '../../domain/entities/split_type.dart';
 
 abstract class AddExpenseEvent extends Equatable {
@@ -16,11 +17,12 @@ class InitAddExpense extends AddExpenseEvent {
   /// this friend is pre-selected as the only other participant/payer option
   /// and no real group needs to be chosen up front.
   final String? friendId;
+  final Expense? existingExpense;
 
-  const InitAddExpense({this.groupId, this.friendId});
+  const InitAddExpense({this.groupId, this.friendId, this.existingExpense});
 
   @override
-  List<Object?> get props => [groupId, friendId];
+  List<Object?> get props => [groupId, friendId, existingExpense];
 }
 
 class GroupSelected extends AddExpenseEvent {
@@ -162,6 +164,10 @@ class PayerAmountChanged extends AddExpenseEvent {
 
 class SaveExpenseRequested extends AddExpenseEvent {
   const SaveExpenseRequested();
+}
+
+class DeleteExpenseRequested extends AddExpenseEvent {
+  const DeleteExpenseRequested();
 }
 
 /// Applies one of the "How was this expense split?" quick presets in a

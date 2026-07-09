@@ -225,7 +225,26 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                       children: [
                         FriendActionPill(
                           label: 'Settle up',
-                          onTap: () => _showComingSoon(context),
+                          onTap: () {
+                            final authState =
+                                context.read<AuthBloc>().state;
+                            if (authState is! Authenticated) return;
+                            context.pushNamed(
+                              RouteConstants.friendRecordPaymentName,
+                              pathParameters: {'friendId': friend.id},
+                              queryParameters: {
+                                'currentUserId': authState.user.id,
+                                'friendName': friend.name,
+                                if (friend.email != null)
+                                  'friendEmail': friend.email!,
+                                if (friend.photoUrl != null)
+                                  'friendPhotoUrl': friend.photoUrl!,
+                                'balance': balance.toStringAsFixed(2),
+                                if (state.soleSharedGroupId != null)
+                                  'groupId': state.soleSharedGroupId!,
+                              },
+                            );
+                          },
                         ),
                         FriendActionPill(
                           label: 'Remind...',

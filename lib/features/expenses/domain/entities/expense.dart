@@ -21,6 +21,11 @@ class Expense extends Equatable {
   final SplitType splitType;
   final List<String> participantIds;
   final String createdBy;
+  final String? updatedBy;
+  final DateTime? deletedAt;
+  final String? deletedBy;
+  final bool isDeleted;
+  final String? receiptUrl;
 
   const Expense({
     required this.id,
@@ -37,6 +42,11 @@ class Expense extends Equatable {
     required this.splitType,
     required this.participantIds,
     required this.createdBy,
+    this.updatedBy,
+    this.deletedAt,
+    this.deletedBy,
+    this.isDeleted = false,
+    this.receiptUrl,
   });
 
   @override
@@ -55,5 +65,10 @@ class Expense extends Equatable {
         splitType,
         participantIds,
         createdBy,
+        updatedBy,
+        deletedAt,
+        deletedBy,
+        isDeleted,
+        receiptUrl,
       ];
 }
