@@ -19,6 +19,12 @@ class MemberBalance extends Equatable {
 }
 
 class GroupSummary extends Equatable {
+  /// [groupType] value used for the synthetic 1:1 "non-group expenses"
+  /// bucket created when an expense is added directly from a friend's page
+  /// without picking a real group. Kept here (rather than in the expenses
+  /// feature) since [groupType] is this entity's own concept.
+  static const String directGroupType = 'direct';
+
   final String groupId;
   final String groupName;
   final String? groupImage;

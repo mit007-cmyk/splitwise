@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:injectable/injectable.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/services/firestore_service.dart';
+import '../../../../core/utils/debt_settlement.dart';
 import '../../../auth/data/models/user_model.dart';
 import '../../domain/entities/balance_summary.dart';
 import '../models/balance_summary_model.dart';
@@ -11,6 +12,12 @@ import '../models/home_summary_model.dart';
 abstract class HomeRemoteDataSource {
   Future<HomeSummaryModel> getHomeSummary(String userId);
   Future<void> createGroup({required String groupId, required Map<String, dynamic> data});
+  Future<void> ensureGroupExists({
+    required String groupId,
+    required String name,
+    required String type,
+    required List<String> memberIds,
+  });
   Future<List<UserModel>> getAllUsers();
   Future<void> addContact({
     required String name,
@@ -35,6 +42,37 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
       'groups',
       {
         groupId: data,
+      },
+      merge: true,
+    );
+  }
+
+  @override
+  Future<void> ensureGroupExists({
+    required String groupId,
+    required String name,
+    required String type,
+    required List<String> memberIds,
+  }) async {
+    final groupsDoc = await _firestoreService.getDocument('Splitwise', 'groups');
+    final groupsData = groupsDoc.data();
+    final existing = groupsData?[groupId];
+    if (existing is Map && existing['members'] is List && (existing['members'] as List).isNotEmpty) {
+      return;
+    }
+
+    await _firestoreService.setDocument(
+      'Splitwise',
+      'groups',
+      {
+        groupId: {
+          'id': groupId,
+          'name': name,
+          'type': type,
+          'createdBy': memberIds.isNotEmpty ? memberIds.first : '',
+          'members': memberIds,
+          'createdAt': FieldValue.serverTimestamp(),
+        },
       },
       merge: true,
     );
@@ -270,42 +308,52 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
       final Map<String, double> netBalances = {};
 
       for (final expense in expenses) {
-        final paidById = expense['paidById'] as String? ?? '';
         final totalAmount = (expense['amount'] as num?)?.toDouble() ?? 0.0;
 
-        final List<Map<String, dynamic>> splits = [];
+        // Splits: userId -> amount owed. Falls back to an equal split
+        // across all group members when the expense doesn't specify one.
+        final Map<String, double> owedByUser = {};
         if (expense['splits'] is Map) {
-          final splitsMap = expense['splits'] as Map;
-          for (final splitEntry in splitsMap.entries) {
-            splits.add({
-              'userId': splitEntry.key as String,
-              'amount': (splitEntry.value as num).toDouble(),
-            });
-          }
-        }
-
-        if (splits.isEmpty && memberIds.isNotEmpty) {
+          (expense['splits'] as Map).forEach((key, value) {
+            owedByUser[key as String] = (value as num?)?.toDouble() ?? 0.0;
+          });
+        } else if (memberIds.isNotEmpty) {
           final equalShare = totalAmount / memberIds.length;
           for (final mId in memberIds) {
-            splits.add({'userId': mId, 'amount': equalShare});
+            owedByUser[mId] = equalShare;
           }
         }
 
-        if (paidById == userId) {
-          for (final split in splits) {
-            final debtorId = split['userId'] as String? ?? '';
-            if (debtorId == userId) continue;
-            final debtAmount = (split['amount'] as num?)?.toDouble() ?? 0.0;
-            netBalances[debtorId] = (netBalances[debtorId] ?? 0.0) + debtAmount;
-          }
+        // Paid: userId -> amount paid. Supports both the multi-payer
+        // `paidBy` map and the legacy single `paidById` string field.
+        final Map<String, double> paidByUser = {};
+        if (expense['paidBy'] is Map) {
+          (expense['paidBy'] as Map).forEach((key, value) {
+            paidByUser[key as String] = (value as num?)?.toDouble() ?? 0.0;
+          });
         } else {
-          final currentUserSplit = splits.firstWhere(
-            (s) => s['userId'] == userId,
-            orElse: () => {'amount': 0.0},
-          );
-          final oweAmount = (currentUserSplit['amount'] as num?)?.toDouble() ?? 0.0;
-          if (oweAmount > 0) {
-            netBalances[paidById] = (netBalances[paidById] ?? 0.0) - oweAmount;
+          final legacyPaidById = expense['paidById'] as String?;
+          if (legacyPaidById != null && legacyPaidById.isNotEmpty) {
+            paidByUser[legacyPaidById] = totalAmount;
+          }
+        }
+
+        // Net (paid - owed) per person touched by this expense, reduced to
+        // the minimal set of pairwise IOUs. A single-payer expense collapses
+        // to exactly the same pairwise result the old logic produced.
+        final involvedIds = {...paidByUser.keys, ...owedByUser.keys};
+        final netForExpense = <String, double>{
+          for (final id in involvedIds)
+            id: (paidByUser[id] ?? 0.0) - (owedByUser[id] ?? 0.0),
+        };
+
+        for (final transfer in DebtSettlement.reduceToTransfers(netForExpense)) {
+          if (transfer.fromUserId == userId) {
+            netBalances[transfer.toUserId] =
+                (netBalances[transfer.toUserId] ?? 0.0) - transfer.amount;
+          } else if (transfer.toUserId == userId) {
+            netBalances[transfer.fromUserId] =
+                (netBalances[transfer.fromUserId] ?? 0.0) + transfer.amount;
           }
         }
       }

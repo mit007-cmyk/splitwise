@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/routing/route_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/context_extension.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_bloc.dart';
+import 'package:splitwise/features/home/presentation/bloc/home_event.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_state.dart';
 
 class GroupDetailPage extends StatelessWidget {
@@ -22,6 +24,16 @@ class GroupDetailPage extends StatelessWidget {
 
   Color _heroColorDark(String name) {
     return Color.lerp(_heroColor(name), AppColors.shadow, 0.35)!;
+  }
+
+  Future<void> _openAddExpense(BuildContext context, String groupId) async {
+    await context.pushNamed(
+      RouteConstants.addExpenseName,
+      queryParameters: {'groupId': groupId},
+    );
+    if (context.mounted) {
+      context.read<HomeBloc>().add(const RefreshHome());
+    }
   }
 
   void _showAddExpenseDialog(BuildContext context, String groupId) {
@@ -61,9 +73,7 @@ class GroupDetailPage extends StatelessWidget {
                 style: theme.elevatedButtonTheme.style,
                 onPressed: () {
                   Navigator.of(dialogContext).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Add Expense is coming soon!')),
-                  );
+                  _openAddExpense(context, groupId);
                 },
                 child: Text(
                   'Start adding expenses',
@@ -406,9 +416,7 @@ class GroupDetailPage extends StatelessWidget {
                     if (isSingleMember) {
                       _showAddExpenseDialog(context, groupId);
                     } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Add Expense is coming soon!')),
-                      );
+                      _openAddExpense(context, groupId);
                     }
                   },
                   child: Icon(Icons.receipt, color: theme.colorScheme.onPrimary),

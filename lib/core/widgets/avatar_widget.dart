@@ -40,13 +40,15 @@ class AvatarWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = context.colorScheme;
     final hasImage = imageUrl != null && imageUrl!.isNotEmpty;
 
     return Container(
       width: size,
       height: size,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         shape: BoxShape.circle,
+        border: Border.all(color: colorScheme.surface, width: 4),
       ),
       child: hasImage
           ? CachedImageWidget(

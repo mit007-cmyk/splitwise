@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter/rendering.dart';
 
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/routing/route_constants.dart';
 import '../../../../core/utils/context_extension.dart';
 import '../../../../core/widgets/app_scaffold.dart';
 import '../../../../core/widgets/empty_state_widget.dart';
@@ -16,6 +17,7 @@ import '../widgets/group_card.dart';
 import '../widgets/skeleton_loaders.dart';
 import '../widgets/filter_bottom_sheet.dart';
 import '../../domain/entities/balance_summary.dart';
+import '../../domain/entities/group_summary.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -37,6 +39,13 @@ class _HomePageState extends State<HomePage> {
         context.read<HomeBloc>().add(const LoadHome());
       }
     });
+  }
+
+  Future<void> _openAddExpense() async {
+    await context.pushNamed(RouteConstants.addExpenseName);
+    if (mounted) {
+      context.read<HomeBloc>().add(const RefreshHome());
+    }
   }
 
   void _scrollListener() {
@@ -152,6 +161,7 @@ class _HomePageState extends State<HomePage> {
       final summary = state.summary;
 
       final filteredGroups = summary.groups.where((group) {
+        if (group.groupType == GroupSummary.directGroupType) return false;
         if (state.selectedFilter == 'all') return true;
         if (state.selectedFilter == 'owe') {
           return group.balanceType == BalanceType.owe;
@@ -342,11 +352,7 @@ class _HomePageState extends State<HomePage> {
                 label: 'Add expense',
                 backgroundColor: theme.colorScheme.primary,
                 foregroundColor: theme.colorScheme.onPrimary,
-                onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Add Expense is coming soon!')),
-                  );
-                },
+                onPressed: _openAddExpense,
               ),
             ],
           ),

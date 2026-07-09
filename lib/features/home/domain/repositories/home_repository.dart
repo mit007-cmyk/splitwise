@@ -23,6 +23,17 @@ abstract class HomeRepository {
     required String type,
   });
 
+  /// Idempotently makes sure a group document with [groupId] exists with at
+  /// least [memberIds]/[name]/[type] set, without touching it if it already
+  /// exists. Used to lazily provision the synthetic "non-group expenses"
+  /// context the first time two friends split an expense directly.
+  Future<Result<GroupSummary>> ensureGroupExists({
+    required String groupId,
+    required String name,
+    required String type,
+    required List<String> memberIds,
+  });
+
   Future<Result<List<UserModel>>> getAllUsers();
 
   Future<Result<void>> addContact({

@@ -118,6 +118,41 @@ class HomeRepositoryImpl implements HomeRepository {
   }
 
   @override
+  Future<Result<GroupSummary>> ensureGroupExists({
+    required String groupId,
+    required String name,
+    required String type,
+    required List<String> memberIds,
+  }) async {
+    try {
+      final isOnline = await _connectivityService.isConnected;
+      if (!isOnline) {
+        return Result.failure(const NetworkFailure('Cannot start this expense while offline.'));
+      }
+
+      await _remoteDataSource.ensureGroupExists(
+        groupId: groupId,
+        name: name,
+        type: type,
+        memberIds: memberIds,
+      );
+
+      return Result.success(GroupSummary(
+        groupId: groupId,
+        groupName: name,
+        totalBalance: 0,
+        balanceType: BalanceType.settled,
+        memberBalances: const [],
+        memberCount: memberIds.length,
+        memberIds: memberIds,
+        groupType: type,
+      ));
+    } catch (e) {
+      return Result.failure(ServerFailure('Failed to prepare this expense: $e'));
+    }
+  }
+
+  @override
   Future<Result<List<UserModel>>> getAllUsers() async {
     try {
       final users = await _remoteDataSource.getAllUsers();

@@ -71,4 +71,7 @@ class RouteConstants {
 
   static const String friendSettingsPath = '/friend-detail/:friendId/settings';
   static const String friendSettingsName = 'friend-settings';
+
+  static const String addExpensePath = '/add-expense';
+  static const String addExpenseName = 'add-expense';
 }

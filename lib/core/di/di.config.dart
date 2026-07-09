@@ -28,6 +28,12 @@ import '../../features/auth/domain/usecases/register_usecase.dart' as _i941;
 import '../../features/auth/domain/usecases/watch_auth_status_usecase.dart'
     as _i281;
 import '../../features/auth/presentation/bloc/auth_bloc.dart' as _i797;
+import '../../features/expenses/data/datasources/expense_remote_datasource.dart'
+    as _i848;
+import '../../features/expenses/data/repositories/expense_repository_impl.dart'
+    as _i786;
+import '../../features/expenses/domain/repositories/expense_repository.dart'
+    as _i939;
 import '../../features/friends/data/datasources/friends_remote_datasource.dart'
     as _i252;
 import '../../features/friends/data/datasources/friends_remote_datasource_impl.dart'
@@ -38,6 +44,8 @@ import '../../features/friends/domain/repositories/friends_repository.dart'
     as _i30;
 import '../../features/friends/presentation/bloc/add_friend_search_cubit.dart'
     as _i437;
+import '../../features/friends/presentation/bloc/friend_detail_cubit.dart'
+    as _i866;
 import '../../features/friends/presentation/bloc/friend_invite_cubit.dart'
     as _i427;
 import '../../features/friends/presentation/bloc/friends_list_cubit.dart'
@@ -129,6 +137,8 @@ extension GetItInjectableX on _i174.GetIt {
           gh<_i1047.HiveService>(),
           gh<_i1019.AppLogger>(),
         ));
+    gh.lazySingleton<_i848.ExpenseRemoteDataSource>(
+        () => _i848.ExpenseRemoteDataSourceImpl(gh<_i52.FirestoreService>()));
     gh.factory<_i437.AddFriendSearchCubit>(
         () => _i437.AddFriendSearchCubit(gh<_i1008.ContactsService>()));
     gh.lazySingleton<_i0.HomeRepository>(() => _i76.HomeRepositoryImpl(
@@ -140,8 +150,6 @@ extension GetItInjectableX on _i174.GetIt {
           gh<_i161.AuthRemoteDataSource>(),
           gh<_i992.AuthLocalDataSource>(),
         ));
-    gh.factory<_i787.FriendsListCubit>(
-        () => _i787.FriendsListCubit(gh<_i30.FriendsRepository>()));
     gh.factory<_i427.FriendInviteCubit>(
         () => _i427.FriendInviteCubit(gh<_i30.FriendsRepository>()));
     gh.factory<_i938.MyCodeCubit>(
@@ -163,6 +171,8 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i941.RegisterUseCase(gh<_i787.AuthRepository>()));
     gh.lazySingleton<_i281.WatchAuthStatusUseCase>(
         () => _i281.WatchAuthStatusUseCase(gh<_i787.AuthRepository>()));
+    gh.lazySingleton<_i939.ExpenseRepository>(
+        () => _i786.ExpenseRepositoryImpl(gh<_i848.ExpenseRemoteDataSource>()));
     gh.factory<_i797.AuthBloc>(() => _i797.AuthBloc(
           gh<_i188.LoginUseCase>(),
           gh<_i941.RegisterUseCase>(),
@@ -170,6 +180,16 @@ extension GetItInjectableX on _i174.GetIt {
           gh<_i17.GetCurrentUserUseCase>(),
           gh<_i281.WatchAuthStatusUseCase>(),
           gh<_i57.LoginWithGoogleUseCase>(),
+        ));
+    gh.factory<_i787.FriendsListCubit>(() => _i787.FriendsListCubit(
+          gh<_i30.FriendsRepository>(),
+          gh<_i0.HomeRepository>(),
+          gh<_i939.ExpenseRepository>(),
+        ));
+    gh.factory<_i866.FriendDetailCubit>(() => _i866.FriendDetailCubit(
+          gh<_i30.FriendsRepository>(),
+          gh<_i0.HomeRepository>(),
+          gh<_i939.ExpenseRepository>(),
         ));
     return this;
   }

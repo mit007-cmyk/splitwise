@@ -9,6 +9,8 @@ import '../../../../core/utils/context_extension.dart';
 import '../../../../core/widgets/avatar_widget.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../../expenses/domain/services/friend_ledger.dart';
+import '../../domain/entities/user_preview.dart';
 import '../bloc/friends_list_cubit.dart';
 import '../widgets/add_expense_extended_fab.dart';
 
@@ -61,6 +63,177 @@ class _FriendsPageState extends State<FriendsPage> {
     super.dispose();
   }
 
+  Widget _buildOverallBalance(BuildContext context, double overallBalance) {
+    final scheme = context.colorScheme;
+    final appColors = context.appColors;
+
+    if (overallBalance.abs() < 0.01) {
+      return RichText(
+        text: TextSpan(
+          style: context.textTheme.bodyLarge?.copyWith(color: scheme.onSurface),
+          children: const [
+            TextSpan(text: 'You are '),
+            TextSpan(text: 'all settled up!', style: TextStyle(fontWeight: FontWeight.bold)),
+          ],
+        ),
+      );
+    }
+
+    final isOwed = overallBalance > 0;
+    return RichText(
+      text: TextSpan(
+        style: context.textTheme.bodyLarge?.copyWith(color: scheme.onSurface),
+        children: [
+          TextSpan(text: isOwed ? 'Overall, you are owed ' : 'Overall, you owe '),
+          TextSpan(
+            text: '₹${overallBalance.abs().toStringAsFixed(2)}',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: isOwed ? appColors.positiveBalanceColor : appColors.negativeBalanceColor,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFriendBalance(BuildContext context, double? balance) {
+    final scheme = context.colorScheme;
+    final appColors = context.appColors;
+
+    if (balance == null || balance.abs() < 0.01) {
+      return Text(
+        'settled up',
+        style: context.textTheme.bodySmall?.copyWith(
+          color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
+        ),
+      );
+    }
+
+    final isOwed = balance > 0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          isOwed ? 'owes you' : 'you owe',
+          style: context.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+        ),
+        Text(
+          '₹${balance.abs().toStringAsFixed(2)}',
+          style: context.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+            color: isOwed ? appColors.positiveBalanceColor : appColors.negativeBalanceColor,
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Up to 3 "{friend} owes you ₹x for "{group}"" lines, matching
+  /// Splitwise's per-friend breakdown. Beyond that, collapses the tail into
+  /// a single "Plus N other balances" line so the tile doesn't grow forever.
+  List<String> _breakdownLines(String friendName, List<FriendGroupBalance> breakdown) {
+    if (breakdown.isEmpty) return const [];
+
+    String lineFor(FriendGroupBalance b) {
+      final amountText = '${b.currencySymbol}${b.amount.abs().toStringAsFixed(2)}';
+      return b.amount > 0
+          ? '$friendName owes you $amountText for "${b.groupName}"'
+          : 'You owe $friendName $amountText for "${b.groupName}"';
+    }
+
+    const maxVisible = 3;
+    if (breakdown.length <= maxVisible) {
+      return breakdown.map(lineFor).toList();
+    }
+
+    final remaining = breakdown.length - 2;
+    return [
+      ...breakdown.take(2).map(lineFor),
+      'Plus $remaining other balance${remaining == 1 ? '' : 's'}',
+    ];
+  }
+
+  Widget _buildFriendTile(
+    BuildContext context,
+    UserPreview friend,
+    double? balance,
+    List<FriendGroupBalance> breakdown,
+  ) {
+    final scheme = context.colorScheme;
+    final lines = _breakdownLines(friend.name, breakdown);
+
+    return InkWell(
+      onTap: () => _openFriendDetail(friend.id),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: AppDimensions.lg.w,
+          vertical: AppDimensions.sm.h,
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AvatarWidget(
+              name: friend.name,
+              imageUrl: friend.photoUrl,
+              size: 44.w,
+            ),
+            SizedBox(width: AppDimensions.md.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.only(top: 4.h),
+                          child: Text(
+                            friend.name,
+                            style: context.textTheme.bodyLarge?.copyWith(
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                      _buildFriendBalance(context, balance),
+                    ],
+                  ),
+                  for (final line in lines)
+                    Padding(
+                      padding: EdgeInsets.only(top: 6.h),
+                      child: IntrinsicHeight(
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Container(
+                              width: 2,
+                              color: scheme.outlineVariant.withValues(alpha: 0.6),
+                            ),
+                            SizedBox(width: 8.w),
+                            Expanded(
+                              child: Text(
+                                line,
+                                style: context.textTheme.bodySmall?.copyWith(
+                                  color: scheme.onSurfaceVariant.withValues(alpha: 0.85),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = context.colorScheme;
@@ -99,7 +272,7 @@ class _FriendsPageState extends State<FriendsPage> {
               SizedBox(width: AppDimensions.sm.w),
             ],
           ),
-          floatingActionButton: const AddExpenseExtendedFab(),
+          floatingActionButton: AddExpenseExtendedFab(onExpenseAdded: _load),
           body: BlocConsumer<FriendsListCubit, FriendsListState>(
             listener: (context, state) {
               if (state.errorMessage != null) {
@@ -173,22 +346,7 @@ class _FriendsPageState extends State<FriendsPage> {
                     ),
                     child: Row(
                       children: [
-                        Expanded(
-                          child: RichText(
-                            text: TextSpan(
-                              style: context.textTheme.bodyLarge?.copyWith(
-                                color: scheme.onSurface,
-                              ),
-                              children: const [
-                                TextSpan(text: 'You are '),
-                                TextSpan(
-                                  text: 'all settled up!',
-                                  style: TextStyle(fontWeight: FontWeight.bold),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                        Expanded(child: _buildOverallBalance(context, state.overallBalance)),
                         IconButton(
                           icon: const Icon(Icons.tune),
                           color: scheme.onSurfaceVariant,
@@ -202,28 +360,11 @@ class _FriendsPageState extends State<FriendsPage> {
                     ),
                   ),
                   ...state.friends.map(
-                    (friend) => ListTile(
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: AppDimensions.lg.w,
-                      ),
-                      leading: AvatarWidget(
-                        name: friend.name,
-                        imageUrl: friend.photoUrl,
-                        size: 44.w,
-                      ),
-                      title: Text(
-                        friend.name,
-                        style: context.textTheme.bodyLarge?.copyWith(
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      trailing: Text(
-                        'no expenses',
-                        style: context.textTheme.bodySmall?.copyWith(
-                          color: scheme.onSurfaceVariant.withValues(alpha: 0.7),
-                        ),
-                      ),
-                      onTap: () => _openFriendDetail(friend.id),
+                    (friend) => _buildFriendTile(
+                      context,
+                      friend,
+                      state.balances[friend.id],
+                      state.groupBreakdowns[friend.id] ?? const [],
                     ),
                   ),
                   Padding(
