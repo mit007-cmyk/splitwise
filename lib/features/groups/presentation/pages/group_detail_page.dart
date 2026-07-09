@@ -30,6 +30,8 @@ class GroupDetailPage extends StatefulWidget {
 
 class _GroupDetailPageState extends State<GroupDetailPage> {
   late final GroupDetailCubit _cubit;
+  late final ScrollController _scrollController;
+  bool _isCollapsed = false;
   String get _currentUserId {
     final authState = context.read<AuthBloc>().state;
     if (authState is Authenticated) {
@@ -42,11 +44,26 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
   void initState() {
     super.initState();
     _cubit = GroupDetailCubit(getIt(), getIt());
+    _scrollController = ScrollController();
+    _scrollController.addListener(_scrollListener);
     WidgetsBinding.instance.addPostFrameCallback((_) => _refreshData());
+  }
+
+  void _scrollListener() {
+    if (!mounted || !_scrollController.hasClients) return;
+    final threshold = 180.h - kToolbarHeight - MediaQuery.of(context).padding.top;
+    final collapsed = _scrollController.offset >= threshold;
+    if (collapsed != _isCollapsed) {
+      setState(() {
+        _isCollapsed = collapsed;
+      });
+    }
   }
 
   @override
   void dispose() {
+    _scrollController.removeListener(_scrollListener);
+    _scrollController.dispose();
     _cubit.close();
     super.dispose();
   }
@@ -319,7 +336,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
     return 'You are not involved';
   }
 
-  Widget _buildExpenseTile(BuildContext context, Expense expense, Map<String, String> memberNames) {
+  Widget _buildExpenseTile(BuildContext context, Expense expense, Map<String, String> memberNames, String groupName) {
     final scheme = context.colorScheme;
     final appColors = context.appColors;
 
@@ -339,6 +356,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
               expense: expense,
               memberNames: memberNames,
               currentUserId: _currentUserId,
+              groupName: groupName,
             ),
           ),
         );
@@ -458,6 +476,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
     BuildContext context,
     List<Expense> expenses,
     Map<String, String> memberNames,
+    String groupName,
   ) {
     final widgets = <Widget>[];
     int? lastMonthKey;
@@ -477,7 +496,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
           ),
         );
       }
-      widgets.add(_buildExpenseTile(context, expense, memberNames));
+      widgets.add(_buildExpenseTile(context, expense, memberNames, groupName));
       lastMonthKey = monthKey;
     }
     return widgets;
@@ -515,6 +534,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                 final memberNameMap = detailState.memberNames;
 
                 return NestedScrollView(
+                  controller: _scrollController,
               headerSliverBuilder: (context, innerBoxIsScrolled) {
                 return [
                   SliverAppBar(
@@ -522,6 +542,16 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                     expandedHeight: 180.h,
                     backgroundColor: heroColor,
                     elevation: 0,
+                    centerTitle: false,
+                    title: _isCollapsed
+                        ? Text(
+                            group.groupName,
+                            style: context.textTheme.titleLarge?.copyWith(
+                              color: colors.onImageColor,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          )
+                        : null,
                     leading: Padding(
                       padding: EdgeInsets.only(left: 8.w, top: 4.h, bottom: 4.h),
                       child: IconButton(
@@ -721,7 +751,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                               .map((e) => '${e.id}:${e.date.millisecondsSinceEpoch}')
                               .join('|'),
                         ),
-                        children: _buildExpenseFeed(context, detailState.expenses, memberNameMap),
+                        children: _buildExpenseFeed(context, detailState.expenses, memberNameMap, group.groupName),
                       ),
                     ),
                 ],

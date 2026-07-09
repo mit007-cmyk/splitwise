@@ -27,11 +27,15 @@ class ExpenseDetailPage extends StatefulWidget {
   /// The current user's id, used to compute "You" labels.
   final String currentUserId;
 
+  /// The group name for this expense, used in charts title.
+  final String? groupName;
+
   const ExpenseDetailPage({
     super.key,
     required this.expense,
     required this.memberNames,
     required this.currentUserId,
+    this.groupName,
   });
 
   @override
@@ -73,17 +77,8 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
     final e = widget.expense;
     return e.splits.entries.map((entry) {
       final name = _displayName(entry.key);
-      // Check how much this person paid vs owes
-      final paid = e.paidBy[entry.key] ?? 0;
       final owes = entry.value;
-      final net = paid - owes;
-      if (net > 0.01) {
-        return '$name gets back ${e.currencySymbol}${net.toStringAsFixed(2)}';
-      } else if (net < -0.01) {
-        return '$name owes ${e.currencySymbol}${owes.toStringAsFixed(2)}';
-      } else {
-        return '$name is settled up';
-      }
+      return '$name owes ${e.currencySymbol}${owes.toStringAsFixed(2)}';
     }).toList();
   }
 
@@ -253,20 +248,39 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
                           currentUserId: widget.currentUserId,
                           memberNames: widget.memberNames,
                         ),
-                        SizedBox(height: AppDimensions.sm.h),
-                        const Divider(),
-                        SizedBox(height: AppDimensions.xs.h),
-                        ..._splitLines.map(
-                          (line) => Padding(
-                            padding: EdgeInsets.symmetric(vertical: 3.h),
-                            child: Text(
-                              line,
-                              style: context.textTheme.bodyMedium?.copyWith(
-                                color: scheme.onSurfaceVariant,
-                              ),
+                        ..._splitLines.asMap().entries.map((entry) {
+                          final idx = entry.key;
+                          final line = entry.value;
+                          final isLast = idx == _splitLines.length - 1;
+                          return IntrinsicHeight(
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                CustomPaint(
+                                  size: Size(36.w, double.infinity),
+                                  painter: TreeLinePainter(
+                                    isPayer: false,
+                                    isLast: isLast,
+                                    color: scheme.outlineVariant.withValues(alpha: 0.5),
+                                  ),
+                                ),
+                                SizedBox(width: AppDimensions.sm.w),
+                                Expanded(
+                                  child: Container(
+                                    padding: EdgeInsets.symmetric(vertical: 6.h),
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      line,
+                                      style: context.textTheme.bodyMedium?.copyWith(
+                                        color: scheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ),
+                          );
+                        }),
                       ],
                     ),
                   ),
@@ -278,6 +292,7 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
                     expense: e,
                     expenseRepository: _expenseRepository,
                     currentUserId: widget.currentUserId,
+                    groupName: widget.groupName,
                   ),
                 ],
               ),
@@ -318,19 +333,29 @@ class _HeroSection extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Category icon box
+          // Category icon box dropdown selector
           Container(
-            width: 52.w,
-            height: 52.w,
+            padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 6.h),
             decoration: BoxDecoration(
-              color: heroColor.withValues(alpha: 0.18),
-              borderRadius: BorderRadius.circular(12.r),
-              border: Border.all(color: heroColor.withValues(alpha: 0.4)),
+              color: scheme.surfaceContainerHigh,
+              borderRadius: BorderRadius.circular(8.r),
+              border: Border.all(color: scheme.outlineVariant),
             ),
-            child: Icon(
-              _iconForCategory(expense.category),
-              color: heroColor,
-              size: 26.r,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _iconForCategory(expense.category),
+                  color: scheme.onSurface,
+                  size: 24.r,
+                ),
+                SizedBox(width: 2.w),
+                Icon(
+                  Icons.arrow_drop_down,
+                  color: scheme.onSurfaceVariant,
+                  size: 16.r,
+                ),
+              ],
             ),
           ),
           SizedBox(width: AppDimensions.md.w),
@@ -414,19 +439,38 @@ class _PayerRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        AvatarWidget(name: _displayName, imageUrl: photoUrl, size: 36.w),
-        SizedBox(width: AppDimensions.sm.w),
-        Expanded(
-          child: Text(
-            payerLine,
-            style: context.textTheme.bodyLarge?.copyWith(
-              fontWeight: FontWeight.w600,
+    final scheme = context.colorScheme;
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          CustomPaint(
+            size: Size(36.w, double.infinity),
+            painter: TreeLinePainter(
+              isPayer: true,
+              isLast: false,
+              color: scheme.outlineVariant.withValues(alpha: 0.5),
+            ),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: AvatarWidget(name: _displayName, imageUrl: photoUrl, size: 36.w),
             ),
           ),
-        ),
-      ],
+          SizedBox(width: AppDimensions.sm.w),
+          Expanded(
+            child: Container(
+              padding: EdgeInsets.symmetric(vertical: 8.h),
+              alignment: Alignment.centerLeft,
+              child: Text(
+                payerLine,
+                style: context.textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -460,10 +504,13 @@ class _SpendingTrendSection extends StatefulWidget {
   final ExpenseRepository expenseRepository;
   final String currentUserId;
 
+  final String? groupName;
+
   const _SpendingTrendSection({
     required this.expense,
     required this.expenseRepository,
     required this.currentUserId,
+    this.groupName,
   });
 
   @override
@@ -524,7 +571,7 @@ class _SpendingTrendSectionState extends State<_SpendingTrendSection> {
               SizedBox(width: 6.w),
               Expanded(
                 child: Text(
-                  'Spending trends for ${widget.expense.category}',
+                  'Spending trends for ${widget.groupName ?? 'group'} :: ${widget.expense.category}',
                   style: context.textTheme.labelLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                     color: scheme.onSurface,
@@ -546,13 +593,20 @@ class _SpendingTrendSectionState extends State<_SpendingTrendSection> {
           else
             _TrendChart(stats: _stats!),
           SizedBox(height: AppDimensions.md.h),
-          // "View more charts" button
+          // "View more charts" button styled purple
           SizedBox(
             width: double.infinity,
-            child: OutlinedButton.icon(
+            child: FilledButton.icon(
               icon: Icon(Icons.diamond_rounded,
-                  size: 16.r, color: scheme.primary),
+                  size: 16.r, color: scheme.onPrimary),
               label: const Text('View more charts'),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF8A3CF6),
+                foregroundColor: scheme.onPrimary,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8.r),
+                ),
+              ),
               onPressed: () {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('Charts coming soon')),
@@ -695,3 +749,66 @@ class _CommentBar extends StatelessWidget {
     );
   }
 }
+
+class TreeLinePainter extends CustomPainter {
+  final bool isPayer;
+  final bool isLast;
+  final Color color;
+
+  TreeLinePainter({
+    required this.isPayer,
+    required this.isLast,
+    required this.color,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+
+    final centerX = size.width / 2;
+
+    if (isPayer) {
+      // Line starts below the avatar (which has size 36.w and is aligned topCenter)
+      canvas.drawLine(
+        Offset(centerX, 36.w),
+        Offset(centerX, size.height),
+        paint,
+      );
+    } else {
+      // Split row tree line
+      final centerY = size.height / 2;
+      if (isLast) {
+        // Vertical line from top to center
+        canvas.drawLine(
+          Offset(centerX, 0),
+          Offset(centerX, centerY),
+          paint,
+        );
+      } else {
+        // Vertical line from top to bottom
+        canvas.drawLine(
+          Offset(centerX, 0),
+          Offset(centerX, size.height),
+          paint,
+        );
+      }
+      // Horizontal branch to the right
+      canvas.drawLine(
+        Offset(centerX, centerY),
+        Offset(size.width, centerY),
+        paint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant TreeLinePainter oldDelegate) {
+    return oldDelegate.isPayer != isPayer ||
+        oldDelegate.isLast != isLast ||
+        oldDelegate.color != color;
+  }
+}
+
