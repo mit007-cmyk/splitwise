@@ -40,6 +40,14 @@ class QuickSplitOptionsPage extends StatelessWidget {
     );
   }
 
+  void _applyPresetAndClose(
+    BuildContext context,
+    AddExpenseEvent event,
+  ) {
+    context.read<AddExpenseBloc>().add(event);
+    Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = context.colorScheme;
@@ -90,12 +98,13 @@ class QuickSplitOptionsPage extends StatelessWidget {
                     : null,
                 detailColor: appColors.positiveBalanceColor,
                 selected: youPaidEqually,
-                onTap: () => context.read<AddExpenseBloc>().add(
-                      QuickSplitPresetApplied(
-                        payerId: state.currentUserId,
-                        splitType: SplitType.equally,
-                      ),
-                    ),
+                onTap: () => _applyPresetAndClose(
+                  context,
+                  QuickSplitPresetApplied(
+                    payerId: state.currentUserId,
+                    splitType: SplitType.equally,
+                  ),
+                ),
               ),
               _buildOption(
                 context,
@@ -107,13 +116,14 @@ class QuickSplitOptionsPage extends StatelessWidget {
                     : null,
                 detailColor: appColors.positiveBalanceColor,
                 selected: youOwedFull,
-                onTap: () => context.read<AddExpenseBloc>().add(
-                      QuickSplitPresetApplied(
-                        payerId: state.currentUserId,
-                        splitType: SplitType.percentage,
-                        splitValueTexts: {state.currentUserId: '0', other.id: '100'},
-                      ),
-                    ),
+                onTap: () => _applyPresetAndClose(
+                  context,
+                  QuickSplitPresetApplied(
+                    payerId: state.currentUserId,
+                    splitType: SplitType.percentage,
+                    splitValueTexts: {state.currentUserId: '0', other.id: '100'},
+                  ),
+                ),
               ),
               _buildOption(
                 context,
@@ -125,12 +135,13 @@ class QuickSplitOptionsPage extends StatelessWidget {
                     : null,
                 detailColor: appColors.negativeBalanceColor,
                 selected: otherPaidEqually,
-                onTap: () => context.read<AddExpenseBloc>().add(
-                      QuickSplitPresetApplied(
-                        payerId: other.id,
-                        splitType: SplitType.equally,
-                      ),
-                    ),
+                onTap: () => _applyPresetAndClose(
+                  context,
+                  QuickSplitPresetApplied(
+                    payerId: other.id,
+                    splitType: SplitType.equally,
+                  ),
+                ),
               ),
               _buildOption(
                 context,
@@ -142,13 +153,14 @@ class QuickSplitOptionsPage extends StatelessWidget {
                     : null,
                 detailColor: appColors.negativeBalanceColor,
                 selected: otherOwedFull,
-                onTap: () => context.read<AddExpenseBloc>().add(
-                      QuickSplitPresetApplied(
-                        payerId: other.id,
-                        splitType: SplitType.percentage,
-                        splitValueTexts: {other.id: '0', state.currentUserId: '100'},
-                      ),
-                    ),
+                onTap: () => _applyPresetAndClose(
+                  context,
+                  QuickSplitPresetApplied(
+                    payerId: other.id,
+                    splitType: SplitType.percentage,
+                    splitValueTexts: {other.id: '0', state.currentUserId: '100'},
+                  ),
+                ),
               ),
               SizedBox(height: AppDimensions.xxl.h),
               Padding(
