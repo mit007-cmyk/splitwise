@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:injectable/injectable.dart';
 import 'package:uuid/uuid.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../../../core/services/firestore_service.dart';
 import '../../../../core/utils/debt_settlement.dart';
 import '../../../auth/data/models/user_model.dart';
@@ -258,6 +259,41 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
 
     final List<GroupSummaryModel> groupsList = [];
     double overallNetBalance = 0.0;
+    final topLevelExpensesByGroup = <String, List<Map<String, dynamic>>>{};
+
+    // Preferred schema: Splitwise/expenses document (same table style as
+    // groups/users where each field key is an expense id).
+    try {
+      final expensesDoc = await _firestoreService.getDocument(
+        FirestorePaths.root,
+        FirestorePaths.expenses,
+      );
+      final expensesData = expensesDoc.data();
+      if (expensesData != null) {
+        for (final entry in expensesData.entries) {
+          if (entry.value is! Map) continue;
+          final mapped = Map<String, dynamic>.from(entry.value as Map);
+          final groupId = mapped['groupId'] as String?;
+          if (groupId == null || groupId.isEmpty) continue;
+          mapped['id'] = entry.key;
+          topLevelExpensesByGroup.putIfAbsent(groupId, () => []).add(mapped);
+        }
+      }
+    } catch (_) {}
+
+    // Backward compatibility: also read mistaken top-level `/expenses/{id}`
+    // collection introduced during migration so no data disappears.
+    try {
+      final expenseDocs = await _firestoreService.getCollection(FirestorePaths.expenses);
+      for (final doc in expenseDocs.docs) {
+        final data = doc.data();
+        final groupId = data['groupId'] as String?;
+        if (groupId == null || groupId.isEmpty) continue;
+        final mapped = Map<String, dynamic>.from(data);
+        mapped['id'] = doc.id;
+        topLevelExpensesByGroup.putIfAbsent(groupId, () => []).add(mapped);
+      }
+    } catch (_) {}
 
     for (final entry in groupsData.entries) {
       final groupId = entry.key;
@@ -283,8 +319,12 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
         memberNames[mId] = allUserNames[mId] ?? mId.substring(0, 5);
       }
 
-      // Map expenses
-      final List<Map<String, dynamic>> expenses = [];
+      // Map expenses.
+      // New schema first (top-level `/expenses`), then legacy nested data.
+      final Map<String, Map<String, dynamic>> expensesById = {
+        for (final expense in (topLevelExpensesByGroup[groupId] ?? const <Map<String, dynamic>>[]))
+          (expense['id'] as String): Map<String, dynamic>.from(expense),
+      };
       DateTime? lastExpenseDate;
       if (groupData['expenses'] is Map) {
         final expensesMap = groupData['expenses'] as Map;
@@ -292,15 +332,19 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
           final expId = expEntry.key as String;
           final expData = Map<String, dynamic>.from(expEntry.value as Map);
           expData['id'] = expId;
+          // Top-level doc wins for same id; use legacy only when missing.
+          expensesById.putIfAbsent(expId, () => expData);
+        }
+      }
 
-          final Timestamp? timestamp = expData['date'] as Timestamp?;
-          if (timestamp != null) {
-            final date = timestamp.toDate();
-            if (lastExpenseDate == null || date.isAfter(lastExpenseDate)) {
-              lastExpenseDate = date;
-            }
+      final expenses = expensesById.values.toList();
+      for (final expData in expenses) {
+        final Timestamp? timestamp = expData['date'] as Timestamp?;
+        if (timestamp != null) {
+          final date = timestamp.toDate();
+          if (lastExpenseDate == null || date.isAfter(lastExpenseDate)) {
+            lastExpenseDate = date;
           }
-          expenses.add(expData);
         }
       }
 

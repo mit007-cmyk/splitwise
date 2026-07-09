@@ -39,8 +39,11 @@ class ExpenseModel extends Expense {
     );
   }
 
-  /// Rebuilds an [ExpenseModel] from a raw Firestore
-  /// `groups.{groupId}.expenses.{id}` map. Tolerant of legacy documents that
+  /// Rebuilds an [ExpenseModel] from a raw Firestore expense map.
+  ///
+  /// Supports both top-level `/expenses/{id}` docs and legacy
+  /// `Splitwise/groups.{groupId}.expenses.{id}` nested maps. Tolerant of
+  /// older documents that
   /// predate this module (single `paidById`, missing `title`/`category`/etc.)
   /// so old and new expenses can be read back side by side.
   factory ExpenseModel.fromMap(String id, String groupId, Map<String, dynamic> map) {
@@ -97,12 +100,15 @@ class ExpenseModel extends Expense {
     );
   }
 
-  /// Firestore payload for `Splitwise/groups.{groupId}.expenses.{id}`.
-  /// `paidBy`/`splits` stay as maps so [HomeRemoteDataSource] can keep
-  /// reading legacy single-payer expenses (`paidById`) alongside these.
+  /// Firestore payload for top-level `/expenses/{id}` documents.
+  ///
+  /// `groupId` is persisted so callers can query expenses by group.
+  /// `paidBy`/`splits` stay as maps so readers can keep handling legacy
+  /// single-payer expenses (`paidById`) alongside these.
   Map<String, dynamic> toMap() {
     return {
       'id': id,
+      'groupId': groupId,
       'title': title.trim(),
       'category': category,
       'amount': amount,
@@ -116,6 +122,7 @@ class ExpenseModel extends Expense {
       'participantIds': participantIds,
       'createdBy': createdBy,
       'createdAt': FieldValue.serverTimestamp(),
+      'updatedAt': FieldValue.serverTimestamp(),
     };
   }
 }

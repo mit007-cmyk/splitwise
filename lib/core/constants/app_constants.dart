@@ -27,6 +27,7 @@ class FirestorePaths {
   static const String root = 'Splitwise';
   static const String users = 'users';
   static const String groups = 'groups';
+  static const String expenses = 'expenses';
   static const String friendCodes = 'friend_codes';
   static const String friends = 'friends';
   static const String friendRequests = 'friend_requests';
