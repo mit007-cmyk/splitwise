@@ -8,6 +8,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/di.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/avatar_widget.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -108,9 +109,7 @@ class _MyCodeTab extends StatelessWidget {
   Future<void> _copyCode(BuildContext context, String code) async {
     await Clipboard.setData(ClipboardData(text: code));
     if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Friend code copied')),
-      );
+      AppToast.show(context, 'Friend code copied', type: ToastType.success);
     }
   }
 
@@ -164,13 +163,9 @@ class _MyCodeTab extends StatelessWidget {
     return BlocConsumer<MyCodeCubit, MyCodeState>(
       listener: (context, state) {
         if (state.errorMessage != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.errorMessage!)),
-          );
+          AppToast.show(context, state.errorMessage!, type: ToastType.error);
         } else if (state.successMessage != null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(state.successMessage!)),
-          );
+          AppToast.show(context, state.successMessage!, type: ToastType.success);
         }
       },
       builder: (context, state) {

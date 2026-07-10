@@ -8,6 +8,7 @@ import '../../../../core/routing/route_constants.dart';
 import '../../../../core/services/app_launcher_service.dart';
 import '../../../../core/services/support_email_service.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_event.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -22,9 +23,7 @@ class AccountPage extends StatelessWidget {
       await _platform.invokeMethod('openNotificationSettings');
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open notifications settings: $e')),
-        );
+        AppToast.show(context, 'Could not open notifications settings: $e', type: ToastType.error);
       }
     }
   }
@@ -42,9 +41,7 @@ class AccountPage extends StatelessWidget {
       );
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not open email app: $e')),
-        );
+        AppToast.show(context, 'Could not open email app: $e', type: ToastType.error);
       }
     }
   }

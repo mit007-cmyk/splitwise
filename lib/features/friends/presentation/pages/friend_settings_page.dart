@@ -6,6 +6,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/di.dart';
 import '../../../../core/routing/route_constants.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/avatar_widget.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -69,9 +70,7 @@ class _FriendSettingsPageState extends State<FriendSettingsPage> {
   }
 
   void _showComingSoon() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Coming soon!')),
-    );
+    AppToast.show(context, 'Coming soon!', type: ToastType.info);
   }
 
   void _showSharedGroupsBlockedDialog() {
@@ -152,9 +151,7 @@ class _FriendSettingsPageState extends State<FriendSettingsPage> {
 
     if (result.isFailure) {
       setState(() => _isRemoving = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not remove friend.')),
-      );
+      AppToast.show(context, 'Could not remove friend.', type: ToastType.error);
       return;
     }
 

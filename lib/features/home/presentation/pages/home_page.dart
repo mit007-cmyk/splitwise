@@ -8,6 +8,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/routing/route_constants.dart';
 import '../../../../core/utils/context_extension.dart';
 import '../../../../core/widgets/app_scaffold.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/empty_state_widget.dart';
 import '../bloc/home_bloc.dart';
 import '../bloc/home_event.dart';
@@ -222,12 +223,8 @@ class _HomePageState extends State<HomePage> {
                           actionText: 'Create Group',
                           onAction: () => context.push('/create-group'),
                           secondaryActionText: 'Add Friend',
-                          onSecondaryAction: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Add Friend coming soon!'),
-                              ),
-                            );
+                        onSecondaryAction: () {
+                            AppToast.show(context, 'Add Friend coming soon!', type: ToastType.info);
                           },
                         ),
                       ),
@@ -309,9 +306,7 @@ class _HomePageState extends State<HomePage> {
               IconButton(
                 icon: const Icon(Icons.search_rounded),
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Search is coming soon!')),
-                  );
+                  AppToast.show(context, 'Search is coming soon!', type: ToastType.info);
                 },
               ),
               IconButton(
@@ -334,9 +329,7 @@ class _HomePageState extends State<HomePage> {
                 backgroundColor: context.appColors.elevatedSurface,
                 foregroundColor: context.appColors.onImageColor,
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Receipt scanning coming soon!')),
-                  );
+                  AppToast.show(context, 'Receipt scanning coming soon!', type: ToastType.info);
                 },
               ),
               SizedBox(height: 12.h),

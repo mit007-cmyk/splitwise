@@ -4,6 +4,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/di.dart';
 import '../../../../core/errors/result.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/avatar_widget.dart';
 import '../../../expenses/domain/entities/expense.dart';
 import '../../../expenses/domain/entities/split_type.dart';
@@ -49,9 +50,7 @@ class _GroupRecordPaymentPageState extends State<GroupRecordPaymentPage> {
     if (_isSaving.value) return;
     final amount = double.tryParse(_amountController.text.trim()) ?? 0.0;
     if (amount <= 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Enter a valid amount')),
-      );
+      AppToast.show(context, 'Enter a valid amount', type: ToastType.warning);
       return;
     }
 
@@ -61,9 +60,7 @@ class _GroupRecordPaymentPageState extends State<GroupRecordPaymentPage> {
     if (otherId.isEmpty || widget.currentUserId.trim().isEmpty) {
       _isSaving.value = false;
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('This balance cannot be settled. Please refresh and try again.')),
-      );
+      AppToast.show(context, 'This balance cannot be settled. Please refresh and try again.', type: ToastType.error);
       return;
     }
     final youOwe = widget.balance.type == BalanceType.owe;
@@ -93,14 +90,10 @@ class _GroupRecordPaymentPageState extends State<GroupRecordPaymentPage> {
 
     if (!mounted) return;
     if (result.isSuccess) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Payment recorded')),
-      );
+      AppToast.show(context, 'Payment recorded', type: ToastType.success);
       Navigator.of(context).pop(true);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not record payment. Please try again.')),
-      );
+      AppToast.show(context, 'Could not record payment. Please try again.', type: ToastType.error);
     }
   }
 

@@ -8,6 +8,7 @@ import '../../../../core/services/biometric_lock_service.dart';
 import '../../../../core/services/hive_service.dart';
 import '../../../../core/utils/context_extension.dart';
 import '../../../../core/widgets/app_switch.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../bloc/security_cubit.dart';
@@ -30,13 +31,9 @@ class SecurityPage extends StatelessWidget {
       child: BlocConsumer<SecurityCubit, SecurityState>(
         listener: (context, state) {
           if (state.isSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Security settings saved successfully!')),
-            );
+            AppToast.show(context, 'Security settings saved successfully!', type: ToastType.success);
           } else if (state.errorMessage != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.errorMessage!)),
-            );
+            AppToast.show(context, state.errorMessage!, type: ToastType.error);
           }
         },
         builder: (context, state) {

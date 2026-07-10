@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/di/di.dart';
 import '../../../../core/utils/context_extension.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/data/models/user_model.dart';
 import 'package:splitwise/features/home/domain/entities/group_summary.dart';
 import 'package:splitwise/features/home/domain/repositories/home_repository.dart';
@@ -171,9 +172,7 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
           memberIds: selectedUsers.map((u) => u.id).toList(),
         ));
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('${selectedUsers.length} members added to the group!')),
-    );
+    AppToast.show(context, '${selectedUsers.length} members added to the group!', type: ToastType.success);
     context.pop();
   }
 

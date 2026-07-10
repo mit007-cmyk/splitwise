@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:splitwise/core/di/di.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../domain/repositories/friends_repository.dart';
@@ -66,14 +67,10 @@ class _AddFriendPageState extends State<AddFriendPage> {
       child: BlocConsumer<AddFriendCubit, AddFriendState>(
         listener: (context, state) {
           if (state.isSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Friend added successfully!')),
-            );
+            AppToast.show(context, 'Friend added successfully!', type: ToastType.success);
             context.pop();
           } else if (state.errorMessage != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.errorMessage!)),
-            );
+            AppToast.show(context, state.errorMessage!, type: ToastType.error);
           }
         },
         builder: (context, state) {

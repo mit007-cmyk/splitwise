@@ -8,6 +8,7 @@ import '../../../../core/utils/group_balance_calculator.dart';
 import '../../../../core/routing/route_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../expenses/domain/entities/expense.dart';
@@ -790,9 +791,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                 backgroundColor: colors.elevatedSurface,
                 hoverColor: colors.elevatedSurfaceHover,
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Receipt scanning coming soon!')),
-                  );
+                  AppToast.show(context, 'Receipt scanning coming soon!', type: ToastType.info);
                 },
                 child: Icon(Icons.photo_camera_outlined, color: colors.onImageColor),
               ),

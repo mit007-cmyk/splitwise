@@ -7,6 +7,7 @@ import '../../../../core/routing/route_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/context_extension.dart';
 import '../../../../core/widgets/app_switch.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/data/models/user_model.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -244,9 +245,7 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
               homeBloc.add(
                 RemoveGroupMemberRequested(groupId: groupId, memberId: member.id),
               );
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('${member.name} removed from group.')),
-              );
+              AppToast.show(context, '${member.name} removed from group.', type: ToastType.success);
             },
             child: Text(
               'OK',
@@ -300,9 +299,7 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
                       DeleteGroupRequested(groupId: widget.groupId),
                     );
                 context.read<ActivityBloc>().add(const RefreshActivity());
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('"${group.groupName}" was deleted.')),
-                );
+                AppToast.show(context, '"${group.groupName}" was deleted.', type: ToastType.success);
                 context.go('/home/groups');
               },
               child: Text(
@@ -674,9 +671,7 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
                             onPressed: () {
                               Navigator.of(dialogContext).pop();
                               context.read<HomeBloc>().add(LeaveGroupRequested(groupId: widget.groupId));
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text('You have left the group.')),
-                              );
+                              AppToast.show(context, 'You have left the group.', type: ToastType.success);
                               context.go('/home/groups');
                             },
                             child: Text(

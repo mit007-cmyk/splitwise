@@ -9,6 +9,7 @@ import '../../../../core/di/di.dart';
 import '../../../../core/errors/result.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/avatar_widget.dart';
 import '../../../expenses/domain/entities/expense.dart';
 import '../../../expenses/domain/repositories/expense_repository.dart';
@@ -89,9 +90,7 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
 
   Future<void> _confirmDelete() async {
     if (widget.expense.createdBy != widget.currentUserId) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Only the creator can delete this expense.')),
-      );
+      AppToast.show(context, 'Only the creator can delete this expense.', type: ToastType.warning);
       return;
     }
     final confirmed = await showDialog<bool>(
@@ -126,14 +125,10 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
     if (!mounted) return;
     _isDeleting.value = false;
     if (result.isSuccess) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Expense deleted')),
-      );
-      Navigator.of(context).pop(true); // true = refresh caller
+      AppToast.show(context, 'Expense deleted', type: ToastType.success);
+      Navigator.of(context).pop(true);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not delete expense. Try again.')),
-      );
+      AppToast.show(context, 'Could not delete expense. Try again.', type: ToastType.error);
     }
   }
 
@@ -163,9 +158,7 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
             icon: const Icon(Icons.receipt_outlined),
             tooltip: 'Attach receipt',
             onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Receipt attachment coming soon')),
-              );
+              AppToast.show(context, 'Receipt attachment coming soon', type: ToastType.info);
             },
           ),
           // Delete
@@ -195,9 +188,7 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
             tooltip: 'Edit expense',
             onPressed: () async {
               if (widget.expense.createdBy != widget.currentUserId) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Only the creator can edit this expense.')),
-                );
+                AppToast.show(context, 'Only the creator can edit this expense.', type: ToastType.warning);
                 return;
               }
               final changed = await Navigator.of(context).push<bool>(
@@ -608,9 +599,7 @@ class _SpendingTrendSectionState extends State<_SpendingTrendSection> {
                 ),
               ),
               onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Charts coming soon')),
-                );
+              AppToast.show(context, 'Charts coming soon', type: ToastType.info);
               },
             ),
           ),
@@ -737,9 +726,7 @@ class _CommentBar extends StatelessWidget {
             icon: Icon(Icons.send_rounded, color: scheme.primary),
             onPressed: () {
               if (controller.text.trim().isNotEmpty) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Comments coming soon')),
-                );
+                AppToast.show(context, 'Comments coming soon', type: ToastType.info);
                 controller.clear();
               }
             },

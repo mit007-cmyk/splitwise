@@ -12,6 +12,7 @@ import '../../../../core/widgets/glass_card.dart';
 import '../../../../core/widgets/google_sign_in_button.dart';
 import '../../../../core/widgets/spacing.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/auth_event.dart';
 import '../bloc/auth_state.dart';
@@ -57,12 +58,7 @@ class _LoginPageState extends State<LoginPage> {
             if (state is Authenticated) {
               context.go('/home');
             } else if (state is AuthError) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text(state.message),
-                  backgroundColor: context.colorScheme.error,
-                ),
-              );
+              AppToast.show(context, state.message, type: ToastType.error);
             }
           },
           child: Builder(

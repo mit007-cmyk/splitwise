@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/di.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/avatar_widget.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -120,12 +121,10 @@ class _AddExpensePageState extends State<AddExpensePage> {
                 state.isEditMode ? 'Expense updated!' : 'Expense added!',
               AddExpenseAction.none => 'Saved successfully!',
             };
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+            AppToast.show(context, message, type: ToastType.success);
             context.pop(true);
           } else if (state.errorMessage != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.errorMessage!)),
-            );
+            AppToast.show(context, state.errorMessage!, type: ToastType.error);
           }
         },
         child: Scaffold(

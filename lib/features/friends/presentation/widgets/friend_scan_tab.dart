@@ -5,6 +5,7 @@ import 'package:mobile_scanner/mobile_scanner.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/utils/context_extension.dart';
 import '../../../../core/utils/friend_code_parser.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../utils/add_friend_flow.dart';
@@ -89,9 +90,7 @@ class _FriendScanTabState extends State<FriendScanTab>
   void _openInvite(String rawValue) {
     final code = FriendCodeParser.parse(rawValue);
     if (code == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid friend code')),
-      );
+      AppToast.show(context, 'Invalid friend code', type: ToastType.warning);
       return;
     }
 

@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../auth/presentation/bloc/auth_event.dart';
@@ -180,14 +181,10 @@ class AccountSettingsPage extends StatelessWidget {
       child: BlocConsumer<AccountSettingsCubit, AccountSettingsState>(
         listener: (context, state) {
           if (state.isSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Account settings saved!')),
-            );
+            AppToast.show(context, 'Account settings saved!', type: ToastType.success);
             context.pop();
           } else if (state.errorMessage != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Error: ${state.errorMessage!}')),
-            );
+            AppToast.show(context, 'Error: ${state.errorMessage!}', type: ToastType.error);
           }
         },
         builder: (context, state) {
@@ -230,9 +227,7 @@ class AccountSettingsPage extends StatelessWidget {
                                   state.password,
                                   (newValue) => cubit.updatePassword(newValue).then((_) {
                                     if (state.errorMessage == null) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(content: Text('Password changed successfully!')),
-                                      );
+                                      AppToast.show(context, 'Password changed successfully!', type: ToastType.success);
                                     }
                                   }),
                                   isPassword: true,
@@ -324,9 +319,7 @@ class AccountSettingsPage extends StatelessWidget {
                                       SizedBox(height: 4.h),
                                       OutlinedButton(
                                         onPressed: () {
-                                          ScaffoldMessenger.of(context).showSnackBar(
-                                            const SnackBar(content: Text('Blocklist is empty.')),
-                                          );
+                                          AppToast.show(context, 'Blocklist is empty.', type: ToastType.info);
                                         },
                                         child: const Text('Manage your blocklist'),
                                       ),

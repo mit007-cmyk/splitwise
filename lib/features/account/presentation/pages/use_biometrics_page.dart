@@ -8,6 +8,7 @@ import '../../../../core/services/app_logger.dart';
 import '../../../../core/services/biometric_lock_service.dart';
 import '../../../../core/services/hive_service.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../bloc/security_cubit.dart';
@@ -33,9 +34,7 @@ class UseBiometricsPage extends StatelessWidget {
           if (state.isSuccess) {
             context.pop(true);
           } else if (state.errorMessage != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.errorMessage!)),
-            );
+            AppToast.show(context, state.errorMessage!, type: ToastType.error);
           }
         },
         builder: (context, state) {

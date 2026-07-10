@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/di/di.dart';
 import '../../../../core/errors/result.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../expenses/domain/repositories/expense_repository.dart';
 import '../../domain/entities/activity_event.dart';
 
@@ -33,14 +34,10 @@ class _ActivityRestoreExpensePageState extends State<ActivityRestoreExpensePage>
     if (!mounted) return;
     setState(() => _restoring = false);
     if (result.isSuccess) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Expense restored')),
-      );
+      AppToast.show(context, 'Expense restored', type: ToastType.success);
       Navigator.of(context).pop(true);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not restore this expense.')),
-      );
+      AppToast.show(context, 'Could not restore this expense.', type: ToastType.error);
     }
   }
 

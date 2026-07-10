@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/utils/context_extension.dart';
 import '../../../../core/widgets/app_scaffold.dart';
+import '../../../../core/widgets/app_toast.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_bloc.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_event.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_state.dart';
@@ -83,9 +84,7 @@ class _EditGroupPageState extends State<EditGroupPage> {
                               type: _selectedType,
                             ),
                           );
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Group updated successfully!')),
-                      );
+                      AppToast.show(context, 'Group updated successfully!', type: ToastType.success);
                       context.pop();
                     }
                   },

@@ -6,6 +6,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/di.dart';
 import '../../../../core/routing/route_constants.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/avatar_widget.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -259,9 +260,7 @@ class _FriendsPageState extends State<FriendsPage> {
               IconButton(
                 icon: const Icon(Icons.search),
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Search coming soon!')),
-                  );
+                AppToast.show(context, 'Search coming soon!', type: ToastType.info);
                 },
               ),
               IconButton(
@@ -276,9 +275,7 @@ class _FriendsPageState extends State<FriendsPage> {
           body: BlocConsumer<FriendsListCubit, FriendsListState>(
             listener: (context, state) {
               if (state.errorMessage != null) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text(state.errorMessage!)),
-                );
+                AppToast.show(context, state.errorMessage!, type: ToastType.error);
               }
             },
             builder: (context, state) {
@@ -351,9 +348,7 @@ class _FriendsPageState extends State<FriendsPage> {
                           icon: const Icon(Icons.tune),
                           color: scheme.onSurfaceVariant,
                           onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Filters coming soon!')),
-                            );
+                          AppToast.show(context, 'Filters coming soon!', type: ToastType.info);
                           },
                         ),
                       ],

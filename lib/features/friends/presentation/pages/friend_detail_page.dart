@@ -14,6 +14,7 @@ import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../expenses/domain/services/friend_ledger.dart';
 import '../../domain/entities/user_preview.dart';
 import '../bloc/friend_detail_cubit.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../widgets/add_expense_extended_fab.dart';
 import '../widgets/friend_action_pill.dart';
 import '../widgets/friend_expenses_empty_state.dart';
@@ -529,8 +530,6 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
   }
 
   void _showComingSoon(BuildContext context) {
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(const SnackBar(content: Text('Coming soon!')));
+    AppToast.show(context, 'Coming soon!', type: ToastType.info);
   }
 }

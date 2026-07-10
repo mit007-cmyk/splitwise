@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../bloc/email_settings_cubit.dart';
@@ -56,14 +57,10 @@ class EmailSettingsPage extends StatelessWidget {
       child: BlocConsumer<EmailSettingsCubit, EmailSettingsState>(
         listener: (context, state) {
           if (state.isSuccess) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Settings saved successfully!')),
-            );
+            AppToast.show(context, 'Settings saved successfully!', type: ToastType.success);
             context.pop();
           } else if (state.errorMessage != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Error: ${state.errorMessage!}')),
-            );
+            AppToast.show(context, 'Error: ${state.errorMessage!}', type: ToastType.error);
           }
         },
         builder: (context, state) {

@@ -8,6 +8,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/utils/context_extension.dart';
 import '../../../../core/widgets/app_scaffold.dart';
 import '../../../../core/widgets/app_switch.dart';
+import '../../../../core/widgets/app_toast.dart';
 import 'package:splitwise/features/activity/presentation/bloc/activity_bloc.dart';
 import 'package:splitwise/features/activity/presentation/bloc/activity_event.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_bloc.dart';
@@ -111,14 +112,10 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
         listener: (context, state) {
           if (state is HomeLoaded) {
             context.read<ActivityBloc>().add(const RefreshActivity());
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Group created successfully!')),
-            );
+            AppToast.show(context, 'Group created successfully!', type: ToastType.success);
             context.pop();
           } else if (state is HomeError) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(state.message)),
-            );
+            AppToast.show(context, state.message, type: ToastType.error);
           }
         },
         child: SingleChildScrollView(
