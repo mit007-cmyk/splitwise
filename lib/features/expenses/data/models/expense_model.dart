@@ -162,8 +162,6 @@ class ExpenseModel extends Expense {
       'updatedAt': FieldValue.serverTimestamp(),
       'updatedBy': updatedBy,
       'isDeleted': false,
-      'deletedAt': FieldValue.delete(),
-      'deletedBy': FieldValue.delete(),
     };
   }
 }

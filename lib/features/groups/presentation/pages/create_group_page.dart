@@ -8,6 +8,8 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/utils/context_extension.dart';
 import '../../../../core/widgets/app_scaffold.dart';
 import '../../../../core/widgets/app_switch.dart';
+import 'package:splitwise/features/activity/presentation/bloc/activity_bloc.dart';
+import 'package:splitwise/features/activity/presentation/bloc/activity_event.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_bloc.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_event.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_state.dart';
@@ -108,6 +110,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
       body: BlocListener<HomeBloc, HomeState>(
         listener: (context, state) {
           if (state is HomeLoaded) {
+            context.read<ActivityBloc>().add(const RefreshActivity());
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('Group created successfully!')),
             );

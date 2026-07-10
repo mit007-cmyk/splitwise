@@ -28,6 +28,7 @@ class FirestorePaths {
   static const String users = 'users';
   static const String groups = 'groups';
   static const String expenses = 'expenses';
+  static const String events = 'events';
   static const String friendCodes = 'friend_codes';
   static const String friends = 'friends';
   static const String friendRequests = 'friend_requests';

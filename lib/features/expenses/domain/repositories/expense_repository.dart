@@ -19,4 +19,9 @@ abstract class ExpenseRepository {
     required String expenseId,
     required String actorUserId,
   });
+
+  Future<Result<void>> restoreExpense({
+    required String expenseId,
+    required String actorUserId,
+  });
 }

@@ -3,6 +3,7 @@ import 'package:injectable/injectable.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/services/firestore_service.dart';
+import '../../../../core/utils/activity_event_writer.dart';
 import '../../../../core/utils/debt_settlement.dart';
 import '../../../auth/data/models/user_model.dart';
 import '../../domain/entities/balance_summary.dart';
@@ -28,6 +29,10 @@ abstract class HomeRemoteDataSource {
   Future<void> addGroupMembers({required String groupId, required List<String> memberIds});
   Future<void> editGroup({required String groupId, required String name, required String type});
   Future<void> leaveGroup({required String groupId, required String userId});
+  Future<void> deleteGroup({
+    required String groupId,
+    required String actorUserId,
+  });
 }
 
 @LazySingleton(as: HomeRemoteDataSource)
@@ -36,16 +41,40 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
 
   HomeRemoteDataSourceImpl(this._firestoreService);
 
+  Map<String, dynamic>? _asStringKeyMap(dynamic value) {
+    if (value is Map) {
+      return Map<String, dynamic>.from(value);
+    }
+    return null;
+  }
+
+  void _readAmountMap(
+    dynamic raw,
+    void Function(String userId, double amount) onEntry,
+  ) {
+    final map = _asStringKeyMap(raw);
+    if (map == null) return;
+    map.forEach((key, value) {
+      final id = key.toString().trim();
+      if (id.isEmpty) return;
+      onEntry(id, (value as num?)?.toDouble() ?? 0.0);
+    });
+  }
+
   @override
   Future<void> createGroup({required String groupId, required Map<String, dynamic> data}) async {
-    return _firestoreService.setDocument(
-      'Splitwise',
-      'groups',
-      {
-        groupId: data,
-      },
-      merge: true,
-    );
+    final firestore = _firestoreService.firestore;
+    final groupsRef = firestore.collection(FirestorePaths.root).doc(FirestorePaths.groups);
+    final eventsRef = ActivityEventWriter.eventsRef(firestore);
+
+    await _firestoreService.runTransaction((transaction) async {
+      transaction.set(groupsRef, {groupId: data}, SetOptions(merge: true));
+      ActivityEventWriter.append(
+        transaction,
+        eventsRef,
+        ActivityEventWriter.groupCreated(groupId: groupId, groupData: data),
+      );
+    });
   }
 
   @override
@@ -89,7 +118,7 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
       final List<UserModel> list = [];
       for (final entry in usersData.entries) {
         final uId = entry.key;
-        final uData = entry.value as Map?;
+        final uData = _asStringKeyMap(entry.value);
         if (uData != null) {
           list.add(UserModel(
             id: uId,
@@ -138,7 +167,10 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
       throw Exception('Group not found');
     }
 
-    final groupMap = Map<String, dynamic>.from(groupsData[groupId] as Map);
+    final groupMap = _asStringKeyMap(groupsData[groupId]);
+    if (groupMap == null) {
+      throw Exception('Group not found');
+    }
     final List<dynamic> currentMembers = List.from(groupMap['members'] as List? ?? []);
     
     for (final id in memberIds) {
@@ -171,7 +203,10 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
       throw Exception('Group not found');
     }
 
-    final groupMap = Map<String, dynamic>.from(groupsData[groupId] as Map);
+    final groupMap = _asStringKeyMap(groupsData[groupId]);
+    if (groupMap == null) {
+      throw Exception('Group not found');
+    }
     groupMap['name'] = name;
     groupMap['type'] = type;
 
@@ -193,7 +228,10 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
       return;
     }
 
-    final groupMap = Map<String, dynamic>.from(groupsData[groupId] as Map);
+    final groupMap = _asStringKeyMap(groupsData[groupId]);
+    if (groupMap == null) {
+      return;
+    }
     final List<dynamic> currentMembers = List.from(groupMap['members'] as List? ?? []);
 
     currentMembers.remove(userId);
@@ -221,6 +259,49 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
   }
 
   @override
+  Future<void> deleteGroup({
+    required String groupId,
+    required String actorUserId,
+  }) async {
+    final firestore = _firestoreService.firestore;
+    final groupsRef = firestore.collection(FirestorePaths.root).doc(FirestorePaths.groups);
+    final eventsRef = ActivityEventWriter.eventsRef(firestore);
+
+    await _firestoreService.runTransaction((transaction) async {
+      final groupsSnap = await transaction.get(groupsRef);
+      final groupsData = groupsSnap.data();
+      if (groupsData == null || !groupsData.containsKey(groupId)) {
+        throw StateError('Group not found.');
+      }
+
+      final groupMap = _asStringKeyMap(groupsData[groupId]);
+      if (groupMap == null) {
+        throw StateError('Group not found.');
+      }
+
+      final memberIds = ActivityEventWriter.memberIdsFromGroup(groupMap);
+      if (!memberIds.contains(actorUserId.trim())) {
+        throw StateError('You are not a member of this group.');
+      }
+
+      transaction.set(
+        groupsRef,
+        {groupId: FieldValue.delete()},
+        SetOptions(merge: true),
+      );
+      ActivityEventWriter.append(
+        transaction,
+        eventsRef,
+        ActivityEventWriter.groupDeleted(
+          groupId: groupId,
+          groupData: groupMap,
+          actorUserId: actorUserId,
+        ),
+      );
+    });
+  }
+
+  @override
   Future<HomeSummaryModel> getHomeSummary(String userId) async {
     // 1. Fetch user names first from 'Splitwise/users' document
     final Map<String, String> allUserNames = {};
@@ -230,7 +311,7 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
       if (usersData != null) {
         for (final entry in usersData.entries) {
           final uId = entry.key;
-          final uData = entry.value as Map?;
+          final uData = _asStringKeyMap(entry.value);
           if (uData != null) {
             allUserNames[uId] = uData['name'] as String? ?? uId.split('@')[0];
           }
@@ -301,7 +382,8 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
 
     for (final entry in groupsData.entries) {
       final groupId = entry.key;
-      final groupData = Map<String, dynamic>.from(entry.value as Map);
+      final groupData = _asStringKeyMap(entry.value);
+      if (groupData == null) continue;
       
       final groupName = groupData['name'] as String? ?? 'Unnamed Group';
       final groupImage = groupData['groupImage'] as String?;
@@ -331,11 +413,12 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
           (expense['id'] as String): Map<String, dynamic>.from(expense),
       };
       DateTime? lastExpenseDate;
-      if (groupData['expenses'] is Map) {
-        final expensesMap = groupData['expenses'] as Map;
+      final expensesMap = _asStringKeyMap(groupData['expenses']);
+      if (expensesMap != null) {
         for (final expEntry in expensesMap.entries) {
-          final expId = expEntry.key as String;
-          final expData = Map<String, dynamic>.from(expEntry.value as Map);
+          final expId = expEntry.key.toString();
+          final expData = _asStringKeyMap(expEntry.value);
+          if (expData == null) continue;
           final isDeleted = (expData['isDeleted'] as bool?) ?? false;
           if (isDeleted || expData['deletedAt'] != null) continue;
           expData['id'] = expId;
@@ -364,11 +447,9 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
         // Splits: userId -> amount owed. Falls back to an equal split
         // across all group members when the expense doesn't specify one.
         final Map<String, double> owedByUser = {};
-        if (expense['splits'] is Map) {
-          (expense['splits'] as Map).forEach((key, value) {
-            final id = key.toString().trim();
-            if (id.isEmpty) return;
-            owedByUser[id] = (value as num?)?.toDouble() ?? 0.0;
+        if (_asStringKeyMap(expense['splits']) != null) {
+          _readAmountMap(expense['splits'], (id, amount) {
+            owedByUser[id] = amount;
           });
         } else if (memberIds.isNotEmpty) {
           final equalShare = totalAmount / memberIds.length;
@@ -380,11 +461,9 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
         // Paid: userId -> amount paid. Supports both the multi-payer
         // `paidBy` map and the legacy single `paidById` string field.
         final Map<String, double> paidByUser = {};
-        if (expense['paidBy'] is Map) {
-          (expense['paidBy'] as Map).forEach((key, value) {
-            final id = key.toString().trim();
-            if (id.isEmpty) return;
-            paidByUser[id] = (value as num?)?.toDouble() ?? 0.0;
+        if (_asStringKeyMap(expense['paidBy']) != null) {
+          _readAmountMap(expense['paidBy'], (id, amount) {
+            paidByUser[id] = amount;
           });
         } else {
           final legacyPaidById = expense['paidById'] as String?;

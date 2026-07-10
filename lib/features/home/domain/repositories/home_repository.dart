@@ -57,4 +57,9 @@ abstract class HomeRepository {
     required String groupId,
     required String userId,
   });
+
+  Future<Result<void>> deleteGroup({
+    required String groupId,
+    required String userId,
+  });
 }

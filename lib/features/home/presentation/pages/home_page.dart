@@ -44,7 +44,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> _openAddExpense() async {
     await context.pushNamed(RouteConstants.addExpenseName);
     if (mounted) {
-      context.read<HomeBloc>().add(const RefreshHome());
+      await context.read<HomeBloc>().refreshAndWait();
     }
   }
 
@@ -176,12 +176,7 @@ class _HomePageState extends State<HomePage> {
       }).toList();
 
       return RefreshIndicator(
-        onRefresh: () async {
-          context.read<HomeBloc>().add(const RefreshHome());
-          await context.read<HomeBloc>().stream.firstWhere(
-                (s) => s is! HomeRefreshing,
-              );
-        },
+        onRefresh: () => context.read<HomeBloc>().refreshAndWait(),
         child: Column(
           children: [
             if (state.isOffline)

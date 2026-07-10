@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../activity/presentation/bloc/activity_bloc.dart';
+import '../../../activity/presentation/bloc/activity_event.dart';
 
 class MainNavigationPage extends StatelessWidget {
+  static const int activityTabIndex = 2;
+
   final StatefulNavigationShell navigationShell;
 
   const MainNavigationPage({
@@ -15,6 +20,9 @@ class MainNavigationPage extends StatelessWidget {
       index,
       initialLocation: index == navigationShell.currentIndex,
     );
+    if (index == activityTabIndex) {
+      context.read<ActivityBloc>().add(const RefreshActivity());
+    }
   }
 
   @override

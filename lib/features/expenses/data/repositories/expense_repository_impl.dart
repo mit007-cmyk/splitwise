@@ -65,4 +65,17 @@ class ExpenseRepositoryImpl extends BaseRepository implements ExpenseRepository 
       ),
     );
   }
+
+  @override
+  Future<Result<void>> restoreExpense({
+    required String expenseId,
+    required String actorUserId,
+  }) {
+    return safeCall(
+      () => _remoteDataSource.restoreExpense(
+        expenseId: expenseId,
+        actorUserId: actorUserId,
+      ),
+    );
+  }
 }

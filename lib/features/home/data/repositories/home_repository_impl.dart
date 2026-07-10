@@ -231,4 +231,24 @@ class HomeRepositoryImpl implements HomeRepository {
       return Result.failure(ServerFailure('Failed to leave group: $e'));
     }
   }
+
+  @override
+  Future<Result<void>> deleteGroup({
+    required String groupId,
+    required String userId,
+  }) async {
+    try {
+      final isOnline = await _connectivityService.isConnected;
+      if (!isOnline) {
+        return Result.failure(const NetworkFailure('Cannot delete group while offline.'));
+      }
+      await _remoteDataSource.deleteGroup(
+        groupId: groupId,
+        actorUserId: userId,
+      );
+      return Result.success(null);
+    } catch (e) {
+      return Result.failure(ServerFailure('Failed to delete group: $e'));
+    }
+  }
 }

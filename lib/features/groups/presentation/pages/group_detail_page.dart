@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/di/di.dart';
+import '../../../../core/utils/group_balance_calculator.dart';
 import '../../../../core/routing/route_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/context_extension.dart';
@@ -16,7 +17,6 @@ import '../../../home/domain/entities/group_summary.dart';
 import '../bloc/group_detail_cubit.dart';
 import 'group_settle_balances_page.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_bloc.dart';
-import 'package:splitwise/features/home/presentation/bloc/home_event.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_state.dart';
 
 class GroupDetailPage extends StatefulWidget {
@@ -69,8 +69,24 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
   }
 
   Future<void> _refreshData() async {
-    context.read<HomeBloc>().add(const RefreshHome());
     await _cubit.loadExpenses(widget.groupId);
+    if (!mounted) return;
+    await context.read<HomeBloc>().refreshAndWait();
+  }
+
+  List<MemberBalance> _effectiveBalances(
+    GroupSummary group,
+    GroupDetailState detailState,
+  ) {
+    if (!detailState.isLoadingExpenses && detailState.expenseError == null) {
+      return GroupBalanceCalculator.computeMemberBalances(
+        expenses: detailState.expenses,
+        currentUserId: _currentUserId,
+        memberNames: detailState.memberNames,
+        memberIds: group.memberIds,
+      );
+    }
+    return group.memberBalances;
   }
 
   Color _heroColor(String name) =>
@@ -94,13 +110,13 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
     await _refreshData();
   }
 
-  Future<void> _openSettleUp(BuildContext context, GroupSummary group) async {
+  Future<void> _openSettleUp(BuildContext context, List<MemberBalance> balances) async {
     final recorded = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => GroupSettleBalancesPage(
           groupId: widget.groupId,
           currentUserId: _currentUserId,
-          balances: group.memberBalances,
+          balances: balances,
         ),
       ),
     );
@@ -210,14 +226,14 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
     );
   }
 
-  List<MemberBalance> _unsettledBalances(GroupSummary group) {
-    return group.memberBalances
+  List<MemberBalance> _unsettledBalances(List<MemberBalance> balances) {
+    return balances
         .where((b) => b.userId.trim().isNotEmpty && b.amount.abs() > 0.01)
         .toList();
   }
 
-  String _overallText(GroupSummary group) {
-    final unsettled = _unsettledBalances(group);
+  String _overallText(List<MemberBalance> balances) {
+    final unsettled = _unsettledBalances(balances);
     if (unsettled.isEmpty) {
       return 'You are all settled up in this group.';
     }
@@ -248,8 +264,8 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
     return 'You owe ₹${oweTotal.toStringAsFixed(2)} overall';
   }
 
-  Color _overallColor(BuildContext context, GroupSummary group) {
-    final unsettled = _unsettledBalances(group);
+  Color _overallColor(BuildContext context, List<MemberBalance> balances) {
+    final unsettled = _unsettledBalances(balances);
     if (unsettled.isEmpty) {
       return context.colorScheme.onSurfaceVariant;
     }
@@ -266,11 +282,11 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
     return hasOwed ? context.appColors.positiveBalanceColor : context.appColors.negativeBalanceColor;
   }
 
-  Widget _buildOverallStatus(BuildContext context, GroupSummary group) {
-    final unsettled = _unsettledBalances(group);
+  Widget _buildOverallStatus(BuildContext context, List<MemberBalance> balances) {
+    final unsettled = _unsettledBalances(balances);
     final textStyle = context.textTheme.titleMedium?.copyWith(
       fontWeight: FontWeight.bold,
-      color: _overallColor(context, group),
+      color: _overallColor(context, balances),
     );
 
     if (unsettled.isEmpty) {
@@ -293,12 +309,12 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
       );
     }
 
-    return Text(_overallText(group), style: textStyle);
+    return Text(_overallText(balances), style: textStyle);
   }
 
-  List<String> _balanceBreakdown(GroupSummary group) {
+  List<String> _balanceBreakdown(List<MemberBalance> balances) {
     final lines = <String>[];
-    for (final balance in _unsettledBalances(group)) {
+    for (final balance in _unsettledBalances(balances)) {
       final amount = '₹${balance.amount.toStringAsFixed(2)}';
       lines.add(
         balance.type == BalanceType.owed
@@ -532,6 +548,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
             child: BlocBuilder<GroupDetailCubit, GroupDetailState>(
               builder: (context, detailState) {
                 final memberNameMap = detailState.memberNames;
+                final balances = _effectiveBalances(group, detailState);
 
                 return NestedScrollView(
                   controller: _scrollController,
@@ -641,16 +658,19 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                 physics: const AlwaysScrollableScrollPhysics(),
                 padding: EdgeInsets.only(bottom: 96.h),
                 children: [
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 0),
-                    child: _buildOverallStatus(context, group),
-                  ),
-                  if (_unsettledBalances(group).isNotEmpty)
+                  if (!detailState.isLoadingExpenses &&
+                      detailState.expenseError == null &&
+                      detailState.expenses.isNotEmpty)
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 0),
+                      child: _buildOverallStatus(context, balances),
+                    ),
+                  if (_unsettledBalances(balances).isNotEmpty)
                     Padding(
                       padding: EdgeInsets.fromLTRB(16.w, 6.h, 16.w, 0),
                       child: Builder(
                         builder: (context) {
-                          final lines = _balanceBreakdown(group);
+                          final lines = _balanceBreakdown(balances);
                           if (lines.length <= 2) {
                             return Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -684,7 +704,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                           _buildActionPill(
                             context,
                             'Settle up',
-                            onTap: () => _openSettleUp(context, group),
+                            onTap: () => _openSettleUp(context, balances),
                           ),
                           _buildActionPill(context, 'Convert to USD', icon: Icons.diamond_rounded),
                           _buildActionPill(context, 'Charts', icon: Icons.diamond_rounded),

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:equatable/equatable.dart';
 
 abstract class HomeEvent extends Equatable {
@@ -12,7 +14,12 @@ class LoadHome extends HomeEvent {
 }
 
 class RefreshHome extends HomeEvent {
-  const RefreshHome();
+  final Completer<void>? completer;
+
+  const RefreshHome({this.completer});
+
+  @override
+  List<Object?> get props => [completer];
 }
 
 class SearchTapped extends HomeEvent {
@@ -95,6 +102,17 @@ class LeaveGroupRequested extends HomeEvent {
   final String groupId;
 
   const LeaveGroupRequested({
+    required this.groupId,
+  });
+
+  @override
+  List<Object?> get props => [groupId];
+}
+
+class DeleteGroupRequested extends HomeEvent {
+  final String groupId;
+
+  const DeleteGroupRequested({
     required this.groupId,
   });
 

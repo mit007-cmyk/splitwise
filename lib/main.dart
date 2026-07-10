@@ -20,8 +20,13 @@ import 'core/services/app_logger.dart';
 import 'core/widgets/biometric_lock_gate.dart';
 import 'features/auth/presentation/bloc/auth_bloc.dart';
 import 'features/auth/presentation/bloc/auth_event.dart';
+import 'features/auth/domain/repositories/auth_repository.dart';
+import 'features/activity/data/datasources/activity_remote_datasource.dart';
+import 'features/activity/data/repositories/activity_repository_impl.dart';
+import 'features/activity/presentation/bloc/activity_bloc.dart';
 import 'features/home/presentation/bloc/home_bloc.dart';
 import 'features/home/presentation/bloc/home_event.dart';
+import 'features/home/domain/repositories/home_repository.dart';
 
 void main() async {
   runZonedGuarded(() async {
@@ -98,6 +103,15 @@ class MyApp extends StatelessWidget {
         ),
         BlocProvider<HomeBloc>(
           create: (context) => getIt<HomeBloc>()..add(const LoadHome()),
+        ),
+        BlocProvider<ActivityBloc>(
+          create: (context) => ActivityBloc(
+            activityRepository: ActivityRepositoryImpl(
+              ActivityRemoteDataSourceImpl(getIt()),
+            ),
+            homeRepository: getIt<HomeRepository>(),
+            authRepository: getIt<AuthRepository>(),
+          ),
         ),
         BlocProvider<ThemeCubit>(
           create: (context) => getIt<ThemeCubit>(),

@@ -13,6 +13,8 @@ import '../../../auth/presentation/bloc/auth_state.dart';
 import 'package:splitwise/features/home/domain/entities/balance_summary.dart';
 import 'package:splitwise/features/home/domain/entities/group_summary.dart';
 import 'package:splitwise/features/home/domain/repositories/home_repository.dart';
+import 'package:splitwise/features/activity/presentation/bloc/activity_bloc.dart';
+import 'package:splitwise/features/activity/presentation/bloc/activity_event.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_bloc.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_event.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_state.dart';
@@ -254,6 +256,63 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteGroup({required GroupSummary group}) {
+    final theme = context.theme;
+    final hasUnsettledBalances = group.memberBalances.isNotEmpty;
+
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: theme.colorScheme.surfaceContainerHigh,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16.r),
+        ),
+        title: Text(
+          'Delete group?',
+          style: context.textTheme.titleLarge,
+        ),
+        content: Text(
+          hasUnsettledBalances
+              ? 'This group still has unsettled balances. Settle up before deleting "${group.groupName}".'
+              : 'Are you sure you want to permanently delete "${group.groupName}"? This cannot be undone.',
+          style: context.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(),
+            child: Text(
+              hasUnsettledBalances ? 'OK' : 'Cancel',
+              style: TextStyle(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ),
+          if (!hasUnsettledBalances)
+            TextButton(
+              onPressed: () {
+                Navigator.of(dialogContext).pop();
+                context.read<HomeBloc>().add(
+                      DeleteGroupRequested(groupId: widget.groupId),
+                    );
+                context.read<ActivityBloc>().add(const RefreshActivity());
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('"${group.groupName}" was deleted.')),
+                );
+                context.go('/home/groups');
+              },
+              child: Text(
+                'Delete',
+                style: TextStyle(
+                  color: theme.colorScheme.error,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
         ],
       ),
     );
@@ -632,6 +691,18 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
                       ),
                     );
                   },
+                ),
+
+                ListTile(
+                  leading: Icon(Icons.delete_outline_rounded, color: theme.colorScheme.error),
+                  title: Text(
+                    'Delete group',
+                    style: TextStyle(
+                      color: theme.colorScheme.error,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  onTap: () => _confirmDeleteGroup(group: group),
                 ),
               ],
             ),
