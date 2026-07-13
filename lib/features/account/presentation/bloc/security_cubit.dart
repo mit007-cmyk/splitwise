@@ -162,8 +162,14 @@ class SecurityCubit extends Cubit<SecurityState> {
         emit(state.copyWith(
           isBiometricsEnabled: true,
           isAuthenticating: false,
-          isSuccess: true,
         ));
+        // Sync to Firestore so the enabled state survives the next loadSettings call.
+        try {
+          await _syncToFirestore();
+        } catch (_) {
+          // Non-fatal — the setting is already persisted locally.
+        }
+        emit(state.copyWith(isSuccess: true));
       } else {
         emit(state.copyWith(
           isAuthenticating: false,
@@ -178,9 +184,15 @@ class SecurityCubit extends Cubit<SecurityState> {
     }
   }
 
-  void disableBiometrics() {
-    _hiveService.put(AppConstants.hiveSettingsBox, BiometricLockService.enabledKey, false);
+  Future<void> disableBiometrics() async {
+    await _hiveService.put(AppConstants.hiveSettingsBox, BiometricLockService.enabledKey, false);
     emit(state.copyWith(isBiometricsEnabled: false, errorMessage: null, isSuccess: false));
+    // Sync to Firestore so the disabled state persists across sessions.
+    try {
+      await _syncToFirestore();
+    } catch (_) {
+      // Non-fatal — the setting is already persisted locally.
+    }
   }
 
   Future<void> saveSettings() async {

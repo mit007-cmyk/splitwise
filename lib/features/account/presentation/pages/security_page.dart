@@ -98,7 +98,7 @@ class SecurityPage extends StatelessWidget {
                                       cubit.loadSettings(userId);
                                     }
                                   } else {
-                                    cubit.disableBiometrics();
+                                    await cubit.disableBiometrics();
                                   }
                                 },
                               ),

@@ -55,23 +55,6 @@ class ActivityRemoteDataSourceImpl implements ActivityRemoteDataSource {
     return items;
   }
 
-  Future<List<ActivityEventModel>> _loadLegacyCollectionEvents(
-    String userId,
-  ) async {
-    try {
-      final snapshot = await _firestoreService.getCollection(
-        FirestorePaths.events,
-        queryBuilder: (query) =>
-            query.where('visibilityUserIds', arrayContains: userId),
-      );
-      return snapshot.docs
-          .map((doc) => ActivityEventModel.fromFirestore(doc.id, doc.data()))
-          .toList();
-    } catch (_) {
-      return [];
-    }
-  }
-
   @override
   Future<ActivityPageRemoteResult> getActivityPage({
     required String userId,
@@ -86,15 +69,7 @@ class ActivityRemoteDataSourceImpl implements ActivityRemoteDataSource {
       );
     }
 
-    final byId = <String, ActivityEventModel>{};
-    for (final event in await _loadSplitwiseDocumentEvents(userId)) {
-      byId[event.id] = event;
-    }
-    for (final event in await _loadLegacyCollectionEvents(userId)) {
-      byId.putIfAbsent(event.id, () => event);
-    }
-
-    var items = byId.values.toList()
+    var items = await _loadSplitwiseDocumentEvents(userId)
       ..sort((a, b) => b.performedAt.compareTo(a.performedAt));
 
     if (before != null) {

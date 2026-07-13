@@ -342,8 +342,7 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
     double overallNetBalance = 0.0;
     final topLevelExpensesByGroup = <String, List<Map<String, dynamic>>>{};
 
-    // Preferred schema: Splitwise/expenses document (same table style as
-    // groups/users where each field key is an expense id).
+    // Preferred schema: Splitwise/expenses document (expense id -> map).
     try {
       final expensesDoc = await _firestoreService.getDocument(
         FirestorePaths.root,
@@ -361,22 +360,6 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
           mapped['id'] = entry.key;
           topLevelExpensesByGroup.putIfAbsent(groupId, () => []).add(mapped);
         }
-      }
-    } catch (_) {}
-
-    // Backward compatibility: also read mistaken top-level `/expenses/{id}`
-    // collection introduced during migration so no data disappears.
-    try {
-      final expenseDocs = await _firestoreService.getCollection(FirestorePaths.expenses);
-      for (final doc in expenseDocs.docs) {
-        final data = doc.data();
-        final isDeleted = (data['isDeleted'] as bool?) ?? false;
-        if (isDeleted || data['deletedAt'] != null) continue;
-        final groupId = data['groupId'] as String?;
-        if (groupId == null || groupId.isEmpty) continue;
-        final mapped = Map<String, dynamic>.from(data);
-        mapped['id'] = doc.id;
-        topLevelExpensesByGroup.putIfAbsent(groupId, () => []).add(mapped);
       }
     } catch (_) {}
 
@@ -407,7 +390,7 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
       }
 
       // Map expenses.
-      // New schema first (top-level `/expenses`), then legacy nested data.
+      // Splitwise/expenses first, then nested group.expenses if present.
       final Map<String, Map<String, dynamic>> expensesById = {
         for (final expense in (topLevelExpensesByGroup[groupId] ?? const <Map<String, dynamic>>[]))
           (expense['id'] as String): Map<String, dynamic>.from(expense),

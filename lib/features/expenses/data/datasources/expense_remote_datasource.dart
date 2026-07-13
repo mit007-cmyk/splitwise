@@ -15,12 +15,11 @@ abstract class ExpenseRemoteDataSource {
 
   /// Reads every expense for [groupId], newest first.
   ///
-  /// Primary source is `Splitwise/expenses` (same table style as groups/users).
-  /// Falls back to prior storage variants so existing users keep seeing old
-  /// data during migration.
+  /// Primary source is `Splitwise/expenses`. Falls back to nested
+  /// `Splitwise/groups.{groupId}.expenses` for older group data.
   Future<List<ExpenseModel>> getGroupExpenses(String groupId);
 
-  /// Reads one expense by id from supported storage variants.
+  /// Reads one expense by id from `Splitwise/expenses`.
   Future<ExpenseModel?> getExpenseById(String expenseId);
 
   /// Updates an expense atomically with audit fields.
@@ -185,9 +184,6 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
     final groupsRef = firestore
         .collection(FirestorePaths.root)
         .doc(FirestorePaths.groups);
-    final legacyRef = firestore
-        .collection(FirestorePaths.expenses)
-        .doc(expenseId);
     final eventsRef = firestore
         .collection(FirestorePaths.root)
         .doc(FirestorePaths.events);
@@ -198,7 +194,6 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
       final groupName = _groupNameFromDoc(groupsData, groupId);
 
       transaction.set(splitwiseRef, {expenseId: data}, SetOptions(merge: true));
-      transaction.set(legacyRef, data, SetOptions(merge: true));
       if (groupId.trim().isNotEmpty) {
         transaction.set(
           groupsRef,
@@ -227,18 +222,14 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
   @override
   Future<List<ExpenseModel>> getGroupExpenses(String groupId) async {
     final splitwiseDoc = await _getSplitwiseDocumentGroupExpenses(groupId);
-    final topLevel = await _getTopLevelCollectionGroupExpenses(groupId);
-    final legacy = await _getLegacyNestedGroupExpenses(groupId);
+    final nested = await _getLegacyNestedGroupExpenses(groupId);
 
-    if (splitwiseDoc.isEmpty && topLevel.isEmpty) return legacy;
-    if (splitwiseDoc.isEmpty && legacy.isEmpty) return topLevel;
-    if (topLevel.isEmpty && legacy.isEmpty) return splitwiseDoc;
+    if (splitwiseDoc.isEmpty) return nested;
+    if (nested.isEmpty) return splitwiseDoc;
 
-    // Merge sources by expense id (newest schema wins on duplicate ids):
-    // splitwise doc > top-level collection > legacy nested.
+    // Splitwise/expenses wins when the same id exists in nested group data.
     final byId = <String, ExpenseModel>{
-      for (final expense in legacy) expense.id: expense,
-      for (final expense in topLevel) expense.id: expense,
+      for (final expense in nested) expense.id: expense,
       for (final expense in splitwiseDoc) expense.id: expense,
     };
     final merged = byId.values.toList()
@@ -265,25 +256,6 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
       if (expenseGroupId != groupId) return;
       expenses.add(ExpenseModel.fromMap(key, groupId, mapped));
     });
-    expenses.sort((a, b) => b.date.compareTo(a.date));
-    return expenses;
-  }
-
-  Future<List<ExpenseModel>> _getTopLevelCollectionGroupExpenses(
-    String groupId,
-  ) async {
-    final snapshot = await _firestoreService.getCollection(
-      FirestorePaths.expenses,
-      queryBuilder: (query) => query.where('groupId', isEqualTo: groupId),
-    );
-
-    final expenses = <ExpenseModel>[];
-    for (final doc in snapshot.docs) {
-      final data = doc.data();
-      if (_isDeleted(data)) continue;
-      expenses.add(ExpenseModel.fromMap(doc.id, groupId, data));
-    }
-
     expenses.sort((a, b) => b.date.compareTo(a.date));
     return expenses;
   }
@@ -341,18 +313,6 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
       }
     } catch (_) {}
 
-    try {
-      final legacyDoc = await _firestoreService.getDocument(
-        FirestorePaths.expenses,
-        expenseId,
-      );
-      final data = legacyDoc.data();
-      if (data != null && !_isDeleted(data)) {
-        final groupId = data['groupId'] as String? ?? '';
-        return ExpenseModel.fromMap(expenseId, groupId, data);
-      }
-    } catch (_) {}
-
     return null;
   }
 
@@ -369,9 +329,6 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
     final groupsRef = firestore
         .collection(FirestorePaths.root)
         .doc(FirestorePaths.groups);
-    final legacyRef = firestore
-        .collection(FirestorePaths.expenses)
-        .doc(expenseId);
     final eventsRef = firestore
         .collection(FirestorePaths.root)
         .doc(FirestorePaths.events);
@@ -381,19 +338,11 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
       final splitwiseData = splitwiseSnap.data();
       final existingRaw = splitwiseData?[expenseId];
 
-      Map<String, dynamic>? existing;
-      if (existingRaw is Map) {
-        existing = Map<String, dynamic>.from(existingRaw);
-      } else {
-        final legacySnap = await transaction.get(legacyRef);
-        if (legacySnap.exists && legacySnap.data() != null) {
-          existing = Map<String, dynamic>.from(legacySnap.data()!);
-        }
-      }
-
-      if (existing == null) {
+      if (existingRaw is! Map) {
         throw StateError('Expense not found.');
       }
+      final existing = Map<String, dynamic>.from(existingRaw);
+
       if (_isDeleted(existing)) {
         throw StateError('Cannot edit a deleted expense.');
       }
@@ -419,7 +368,6 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
       final groupName = _groupNameFromDoc(groupsData, nextGroupId);
 
       transaction.set(splitwiseRef, {expenseId: merged}, SetOptions(merge: true));
-      transaction.set(legacyRef, merged, SetOptions(merge: true));
       if (previousGroupId.isNotEmpty && previousGroupId != nextGroupId) {
         transaction.set(
           groupsRef,
@@ -464,9 +412,6 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
     final groupsRef = firestore
         .collection(FirestorePaths.root)
         .doc(FirestorePaths.groups);
-    final legacyRef = firestore
-        .collection(FirestorePaths.expenses)
-        .doc(expenseId);
     final eventsRef = firestore
         .collection(FirestorePaths.root)
         .doc(FirestorePaths.events);
@@ -476,19 +421,11 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
       final splitwiseData = splitwiseSnap.data();
       final existingRaw = splitwiseData?[expenseId];
 
-      Map<String, dynamic>? existing;
-      if (existingRaw is Map) {
-        existing = Map<String, dynamic>.from(existingRaw);
-      } else {
-        final legacySnap = await transaction.get(legacyRef);
-        if (legacySnap.exists && legacySnap.data() != null) {
-          existing = Map<String, dynamic>.from(legacySnap.data()!);
-        }
-      }
-
-      if (existing == null) {
+      if (existingRaw is! Map) {
         throw StateError('Expense not found.');
       }
+      final existing = Map<String, dynamic>.from(existingRaw);
+
       if (_isDeleted(existing)) {
         throw StateError('This expense is already deleted.');
       }
@@ -511,7 +448,6 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
       final groupName = _groupNameFromDoc(groupsData, groupId);
 
       transaction.set(splitwiseRef, {expenseId: deleted}, SetOptions(merge: true));
-      transaction.set(legacyRef, deleted, SetOptions(merge: true));
       if (groupId.isNotEmpty) {
         transaction.set(
           groupsRef,
@@ -549,9 +485,6 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
     final groupsRef = firestore
         .collection(FirestorePaths.root)
         .doc(FirestorePaths.groups);
-    final legacyRef = firestore
-        .collection(FirestorePaths.expenses)
-        .doc(expenseId);
     final eventsRef = firestore
         .collection(FirestorePaths.root)
         .doc(FirestorePaths.events);
@@ -561,19 +494,11 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
       final splitwiseData = splitwiseSnap.data();
       final existingRaw = splitwiseData?[expenseId];
 
-      Map<String, dynamic>? existing;
-      if (existingRaw is Map) {
-        existing = Map<String, dynamic>.from(existingRaw);
-      } else {
-        final legacySnap = await transaction.get(legacyRef);
-        if (legacySnap.exists && legacySnap.data() != null) {
-          existing = Map<String, dynamic>.from(legacySnap.data()!);
-        }
-      }
-
-      if (existing == null) {
+      if (existingRaw is! Map) {
         throw StateError('Expense not found.');
       }
+      final existing = Map<String, dynamic>.from(existingRaw);
+
       if (!_isDeleted(existing)) {
         throw StateError('Expense is not deleted.');
       }
@@ -596,7 +521,6 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
       final groupName = _groupNameFromDoc(groupsData, groupId);
 
       transaction.set(splitwiseRef, {expenseId: restored}, SetOptions(merge: true));
-      transaction.set(legacyRef, restored, SetOptions(merge: true));
       if (groupId.isNotEmpty) {
         transaction.set(
           groupsRef,

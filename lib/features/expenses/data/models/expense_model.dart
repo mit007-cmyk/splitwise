@@ -51,8 +51,8 @@ class ExpenseModel extends Expense {
 
   /// Rebuilds an [ExpenseModel] from a raw Firestore expense map.
   ///
-  /// Supports both top-level `/expenses/{id}` docs and legacy
-  /// `Splitwise/groups.{groupId}.expenses.{id}` nested maps. Tolerant of
+  /// Supports `Splitwise/expenses.{id}` maps and nested
+  /// `Splitwise/groups.{groupId}.expenses.{id}` maps. Tolerant of
   /// older documents that
   /// predate this module (single `paidById`, missing `title`/`category`/etc.)
   /// so old and new expenses can be read back side by side.
@@ -117,9 +117,9 @@ class ExpenseModel extends Expense {
     );
   }
 
-  /// Firestore payload for top-level `/expenses/{id}` documents.
+  /// Firestore payload for `Splitwise/expenses.{id}` map entries.
   ///
-  /// `groupId` is persisted so callers can query expenses by group.
+  /// `groupId` is persisted so callers can filter expenses by group.
   /// `paidBy`/`splits` stay as maps so readers can keep handling legacy
   /// single-payer expenses (`paidById`) alongside these.
   Map<String, dynamic> toMap({bool includeCreateAudit = true, String? updatedBy}) {
