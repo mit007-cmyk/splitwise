@@ -43,6 +43,9 @@ class RouteConstants {
   static const String groupWhiteboardPath = '/group-detail/:groupId/whiteboard';
   static const String groupWhiteboardName = 'group-whiteboard';
 
+  static const String groupInviteLinkPath = '/group-detail/:groupId/invite-link';
+  static const String groupInviteLinkName = 'group-invite-link';
+
   static const String addFriendPath = '/add-friend';
   static const String addFriendName = 'add-friend';
 

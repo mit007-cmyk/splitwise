@@ -13,6 +13,7 @@ import 'package:splitwise/features/groups/presentation/pages/add_group_members_p
 import 'package:splitwise/features/groups/presentation/pages/group_charts_page.dart';
 import 'package:splitwise/features/groups/presentation/pages/group_category_expenses_page.dart';
 import 'package:splitwise/features/groups/presentation/pages/group_whiteboard_page.dart';
+import 'package:splitwise/features/groups/presentation/pages/group_invite_link_page.dart';
 import 'package:splitwise/features/friends/presentation/pages/add_friend_page.dart';
 import 'package:splitwise/features/friends/presentation/pages/add_friend_search_page.dart';
 import 'package:splitwise/features/groups/presentation/pages/group_settings_page.dart';
@@ -201,6 +202,14 @@ class AppRouter {
         builder: (context, state) {
           final groupId = state.pathParameters['groupId'] ?? '';
           return GroupWhiteboardPage(groupId: groupId);
+        },
+      ),
+      GoRoute(
+        path: RouteConstants.groupInviteLinkPath,
+        name: RouteConstants.groupInviteLinkName,
+        builder: (context, state) {
+          final groupId = state.pathParameters['groupId'] ?? '';
+          return GroupInviteLinkPage(groupId: groupId);
         },
       ),
       GoRoute(

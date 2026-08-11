@@ -445,7 +445,7 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
                       fontWeight: FontWeight.w500,
                     ),
                   ),
-                  onTap: () {},
+                  onTap: () => context.push('/group-detail/${widget.groupId}/invite-link'),
                 ),
 
                 if (_isLoadingUsers)
