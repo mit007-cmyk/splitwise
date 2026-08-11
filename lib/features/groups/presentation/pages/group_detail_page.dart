@@ -714,6 +714,12 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                             icon: Icons.bar_chart_rounded,
                             onTap: () => context.push('/group-detail/${widget.groupId}/charts'),
                           ),
+                          _buildActionPill(
+                            context,
+                            'Whiteboard',
+                            icon: Icons.edit_note_rounded,
+                            onTap: () => context.push('/group-detail/${widget.groupId}/whiteboard'),
+                          ),
                         ],
                       ),
                     ),

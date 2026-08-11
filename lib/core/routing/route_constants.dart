@@ -40,6 +40,9 @@ class RouteConstants {
       '/group-detail/:groupId/charts/category/:category';
   static const String groupCategoryExpensesName = 'group-category-expenses';
 
+  static const String groupWhiteboardPath = '/group-detail/:groupId/whiteboard';
+  static const String groupWhiteboardName = 'group-whiteboard';
+
   static const String addFriendPath = '/add-friend';
   static const String addFriendName = 'add-friend';
 
