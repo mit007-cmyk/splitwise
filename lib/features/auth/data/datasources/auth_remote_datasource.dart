@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:injectable/injectable.dart';
 import 'package:uuid/uuid.dart';
@@ -46,6 +47,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   // Use a lazy getter to prevent startup crashes when Firebase is not active
   FirebaseAuth get _auth => FirebaseAuth.instance;
+
+  // Web OAuth 2.0 client ID (client_type 3 from google-services.json)
+  // Required by google_sign_in_web on Flutter Web
+  static const _webClientId =
+      '1094838385635-st86qptmi9spiuceiqffdjigc272j8q9.apps.googleusercontent.com';
+
+  GoogleSignIn get _googleSignIn => GoogleSignIn(
+        clientId: kIsWeb ? _webClientId : null,
+        scopes: ['email', 'profile'],
+      );
 
   // Key to store mock users database locally when Firebase is disabled
   static const String _mockDbBox = 'settings_box';
@@ -145,33 +156,51 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<UserModel> loginWithGoogle() async {
     if (_isFirebaseActive) {
       try {
-        _logger.d('AuthRemoteDataSource: Actual Google Sign-In init');
-        
-        // Trigger Google account selection dialog
-        final googleUser = await GoogleSignIn().signIn();
-        if (googleUser == null) {
-          throw const AuthException(message: 'Google Sign-in cancelled by user');
+        _logger.d('AuthRemoteDataSource: Google Sign-In init (web=$kIsWeb)');
+
+        User? user;
+
+        if (kIsWeb) {
+          // Sign out of Firebase first so Google doesn't auto-reuse the previous session.
+          // This forces Chrome to show the full account picker every time.
+          await _auth.signOut();
+
+          final provider = GoogleAuthProvider()
+            ..addScope('email')
+            ..addScope('profile')
+            ..setCustomParameters({
+              'prompt': 'select_account',
+            });
+          final credentialResult = await _auth.signInWithPopup(provider);
+          user = credentialResult.user;
+        } else {
+          // On mobile: use google_sign_in package
+          // Sign out first to force account picker on next sign-in
+          await _googleSignIn.signOut();
+          final googleUser = await _googleSignIn.signIn();
+          if (googleUser == null) {
+            throw const AuthException(message: 'Google Sign-in cancelled by user');
+          }
+          final googleAuth = await googleUser.authentication;
+          final credential = GoogleAuthProvider.credential(
+            accessToken: googleAuth.accessToken,
+            idToken: googleAuth.idToken,
+          );
+          final credentialResult = await _auth.signInWithCredential(credential);
+          user = credentialResult.user;
         }
-        
-        final googleAuth = await googleUser.authentication;
-        final AuthCredential credential = GoogleAuthProvider.credential(
-          accessToken: googleAuth.accessToken,
-          idToken: googleAuth.idToken,
-        );
-        
-        final credentialResult = await _auth.signInWithCredential(credential);
-        final user = credentialResult.user;
+
         if (user == null) {
           throw const AuthException(message: 'Google login failed');
         }
-        
+
         final userModel = UserModel(
           id: user.uid,
-          email: user.email ?? googleUser.email,
-          name: user.displayName ?? googleUser.displayName ?? 'Google User',
-          photoUrl: user.photoURL ?? googleUser.photoUrl,
+          email: user.email ?? '',
+          name: user.displayName ?? 'Google User',
+          photoUrl: user.photoURL,
         );
-        
+
         // Sync to Firestore 'Splitwise/users' document as a merged field
         await _firestoreService.setDocument(
           'Splitwise',
@@ -189,7 +218,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           userId: userModel.id,
           email: userModel.email,
         );
-        
+
         return _friendsRemoteDataSource.ensureFriendCodeForUser(userModel);
       } on FirebaseAuthException catch (e) {
         _logger.e('FirebaseAuth Google login failed', e);
@@ -296,7 +325,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       _logger.d('AuthRemoteDataSource: Logout via FirebaseAuth and GoogleSignIn');
       await _auth.signOut();
       try {
-        await GoogleSignIn().signOut();
+        await _googleSignIn.signOut();
       } catch (e, stackTrace) {
         _logger.e('Failed to sign out of GoogleSignIn', e, stackTrace);
       }

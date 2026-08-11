@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import '../constants/app_constants.dart';
 import '../utils/context_extension.dart';
@@ -17,7 +16,8 @@ class GoogleSignInButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = context.theme.brightness == Brightness.dark;
-    final isUnderTest = Platform.environment.containsKey('FLUTTER_TEST');
+    // bool.fromEnvironment works on all platforms including web (unlike dart:io Platform)
+    const isUnderTest = bool.fromEnvironment('FLUTTER_TEST');
     final colors = context.appColors;
     final scheme = context.colorScheme;
 

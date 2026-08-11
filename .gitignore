@@ -20,8 +20,12 @@
 # The .vscode folder contains launch configuration and tasks you configure in
 # VS Code which you may wish to be included in version control, so this line
 # is commented out by default.
-#.vscode/
-.vscode/settings.json
+.vscode/
+
+# Node / npm — not needed in a Flutter project (leftover from any accidental npm install)
+node_modules/
+package.json
+package-lock.json
 
 # Cursor IDE rules/config and local project docs — not needed in version control
 .cursor/

@@ -18,9 +18,20 @@ class FirestoreService {
     try {
       return await _firestore.collection(collectionPath).doc(documentId).get();
     } catch (e, stackTrace) {
-      _logger.e('Firestore getDocument failed: $collectionPath/$documentId', e, stackTrace);
+      _logger.e(
+        'Firestore getDocument failed: $collectionPath/$documentId (${_describeError(e)})',
+        e,
+        stackTrace,
+      );
       rethrow;
     }
+  }
+
+  String _describeError(Object error) {
+    if (error is FirebaseException) {
+      return '${error.code}: ${error.message ?? error.toString()}';
+    }
+    return error.toString();
   }
 
   /// Create or overwrite a document

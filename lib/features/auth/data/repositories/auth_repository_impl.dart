@@ -59,17 +59,15 @@ class AuthRepositoryImpl extends BaseRepository implements AuthRepository {
   @override
   Future<Result<UserEntity>> getCurrentUser() async {
     return safeCall(() async {
-      final cachedUser = await _localDataSource.getCachedUser();
-      if (cachedUser != null) {
-        return cachedUser;
-      }
-
       final remoteUser = await _remoteDataSource.getCurrentUser();
       if (remoteUser != null) {
         await _localDataSource.cacheUser(remoteUser);
         return remoteUser;
       }
 
+      // Stale Hive session must not count as logged-in: Firestore rules
+      // require Firebase Auth, so a cache-only user gets permission-denied.
+      await _localDataSource.clearCache();
       return UserEntity.empty;
     });
   }
