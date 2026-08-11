@@ -51,31 +51,33 @@ class CategoryPickerSheet extends StatelessWidget {
     return BlocBuilder<AddExpenseBloc, AddExpenseState>(
       builder: (context, state) {
         return SafeArea(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Padding(
-                padding: EdgeInsets.all(AppDimensions.lg.w),
-                child: Text(
-                  'Choose a category',
-                  style: context.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: EdgeInsets.all(AppDimensions.lg.w),
+                  child: Text(
+                    'Choose a category',
+                    style: context.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                  ),
                 ),
-              ),
-              ...kExpenseCategories.map(
-                (category) => ListTile(
-                  leading: Icon(category.icon, color: scheme.onSurface),
-                  title: Text(category.name),
-                  trailing: state.category == category.name
-                      ? Icon(Icons.check, color: scheme.primary)
-                      : null,
-                  onTap: () {
-                    context.read<AddExpenseBloc>().add(CategoryChanged(category.name));
-                    Navigator.of(context).pop();
-                  },
+                ...kExpenseCategories.map(
+                  (category) => ListTile(
+                    leading: Icon(category.icon, color: scheme.onSurface),
+                    title: Text(category.name),
+                    trailing: state.category == category.name
+                        ? Icon(Icons.check, color: scheme.primary)
+                        : null,
+                    onTap: () {
+                      context.read<AddExpenseBloc>().add(CategoryChanged(category.name));
+                      Navigator.of(context).pop();
+                    },
+                  ),
                 ),
-              ),
-              SizedBox(height: AppDimensions.sm.h),
-            ],
+                SizedBox(height: AppDimensions.sm.h),
+              ],
+            ),
           ),
         );
       },

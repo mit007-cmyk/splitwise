@@ -33,6 +33,13 @@ class RouteConstants {
   static const String addGroupMembersPath = '/group-detail/:groupId/add-members';
   static const String addGroupMembersName = 'add-group-members';
 
+  static const String groupChartsPath = '/group-detail/:groupId/charts';
+  static const String groupChartsName = 'group-charts';
+
+  static const String groupCategoryExpensesPath =
+      '/group-detail/:groupId/charts/category/:category';
+  static const String groupCategoryExpensesName = 'group-category-expenses';
+
   static const String addFriendPath = '/add-friend';
   static const String addFriendName = 'add-friend';
 

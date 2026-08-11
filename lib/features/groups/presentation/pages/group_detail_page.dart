@@ -708,7 +708,12 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                             onTap: () => _openSettleUp(context, balances),
                           ),
                           _buildActionPill(context, 'Convert to USD', icon: Icons.diamond_rounded),
-                          _buildActionPill(context, 'Charts', icon: Icons.diamond_rounded),
+                          _buildActionPill(
+                            context,
+                            'Charts',
+                            icon: Icons.bar_chart_rounded,
+                            onTap: () => context.push('/group-detail/${widget.groupId}/charts'),
+                          ),
                         ],
                       ),
                     ),
