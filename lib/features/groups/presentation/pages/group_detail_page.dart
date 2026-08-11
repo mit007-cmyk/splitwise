@@ -8,6 +8,7 @@ import '../../../../core/utils/group_balance_calculator.dart';
 import '../../../../core/routing/route_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/utils/csv_exporter.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -720,6 +721,12 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                             icon: Icons.edit_note_rounded,
                             onTap: () => context.push('/group-detail/${widget.groupId}/whiteboard'),
                           ),
+                          _buildActionPill(
+                            context,
+                            'Export',
+                            icon: Icons.download_rounded,
+                            onTap: () => _exportGroupExpenses(context, group, detailState.expenses, memberNameMap),
+                          ),
                         ],
                       ),
                     ),
@@ -828,5 +835,97 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
       },
       ),
     );
+  }
+
+  Future<void> _exportGroupExpenses(
+    BuildContext context,
+    GroupSummary group,
+    List<Expense> expenses,
+    Map<String, String> memberNameMap,
+  ) async {
+    // Only non-deleted expenses
+    final validExpenses = expenses.where((e) => !e.isDeleted).toList();
+
+    // Prepare headers
+    final memberIds = group.memberIds;
+    final memberNames = memberIds.map((id) => memberNameMap[id] ?? id).toList();
+
+    final csvRows = <String>[];
+    // Header row
+    final headers = ['Date', 'Description', 'Category', 'Cost', 'Currency', ...memberNames];
+    csvRows.add(headers.map((h) => _escapeCsvField(h)).join(','));
+    csvRows.add(''); // Blank line after headers
+
+    // Columns sums
+    final memberNetSums = <String, double>{
+      for (final id in memberIds) id: 0.0,
+    };
+
+    // Data rows
+    for (final exp in validExpenses) {
+      final dateStr = DateFormat('yyyy-MM-dd').format(exp.date);
+      final row = [
+        dateStr,
+        exp.title,
+        exp.category,
+        exp.amount.toStringAsFixed(2),
+        exp.currencyCode,
+      ];
+
+      for (final id in memberIds) {
+        final net = (exp.paidBy[id] ?? 0.0) - (exp.splits[id] ?? 0.0);
+        row.add(net.toStringAsFixed(2));
+        memberNetSums[id] = (memberNetSums[id] ?? 0.0) + net;
+      }
+
+      csvRows.add(row.map((val) => _escapeCsvField(val)).join(','));
+    }
+
+    // Blank line
+    csvRows.add('');
+
+    // Summary row
+    final lastDate = validExpenses.isNotEmpty
+        ? DateFormat('yyyy-MM-dd').format(validExpenses.first.date)
+        : DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final defaultCurrency = validExpenses.isNotEmpty ? validExpenses.first.currencyCode : 'INR';
+
+    final summaryRow = [
+      lastDate,
+      'Total balance',
+      ' ',
+      ' ',
+      defaultCurrency,
+    ];
+
+    for (final id in memberIds) {
+      final totalNet = memberNetSums[id] ?? 0.0;
+      summaryRow.add(totalNet.toStringAsFixed(2));
+    }
+
+    csvRows.add(summaryRow.map((val) => _escapeCsvField(val)).join(','));
+    csvRows.add('');
+    csvRows.add(''); // Matches the trailing newlines in export.csv
+
+    final csvContent = csvRows.join('\n');
+    final filename = '${group.groupName.replaceAll(RegExp(r'[^\w\s\-]'), '_')}_export.csv';
+
+    try {
+      saveCsvFile(csvContent, filename);
+      if (context.mounted) {
+        AppToast.show(context, 'Expenses exported successfully.', type: ToastType.success);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        AppToast.show(context, 'Failed to export CSV: $e', type: ToastType.error);
+      }
+    }
+  }
+
+  String _escapeCsvField(String field) {
+    if (field.contains(',') || field.contains('"') || field.contains('\n')) {
+      return '"${field.replaceAll('"', '""')}"';
+    }
+    return field;
   }
 }
