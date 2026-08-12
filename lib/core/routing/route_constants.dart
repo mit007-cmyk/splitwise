@@ -103,4 +103,7 @@ class RouteConstants {
 
   static const String onboardingTourPath = '/onboarding-tour';
   static const String onboardingTourName = 'onboarding-tour';
+
+  static const String getStartedPath = '/get-started';
+  static const String getStartedName = 'get-started';
 }

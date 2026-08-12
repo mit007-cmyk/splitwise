@@ -13,7 +13,10 @@ const List<String> _stepAssets = [
 ];
 
 class OnboardingTourPage extends StatefulWidget {
-  const OnboardingTourPage({super.key});
+  /// Pass true when coming from registration, false from login.
+  final bool isNewUser;
+
+  const OnboardingTourPage({super.key, required this.isNewUser});
 
   @override
   State<OnboardingTourPage> createState() => _OnboardingTourPageState();
@@ -116,7 +119,13 @@ class _OnboardingTourPageState extends State<OnboardingTourPage>
     _advancing = false;
   }
 
-  void _finish() => context.go(RouteConstants.homePath);
+  void _finish() {
+    if (widget.isNewUser) {
+      context.go(RouteConstants.getStartedPath);
+    } else {
+      context.go(RouteConstants.homePath);
+    }
+  }
 
   @override
   void dispose() {

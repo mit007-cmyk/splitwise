@@ -60,7 +60,7 @@ class _RegisterPageState extends State<RegisterPage> {
         child: BlocListener<AuthBloc, AuthState>(
           listener: (context, state) {
             if (state is Authenticated) {
-              context.go(RouteConstants.onboardingTourPath);
+              context.go(RouteConstants.onboardingTourPath, extra: true);
             } else if (state is AuthError) {
               AppToast.show(context, state.message, type: ToastType.error);
             }
