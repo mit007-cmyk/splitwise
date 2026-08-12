@@ -34,6 +34,7 @@ import 'package:splitwise/features/account/presentation/pages/use_biometrics_pag
 import 'package:splitwise/features/expenses/presentation/pages/add_expense_page.dart';
 import 'package:splitwise/features/friends/presentation/pages/friend_record_payment_page.dart';
 import 'package:splitwise/features/groups/presentation/pages/simplify_debts_info_page.dart';
+import 'package:splitwise/features/auth/presentation/pages/onboarding_tour_page.dart';
 import 'route_constants.dart';
 import 'placeholder_screens.dart';
 
@@ -69,18 +70,20 @@ class AppRouter {
       final authRepo = getIt<AuthRepository>();
       final userResult = await authRepo.getCurrentUser();
       
-      final isLoggingIn = state.matchedLocation == RouteConstants.loginPath || 
+      final isLoggingIn = state.matchedLocation == RouteConstants.loginPath ||
                           state.matchedLocation == RouteConstants.registerPath;
-                          
+
       final isSplash = state.matchedLocation == RouteConstants.splashPath;
+      final isOnboarding =
+          state.matchedLocation == RouteConstants.onboardingTourPath;
 
       if (userResult.isSuccess) {
         final user = userResult.dataOrThrow;
         final isLoggedIn = user.isNotEmpty;
-        
+
         if (!isLoggedIn) {
-          // If not logged in and not on login/register/splash, redirect to login
-          if (!isLoggingIn && !isSplash) {
+          // If not logged in and not on login/register/splash/onboarding, redirect to login
+          if (!isLoggingIn && !isSplash && !isOnboarding) {
             return RouteConstants.loginPath;
           }
         } else {
@@ -91,7 +94,7 @@ class AppRouter {
         }
       } else {
         // Fallback for check session failures
-        if (!isLoggingIn && !isSplash) {
+        if (!isLoggingIn && !isSplash && !isOnboarding) {
           return RouteConstants.loginPath;
         }
       }
@@ -358,6 +361,12 @@ class AppRouter {
         name: RouteConstants.simplifyDebtsInfoName,
         parentNavigatorKey: rootNavigatorKey,
         builder: (context, state) => const SimplifyDebtsInfoPage(),
+      ),
+      GoRoute(
+        path: RouteConstants.onboardingTourPath,
+        name: RouteConstants.onboardingTourName,
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const OnboardingTourPage(),
       ),
       GoRoute(
         path: RouteConstants.unknownPath,

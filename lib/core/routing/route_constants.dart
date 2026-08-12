@@ -100,4 +100,7 @@ class RouteConstants {
 
   static const String simplifyDebtsInfoPath = '/simplify-debts-info';
   static const String simplifyDebtsInfoName = 'simplify-debts-info';
+
+  static const String onboardingTourPath = '/onboarding-tour';
+  static const String onboardingTourName = 'onboarding-tour';
 }
