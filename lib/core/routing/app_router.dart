@@ -33,6 +33,7 @@ import 'package:splitwise/features/friends/presentation/pages/friend_code_page.d
 import 'package:splitwise/features/account/presentation/pages/use_biometrics_page.dart';
 import 'package:splitwise/features/expenses/presentation/pages/add_expense_page.dart';
 import 'package:splitwise/features/friends/presentation/pages/friend_record_payment_page.dart';
+import 'package:splitwise/features/groups/presentation/pages/simplify_debts_info_page.dart';
 import 'route_constants.dart';
 import 'placeholder_screens.dart';
 
@@ -351,6 +352,12 @@ class AppRouter {
           final friendId = state.uri.queryParameters['friendId'];
           return AddExpensePage(groupId: groupId, friendId: friendId);
         },
+      ),
+      GoRoute(
+        path: RouteConstants.simplifyDebtsInfoPath,
+        name: RouteConstants.simplifyDebtsInfoName,
+        parentNavigatorKey: rootNavigatorKey,
+        builder: (context, state) => const SimplifyDebtsInfoPage(),
       ),
       GoRoute(
         path: RouteConstants.unknownPath,

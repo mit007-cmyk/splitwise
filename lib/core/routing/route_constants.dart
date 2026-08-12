@@ -97,4 +97,7 @@ class RouteConstants {
 
   static const String expenseDetailPath = '/expense-detail/:expenseId';
   static const String expenseDetailName = 'expense-detail';
+
+  static const String simplifyDebtsInfoPath = '/simplify-debts-info';
+  static const String simplifyDebtsInfoName = 'simplify-debts-info';
 }

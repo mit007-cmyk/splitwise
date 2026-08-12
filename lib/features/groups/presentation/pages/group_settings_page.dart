@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
@@ -581,6 +582,10 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
                               color: theme.colorScheme.primary,
                               fontWeight: FontWeight.bold,
                             ),
+                            recognizer: TapGestureRecognizer()
+                              ..onTap = () => context.pushNamed(
+                                    RouteConstants.simplifyDebtsInfoName,
+                                  ),
                           ),
                         ],
                       ),
