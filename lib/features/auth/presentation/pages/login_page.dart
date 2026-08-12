@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/di/di.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/helpers/validation_helper.dart';
+import '../../../../core/routing/route_constants.dart';
 import '../../../../core/widgets/app_button.dart';
 import '../../../../core/widgets/app_text_field.dart';
 import '../../../../core/widgets/glass_background.dart';
@@ -56,7 +57,7 @@ class _LoginPageState extends State<LoginPage> {
         child: BlocListener<AuthBloc, AuthState>(
           listener: (context, state) {
             if (state is Authenticated) {
-              context.go('/home');
+              context.go(RouteConstants.onboardingTourPath);
             } else if (state is AuthError) {
               AppToast.show(context, state.message, type: ToastType.error);
             }
