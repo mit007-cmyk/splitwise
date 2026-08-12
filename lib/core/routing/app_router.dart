@@ -14,6 +14,7 @@ import 'package:splitwise/features/groups/presentation/pages/group_charts_page.d
 import 'package:splitwise/features/groups/presentation/pages/group_category_expenses_page.dart';
 import 'package:splitwise/features/groups/presentation/pages/group_whiteboard_page.dart';
 import 'package:splitwise/features/groups/presentation/pages/group_invite_link_page.dart';
+import 'package:splitwise/features/groups/presentation/pages/group_balances_page.dart';
 import 'package:splitwise/features/friends/presentation/pages/add_friend_page.dart';
 import 'package:splitwise/features/friends/presentation/pages/add_friend_search_page.dart';
 import 'package:splitwise/features/groups/presentation/pages/group_settings_page.dart';
@@ -210,6 +211,14 @@ class AppRouter {
         builder: (context, state) {
           final groupId = state.pathParameters['groupId'] ?? '';
           return GroupInviteLinkPage(groupId: groupId);
+        },
+      ),
+      GoRoute(
+        path: RouteConstants.groupBalancesPath,
+        name: RouteConstants.groupBalancesName,
+        builder: (context, state) {
+          final groupId = state.pathParameters['groupId'] ?? '';
+          return GroupBalancesPage(groupId: groupId);
         },
       ),
       GoRoute(

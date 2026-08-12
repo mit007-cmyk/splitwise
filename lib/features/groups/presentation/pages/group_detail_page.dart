@@ -723,6 +723,12 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                           ),
                           _buildActionPill(
                             context,
+                            'Balances',
+                            icon: Icons.account_balance_wallet_rounded,
+                            onTap: () => context.push('/group-detail/${widget.groupId}/balances'),
+                          ),
+                          _buildActionPill(
+                            context,
                             'Export',
                             icon: Icons.download_rounded,
                             onTap: () => _exportGroupExpenses(context, group, detailState.expenses, memberNameMap),
