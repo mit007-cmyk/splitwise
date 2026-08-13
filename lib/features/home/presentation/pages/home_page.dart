@@ -28,10 +28,13 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   late final ScrollController _scrollController;
+  late final TextEditingController _searchController;
+  bool _isSearching = false;
 
   @override
   void initState() {
     super.initState();
+    _searchController = TextEditingController();
     _scrollController = ScrollController();
     _scrollController.addListener(_scrollListener);
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -68,9 +71,29 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    _searchController.dispose();
     _scrollController.removeListener(_scrollListener);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _openSearch() {
+    setState(() => _isSearching = true);
+  }
+
+  void _closeSearch() {
+    _searchController.clear();
+    setState(() => _isSearching = false);
+  }
+
+  /// Search only groups the signed-in user already belongs to.
+  /// Home summary is membership-scoped; this never queries other users' groups.
+  List<GroupSummary> _searchMemberGroups(List<GroupSummary> memberGroups) {
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isEmpty) return memberGroups;
+    return memberGroups
+        .where((group) => group.groupName.toLowerCase().contains(query))
+        .toList();
   }
 
   Widget _buildBody(BuildContext context, HomeState state) {
@@ -141,8 +164,14 @@ class _HomePageState extends State<HomePage> {
     if (state is HomeLoaded) {
       final summary = state.summary;
 
-      final filteredGroups = summary.groups.where((group) {
-        if (group.groupType == GroupSummary.directGroupType) return false;
+      final memberGroups = summary.groups
+          .where((group) => group.groupType != GroupSummary.directGroupType)
+          .toList();
+      final query = _searchController.text.trim();
+      final isSearching = _isSearching && query.isNotEmpty;
+
+      final filteredGroups = _searchMemberGroups(memberGroups).where((group) {
+        if (isSearching) return true;
         if (state.selectedFilter == 'all') return true;
         if (state.selectedFilter == 'owe') {
           return group.balanceType == BalanceType.owe;
@@ -189,7 +218,9 @@ class _HomePageState extends State<HomePage> {
               ),
 
             Expanded(
-              child: filteredGroups.isEmpty && state.selectedFilter == 'all'
+              child: filteredGroups.isEmpty &&
+                      state.selectedFilter == 'all' &&
+                      !isSearching
                   ? SingleChildScrollView(
                       controller: _scrollController,
                       physics: const AlwaysScrollableScrollPhysics(),
@@ -229,7 +260,9 @@ class _HomePageState extends State<HomePage> {
                             padding: EdgeInsets.symmetric(vertical: 40.h),
                             child: Center(
                               child: Text(
-                                'No groups match this filter.',
+                                isSearching
+                                    ? 'No groups match "$query".'
+                                    : 'No groups match this filter.',
                                 style: context.textTheme.bodyMedium?.copyWith(
                                   color: theme.colorScheme.onSurface.withOpacity(0.6),
                                 ),
@@ -282,20 +315,55 @@ class _HomePageState extends State<HomePage> {
 
         return AppScaffold(
           appBar: AppBar(
-            title: null,
+            leading: _isSearching
+                ? IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: _closeSearch,
+                  )
+                : null,
+            automaticallyImplyLeading: false,
+            title: _isSearching
+                ? TextField(
+                    controller: _searchController,
+                    autofocus: true,
+                    textInputAction: TextInputAction.search,
+                    style: context.textTheme.titleMedium,
+                    decoration: InputDecoration(
+                      hintText: 'Search groups',
+                      hintStyle: context.textTheme.titleMedium?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
+                      ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
+                      isDense: true,
+                    ),
+                    onChanged: (_) => setState(() {}),
+                  )
+                : null,
             centerTitle: false,
             actions: [
-              IconButton(
-                icon: const Icon(Icons.search_rounded),
-                onPressed: () {
-                  AppToast.show(context, 'Search is coming soon!', type: ToastType.info);
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.group_add_outlined),
-                tooltip: 'Create a group',
-                onPressed: () => context.push('/create-group'),
-              ),
+              if (_isSearching && _searchController.text.isNotEmpty)
+                IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() {});
+                  },
+                )
+              else if (!_isSearching) ...[
+                IconButton(
+                  icon: const Icon(Icons.search_rounded),
+                  tooltip: 'Search groups',
+                  onPressed: _openSearch,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.group_add_outlined),
+                  tooltip: 'Create a group',
+                  onPressed: () => context.push('/create-group'),
+                ),
+              ],
             ],
           ),
           body: _buildBody(context, state),
