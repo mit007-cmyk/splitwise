@@ -8,6 +8,7 @@ import '../../../../core/routing/route_constants.dart';
 import '../../../../core/utils/context_extension.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/avatar_widget.dart';
+import '../../../../core/widgets/filter_popup_button.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../expenses/domain/services/friend_ledger.dart';
@@ -46,6 +47,22 @@ class _FriendsPageState extends State<FriendsPage> {
     if (mounted) {
       _load();
     }
+  }
+
+  List<UserPreview> _filteredFriends(FriendsListState state) {
+    return state.friends.where((friend) {
+      final balance = state.balances[friend.id] ?? 0.0;
+      switch (state.selectedFilter) {
+        case 'outstanding':
+          return balance.abs() > 0.01;
+        case 'owe':
+          return balance < -0.01;
+        case 'owed':
+          return balance > 0.01;
+        default:
+          return true;
+      }
+    }).toList();
   }
 
   Future<void> _openFriendDetail(String friendId) async {
@@ -329,6 +346,8 @@ class _FriendsPageState extends State<FriendsPage> {
               );
             }
 
+            final filteredFriends = _filteredFriends(state);
+
             return RefreshIndicator(
               onRefresh: () async => _load(),
               child: ListView(
@@ -344,24 +363,35 @@ class _FriendsPageState extends State<FriendsPage> {
                     child: Row(
                       children: [
                         Expanded(child: _buildOverallBalance(context, state.overallBalance)),
-                        IconButton(
-                          icon: const Icon(Icons.tune),
-                          color: scheme.onSurfaceVariant,
-                          onPressed: () {
-                          AppToast.show(context, 'Filters coming soon!', type: ToastType.info);
-                          },
+                        FilterPopupButton(
+                          selectedFilter: state.selectedFilter,
+                          options: FilterPopupButton.friendFilters,
+                          onSelected: _cubit.changeFilter,
                         ),
                       ],
                     ),
                   ),
-                  ...state.friends.map(
-                    (friend) => _buildFriendTile(
-                      context,
-                      friend,
-                      state.balances[friend.id],
-                      state.groupBreakdowns[friend.id] ?? const [],
+                  if (filteredFriends.isEmpty)
+                    Padding(
+                      padding: EdgeInsets.symmetric(vertical: 40.h),
+                      child: Center(
+                        child: Text(
+                          'No friends match this filter.',
+                          style: context.textTheme.bodyMedium?.copyWith(
+                            color: scheme.onSurface.withValues(alpha: 0.6),
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    ...filteredFriends.map(
+                      (friend) => _buildFriendTile(
+                        context,
+                        friend,
+                        state.balances[friend.id],
+                        state.groupBreakdowns[friend.id] ?? const [],
+                      ),
                     ),
-                  ),
                   Padding(
                     padding: EdgeInsets.fromLTRB(
                       AppDimensions.lg.w,

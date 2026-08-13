@@ -13,6 +13,7 @@ class FriendsListState extends Equatable {
   final List<UserPreview> friends;
   final Map<String, double> balances;
   final Map<String, List<FriendGroupBalance>> groupBreakdowns;
+  final String selectedFilter;
   final String? errorMessage;
 
   const FriendsListState({
@@ -20,6 +21,7 @@ class FriendsListState extends Equatable {
     required this.friends,
     this.balances = const {},
     this.groupBreakdowns = const {},
+    this.selectedFilter = 'all',
     this.errorMessage,
   });
 
@@ -37,6 +39,7 @@ class FriendsListState extends Equatable {
     List<UserPreview>? friends,
     Map<String, double>? balances,
     Map<String, List<FriendGroupBalance>>? groupBreakdowns,
+    String? selectedFilter,
     String? errorMessage,
   }) {
     return FriendsListState(
@@ -44,13 +47,14 @@ class FriendsListState extends Equatable {
       friends: friends ?? this.friends,
       balances: balances ?? this.balances,
       groupBreakdowns: groupBreakdowns ?? this.groupBreakdowns,
+      selectedFilter: selectedFilter ?? this.selectedFilter,
       errorMessage: errorMessage,
     );
   }
 
   @override
   List<Object?> get props =>
-      [isLoading, friends, balances, groupBreakdowns, errorMessage];
+      [isLoading, friends, balances, groupBreakdowns, selectedFilter, errorMessage];
 }
 
 @injectable
@@ -71,8 +75,13 @@ class FriendsListCubit extends Cubit<FriendsListState> {
       friends: const [],
       balances: const {},
       groupBreakdowns: const {},
+      selectedFilter: 'all',
       errorMessage: null,
     ));
+  }
+
+  void changeFilter(String filter) {
+    emit(state.copyWith(selectedFilter: filter));
   }
 
   Future<void> load(String userId) async {

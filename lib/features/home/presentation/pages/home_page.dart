@@ -16,7 +16,6 @@ import '../bloc/home_state.dart';
 import '../widgets/overall_balance_card.dart';
 import '../widgets/group_card.dart';
 import '../widgets/skeleton_loaders.dart';
-import '../widgets/filter_bottom_sheet.dart';
 import '../../domain/entities/balance_summary.dart';
 import '../../domain/entities/group_summary.dart';
 
@@ -72,25 +71,6 @@ class _HomePageState extends State<HomePage> {
     _scrollController.removeListener(_scrollListener);
     _scrollController.dispose();
     super.dispose();
-  }
-
-  void _showFilterBottomSheet(String currentFilter) {
-    showModalBottomSheet(
-      context: context,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(AppDimensions.radiusLg.r),
-        ),
-      ),
-      builder: (bottomSheetContext) {
-        return FilterBottomSheet(
-          selectedFilter: currentFilter,
-          onFilterSelected: (filter) {
-            context.read<HomeBloc>().add(ChangeFilter(filter));
-          },
-        );
-      },
-    );
   }
 
   Widget _buildBody(BuildContext context, HomeState state) {
@@ -237,7 +217,9 @@ class _HomePageState extends State<HomePage> {
                         OverallBalanceCard(
                           balance: summary.overallBalance,
                           selectedFilter: state.selectedFilter,
-                          onFilterTap: () => _showFilterBottomSheet(state.selectedFilter),
+                          onFilterSelected: (filter) {
+                            context.read<HomeBloc>().add(ChangeFilter(filter));
+                          },
                         ),
                         const Divider(height: 1),
                         SizedBox(height: AppDimensions.sm.h),

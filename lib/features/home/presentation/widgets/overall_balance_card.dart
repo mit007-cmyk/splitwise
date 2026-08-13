@@ -1,18 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/widgets/filter_popup_button.dart';
 import '../../domain/entities/balance_summary.dart';
 
 class OverallBalanceCard extends StatelessWidget {
   final BalanceSummary balance;
   final String selectedFilter;
-  final VoidCallback onFilterTap;
+  final ValueChanged<String> onFilterSelected;
 
   const OverallBalanceCard({
     super.key,
     required this.balance,
     required this.selectedFilter,
-    required this.onFilterTap,
+    required this.onFilterSelected,
   });
 
   @override
@@ -69,16 +70,10 @@ class OverallBalanceCard extends StatelessWidget {
               ),
             ),
           ),
-          IconButton(
-            icon: Icon(
-              selectedFilter == 'all'
-                  ? Icons.filter_list_rounded
-                  : Icons.filter_list_off_rounded,
-              color: selectedFilter == 'all'
-                  ? theme.colorScheme.onSurface
-                  : theme.colorScheme.primary,
-            ),
-            onPressed: onFilterTap,
+          FilterPopupButton(
+            selectedFilter: selectedFilter,
+            options: FilterPopupButton.groupFilters,
+            onSelected: onFilterSelected,
           ),
         ],
       ),
