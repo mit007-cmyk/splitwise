@@ -8,8 +8,9 @@ import '../../../../core/utils/context_extension.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/data/models/user_model.dart';
-import 'package:splitwise/features/home/domain/entities/group_summary.dart';
-import 'package:splitwise/features/home/domain/repositories/home_repository.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../auth/presentation/bloc/auth_state.dart';
+import 'package:splitwise/features/friends/domain/repositories/friends_repository.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_bloc.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_event.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_state.dart';
@@ -34,6 +35,19 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  String _currentUserId(BuildContext context) {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated) return authState.user.id;
+    return '';
+  }
+
+  void _reloadFriends(BuildContext context, AddGroupMembersCubit cubit) {
+    cubit.init(
+      currentUserId: _currentUserId(context),
+      existingMemberIds: _getExistingMemberIds(context),
+    );
   }
 
   List<String> _getExistingMemberIds(BuildContext context) {
@@ -182,7 +196,11 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
     final existingMemberIds = _getExistingMemberIds(context);
 
     return BlocProvider<AddGroupMembersCubit>(
-      create: (context) => AddGroupMembersCubit(getIt<HomeRepository>())..init(existingMemberIds),
+      create: (context) => AddGroupMembersCubit(getIt<FriendsRepository>())
+        ..init(
+          currentUserId: _currentUserId(context),
+          existingMemberIds: existingMemberIds,
+        ),
       child: BlocListener<HomeBloc, HomeState>(
         listener: (context, homeState) {
           if (homeState is HomeLoaded) {
@@ -248,7 +266,7 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
                                 onTap: () async {
                                   await context.push('/add-friend');
                                   // Refresh lists when returning
-                                  cubit.init(_getExistingMemberIds(context));
+                                  _reloadFriends(context, cubit);
                                 },
                                 child: Padding(
                                   padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),

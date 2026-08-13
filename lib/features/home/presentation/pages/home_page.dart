@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -30,6 +32,8 @@ class _HomePageState extends State<HomePage> {
   late final ScrollController _scrollController;
   late final TextEditingController _searchController;
   bool _isSearching = false;
+  String _searchQuery = '';
+  Timer? _searchDebounce;
 
   @override
   void initState() {
@@ -71,6 +75,7 @@ class _HomePageState extends State<HomePage> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     _scrollController.removeListener(_scrollListener);
     _scrollController.dispose();
@@ -82,14 +87,29 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _closeSearch() {
+    _searchDebounce?.cancel();
     _searchController.clear();
-    setState(() => _isSearching = false);
+    setState(() {
+      _isSearching = false;
+      _searchQuery = '';
+    });
   }
 
-  /// Search only groups the signed-in user already belongs to.
-  /// Home summary is membership-scoped; this never queries other users' groups.
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      setState(() => _searchQuery = '');
+      return;
+    }
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      setState(() => _searchQuery = trimmed);
+    });
+  }
+
   List<GroupSummary> _searchMemberGroups(List<GroupSummary> memberGroups) {
-    final query = _searchController.text.trim().toLowerCase();
+    final query = _searchQuery.toLowerCase();
     if (query.isEmpty) return memberGroups;
     return memberGroups
         .where((group) => group.groupName.toLowerCase().contains(query))
@@ -167,11 +187,10 @@ class _HomePageState extends State<HomePage> {
       final memberGroups = summary.groups
           .where((group) => group.groupType != GroupSummary.directGroupType)
           .toList();
-      final query = _searchController.text.trim();
-      final isSearching = _isSearching && query.isNotEmpty;
+      final isSearching = _isSearching && _searchQuery.isNotEmpty;
 
       final filteredGroups = _searchMemberGroups(memberGroups).where((group) {
-        if (isSearching) return true;
+        if (_isSearching) return true;
         if (state.selectedFilter == 'all') return true;
         if (state.selectedFilter == 'owe') {
           return group.balanceType == BalanceType.owe;
@@ -220,7 +239,7 @@ class _HomePageState extends State<HomePage> {
             Expanded(
               child: filteredGroups.isEmpty &&
                       state.selectedFilter == 'all' &&
-                      !isSearching
+                      !_isSearching
                   ? SingleChildScrollView(
                       controller: _scrollController,
                       physics: const AlwaysScrollableScrollPhysics(),
@@ -261,7 +280,7 @@ class _HomePageState extends State<HomePage> {
                             child: Center(
                               child: Text(
                                 isSearching
-                                    ? 'No groups match "$query".'
+                                    ? 'No groups match "$_searchQuery".'
                                     : 'No groups match this filter.',
                                 style: context.textTheme.bodyMedium?.copyWith(
                                   color: theme.colorScheme.onSurface.withOpacity(0.6),
@@ -339,7 +358,7 @@ class _HomePageState extends State<HomePage> {
                       filled: false,
                       isDense: true,
                     ),
-                    onChanged: (_) => setState(() {}),
+                    onChanged: _onSearchChanged,
                   )
                 : null,
             centerTitle: false,
@@ -349,7 +368,7 @@ class _HomePageState extends State<HomePage> {
                   icon: const Icon(Icons.close_rounded),
                   onPressed: () {
                     _searchController.clear();
-                    setState(() {});
+                    _onSearchChanged('');
                   },
                 )
               else if (!_isSearching) ...[

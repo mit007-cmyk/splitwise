@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -25,12 +27,43 @@ class FriendsPage extends StatefulWidget {
 
 class _FriendsPageState extends State<FriendsPage> {
   late final FriendsListCubit _cubit;
+  late final TextEditingController _searchController;
+  bool _isSearching = false;
+  String _searchQuery = '';
+  Timer? _searchDebounce;
 
   @override
   void initState() {
     super.initState();
+    _searchController = TextEditingController();
     _cubit = getIt<FriendsListCubit>();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  void _openSearch() {
+    setState(() => _isSearching = true);
+  }
+
+  void _closeSearch() {
+    _searchDebounce?.cancel();
+    _searchController.clear();
+    setState(() {
+      _isSearching = false;
+      _searchQuery = '';
+    });
+  }
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      setState(() => _searchQuery = '');
+      return;
+    }
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      setState(() => _searchQuery = trimmed);
+    });
   }
 
   void _load() {
@@ -50,7 +83,21 @@ class _FriendsPageState extends State<FriendsPage> {
   }
 
   List<UserPreview> _filteredFriends(FriendsListState state) {
+    final query = _searchQuery.toLowerCase();
+    final phoneQuery = query.replaceAll(RegExp(r'\D'), '');
+
     return state.friends.where((friend) {
+      if (_isSearching) {
+        if (query.isEmpty) return true;
+        if (friend.name.toLowerCase().contains(query)) return true;
+        final email = friend.email?.trim().toLowerCase() ?? '';
+        if (email.isNotEmpty && email.contains(query)) return true;
+        if (phoneQuery.length >= 4) {
+          final phone = (friend.phone ?? '').replaceAll(RegExp(r'\D'), '');
+          if (phone.contains(phoneQuery)) return true;
+        }
+        return false;
+      }
       final balance = state.balances[friend.id] ?? 0.0;
       switch (state.selectedFilter) {
         case 'outstanding':
@@ -77,6 +124,8 @@ class _FriendsPageState extends State<FriendsPage> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
+    _searchController.dispose();
     _cubit.close();
     super.dispose();
   }
@@ -271,21 +320,55 @@ class _FriendsPageState extends State<FriendsPage> {
         child: Scaffold(
           backgroundColor: scheme.surface,
           appBar: AppBar(
-            title: const SizedBox.shrink(),
+            leading: _isSearching
+                ? IconButton(
+                    icon: const Icon(Icons.arrow_back),
+                    onPressed: _closeSearch,
+                  )
+                : null,
+            title: _isSearching
+                ? TextField(
+                    controller: _searchController,
+                    autofocus: true,
+                    textInputAction: TextInputAction.search,
+                    style: context.textTheme.titleMedium,
+                    decoration: InputDecoration(
+                      hintText: 'Search friends',
+                      hintStyle: context.textTheme.titleMedium?.copyWith(
+                        color: scheme.onSurfaceVariant.withValues(alpha: 0.6),
+                      ),
+                      border: InputBorder.none,
+                      enabledBorder: InputBorder.none,
+                      focusedBorder: InputBorder.none,
+                      filled: false,
+                      isDense: true,
+                    ),
+                    onChanged: _onSearchChanged,
+                  )
+                : const SizedBox.shrink(),
             centerTitle: false,
             actions: [
-              IconButton(
-                icon: const Icon(Icons.search),
-                onPressed: () {
-                AppToast.show(context, 'Search coming soon!', type: ToastType.info);
-                },
-              ),
-              IconButton(
-                icon: const Icon(Icons.person_add_outlined),
-                tooltip: 'Add friend',
-                onPressed: _openAddFriend,
-              ),
-              SizedBox(width: AppDimensions.sm.w),
+              if (_isSearching && _searchController.text.isNotEmpty)
+                IconButton(
+                  icon: const Icon(Icons.close_rounded),
+                  onPressed: () {
+                    _searchController.clear();
+                    _onSearchChanged('');
+                  },
+                )
+              else if (!_isSearching) ...[
+                IconButton(
+                  icon: const Icon(Icons.search),
+                  tooltip: 'Search friends',
+                  onPressed: _openSearch,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.person_add_outlined),
+                  tooltip: 'Add friend',
+                  onPressed: _openAddFriend,
+                ),
+                SizedBox(width: AppDimensions.sm.w),
+              ],
             ],
           ),
           floatingActionButton: AddExpenseExtendedFab(onExpenseAdded: _load),
@@ -347,6 +430,7 @@ class _FriendsPageState extends State<FriendsPage> {
             }
 
             final filteredFriends = _filteredFriends(state);
+            final isSearching = _isSearching && _searchQuery.isNotEmpty;
 
             return RefreshIndicator(
               onRefresh: () async => _load(),
@@ -376,7 +460,9 @@ class _FriendsPageState extends State<FriendsPage> {
                       padding: EdgeInsets.symmetric(vertical: 40.h),
                       child: Center(
                         child: Text(
-                          'No friends match this filter.',
+                          isSearching
+                              ? 'No friends match "$_searchQuery".'
+                              : 'No friends match this filter.',
                           style: context.textTheme.bodyMedium?.copyWith(
                             color: scheme.onSurface.withValues(alpha: 0.6),
                           ),
