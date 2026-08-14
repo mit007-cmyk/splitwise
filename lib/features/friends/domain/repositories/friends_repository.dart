@@ -77,4 +77,17 @@ abstract class FriendsRepository {
   });
 
   Future<Result<UserPreview?>> getUserById(String userId);
+
+  /// One-way block: removes friendship, does not delete expense history.
+  Future<Result<void>> blockUser({
+    required String currentUserId,
+    required String blockedUserId,
+  });
+
+  Future<Result<void>> unblockUser({
+    required String currentUserId,
+    required String blockedUserId,
+  });
+
+  Future<Result<List<UserPreview>>> getBlockedUsers(String currentUserId);
 }

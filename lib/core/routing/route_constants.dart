@@ -67,6 +67,9 @@ class RouteConstants {
   static const String accountSettingsPath = '/account/settings';
   static const String accountSettingsName = 'account-settings';
 
+  static const String blocklistPath = '/account/blocklist';
+  static const String blocklistName = 'account-blocklist';
+
   static const String emailSettingsPath = '/account/email-settings';
   static const String emailSettingsName = 'account-email-settings';
 

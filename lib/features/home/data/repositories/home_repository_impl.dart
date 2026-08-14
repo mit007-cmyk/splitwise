@@ -184,13 +184,18 @@ class HomeRepositoryImpl implements HomeRepository {
   Future<Result<void>> addGroupMembers({
     required String groupId,
     required List<String> memberIds,
+    required String actorUserId,
   }) async {
     try {
       final isOnline = await _connectivityService.isConnected;
       if (!isOnline) {
         return Result.failure(const NetworkFailure('Cannot update group members while offline.'));
       }
-      await _remoteDataSource.addGroupMembers(groupId: groupId, memberIds: memberIds);
+      await _remoteDataSource.addGroupMembers(
+        groupId: groupId,
+        memberIds: memberIds,
+        actorUserId: actorUserId,
+      );
       return Result.success(null);
     } catch (e) {
       return Result.failure(ServerFailure('Failed to add group members: $e'));

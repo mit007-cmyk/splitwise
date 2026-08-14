@@ -2,6 +2,7 @@ import '../../features/expenses/domain/entities/expense.dart';
 import '../../features/home/domain/entities/balance_summary.dart';
 import '../../features/home/domain/entities/group_summary.dart';
 import 'debt_settlement.dart';
+import 'user_display_names.dart';
 
 /// Derives pairwise balances for the current user from a group's expenses.
 /// Shared by the home summary datasource and group detail header so both
@@ -64,8 +65,7 @@ class GroupBalanceCalculator {
       if (balance.abs() > DebtSettlement.epsilon) {
         memberBalances.add(MemberBalance(
           userId: otherId,
-          userName: memberNames[otherId] ??
-              (otherId.length > 5 ? otherId.substring(0, 5) : otherId),
+          userName: UserDisplayNames.resolve(memberNames, otherId),
           amount: balance.abs(),
           type: balance > 0 ? BalanceType.owed : BalanceType.owe,
         ));

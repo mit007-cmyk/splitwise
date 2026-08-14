@@ -46,12 +46,74 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
 
   Future<void> _fetchUsers() async {
     final result = await getIt<HomeRepository>().getAllUsers();
-    if (mounted) {
-      setState(() {
-        _allUsers = result.isSuccess ? result.dataOrThrow : [];
-        _isLoadingUsers = false;
-      });
+    if (!mounted) return;
+
+    final users = result.isSuccess
+        ? List<UserModel>.from(result.dataOrThrow)
+        : <UserModel>[];
+
+    // Always prefer the signed-in profile for the current user so we never
+    // fall back to showing a raw Firebase UID as the display name.
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated) {
+      final me = UserModel(
+        id: authState.user.id,
+        name: authState.user.name.trim().isNotEmpty
+            ? authState.user.name.trim()
+            : (authState.user.email.contains('@')
+                ? authState.user.email.split('@').first
+                : 'You'),
+        email: authState.user.email,
+        photoUrl: authState.user.photoUrl,
+      );
+      final index = users.indexWhere((user) => user.id == me.id);
+      if (index >= 0) {
+        final existing = users[index];
+        final looksLikeId =
+            existing.name.trim().isEmpty || existing.name.trim() == existing.id;
+        if (looksLikeId) {
+          users[index] = me;
+        }
+      } else {
+        users.add(me);
+      }
     }
+
+    setState(() {
+      _allUsers = users;
+      _isLoadingUsers = false;
+    });
+  }
+
+  UserModel _resolveMember(String memberId, String? currentUserId) {
+    for (final user in _allUsers) {
+      if (user.id != memberId) continue;
+      final looksLikeId =
+          user.name.trim().isEmpty || user.name.trim() == user.id;
+      if (!looksLikeId) return user;
+      break;
+    }
+
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated && authState.user.id == memberId) {
+      final name = authState.user.name.trim().isNotEmpty
+          ? authState.user.name.trim()
+          : (authState.user.email.contains('@')
+              ? authState.user.email.split('@').first
+              : 'You');
+      return UserModel(
+        id: memberId,
+        name: name,
+        email: authState.user.email,
+        photoUrl: authState.user.photoUrl,
+      );
+    }
+
+    return UserModel(
+      id: memberId,
+      name: 'Splitwise user',
+      email: '',
+    );
   }
 
   Color _getGroupColor(String name) {
@@ -456,10 +518,7 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
                   ))
                 else
                   ...group.memberIds.map((mId) {
-                    final user = _allUsers.firstWhere(
-                      (u) => u.id == mId,
-                      orElse: () => UserModel(id: mId, name: mId.split('@')[0], email: ''),
-                    );
+                    final user = _resolveMember(mId, currentUserId);
 
                     final bool isMe = user.id == currentUserId;
                     final displayName = isMe ? '${user.name} (you)' : user.name;

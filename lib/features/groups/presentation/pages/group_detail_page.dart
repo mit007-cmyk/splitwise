@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/di/di.dart';
 import '../../../../core/utils/group_balance_calculator.dart';
+import '../../../../core/utils/user_display_names.dart';
 import '../../../../core/routing/route_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/context_extension.dart';
@@ -329,7 +330,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
 
   String _displayName(String userId, Map<String, String> memberNames) {
     if (userId == _currentUserId) return 'You';
-    return memberNames[userId] ?? 'Unknown';
+    return UserDisplayNames.resolve(memberNames, userId);
   }
 
   String _leadingSubtitle(Expense expense, Map<String, String> memberNames) {

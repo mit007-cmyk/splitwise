@@ -4,6 +4,7 @@ class AppConstants {
   static const String appName = 'Splitwise';
   static const String appVersion = '1.0.0';
   static const String supportEmail = 'support@splitwise.com';
+  static const String abuseEmail = 'abuse@splitwise.com';
   
   // Hive box names
   static const String hiveUserBox = 'user_box';
@@ -33,6 +34,7 @@ class FirestorePaths {
   static const String friends = 'friends';
   static const String friendRequests = 'friend_requests';
   static const String pendingContacts = 'pending_contacts';
+  static const String blockedUsers = 'blocked_users';
   static const String app = 'app';
   static const String emailConfiguration = 'email_configuration';
   static const String securityDetails = 'security_details';

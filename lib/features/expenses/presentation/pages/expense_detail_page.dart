@@ -7,12 +7,15 @@ import 'package:intl/intl.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/di.dart';
 import '../../../../core/errors/result.dart';
+import '../../../../core/services/firestore_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/utils/user_display_names.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/avatar_widget.dart';
 import '../../../expenses/domain/entities/expense.dart';
 import '../../../expenses/domain/repositories/expense_repository.dart';
+import '../../../friends/domain/repositories/friends_repository.dart';
 import 'add_expense_page.dart';
 
 /// Full-screen expense detail page.
@@ -47,6 +50,14 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
   final ExpenseRepository _expenseRepository = getIt<ExpenseRepository>();
   final TextEditingController _commentController = TextEditingController();
   final ValueNotifier<bool> _isDeleting = ValueNotifier(false);
+  late Map<String, String> _memberNames;
+
+  @override
+  void initState() {
+    super.initState();
+    _memberNames = Map<String, String>.from(widget.memberNames);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _resolveMissingNames());
+  }
 
   @override
   void dispose() {
@@ -55,11 +66,79 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
     super.dispose();
   }
 
+  bool _isMissingName(String? name, String userId) {
+    return UserDisplayNames.looksLikeRawId(name, userId) ||
+        (name?.trim().toLowerCase() == 'unknown');
+  }
+
+  Future<void> _resolveMissingNames() async {
+    final ids = <String>{
+      ...widget.expense.participantIds,
+      ...widget.expense.paidBy.keys,
+      ...widget.expense.splits.keys,
+      widget.expense.createdBy,
+    }..removeWhere((id) => id.trim().isEmpty);
+
+    final missing = ids.where((id) {
+      if (id == widget.currentUserId) return false;
+      return _isMissingName(_memberNames[id], id);
+    }).toList();
+
+    if (missing.isEmpty) return;
+
+    final resolved = <String, String>{};
+
+    // Bulk load from users + pending contacts first.
+    final directory = await UserDisplayNames.load(getIt<FirestoreService>());
+    for (final id in missing) {
+      final name = directory[id];
+      if (name != null && !_isMissingName(name, id)) {
+        resolved[id] = name;
+      }
+    }
+
+    final stillMissing =
+        missing.where((id) => _isMissingName(resolved[id] ?? _memberNames[id], id));
+    if (stillMissing.isNotEmpty) {
+      final friendsRepo = getIt<FriendsRepository>();
+      await Future.wait(stillMissing.map((id) async {
+        final result = await friendsRepo.getUserById(id);
+        if (!result.isSuccess) return;
+        final user = result.dataOrThrow;
+        final name = user?.name.trim();
+        if (name == null || _isMissingName(name, id)) return;
+        resolved[id] = name;
+      }));
+    }
+
+    // Last resort: names saved on block records (covers users blocked earlier).
+    final remaining = missing
+        .where((id) => _isMissingName(resolved[id] ?? _memberNames[id], id))
+        .toList();
+    if (remaining.isNotEmpty && widget.currentUserId.isNotEmpty) {
+      final blocked =
+          await getIt<FriendsRepository>().getBlockedUsers(widget.currentUserId);
+      if (blocked.isSuccess) {
+        for (final user in blocked.dataOrThrow) {
+          if (!remaining.contains(user.id)) continue;
+          final name = user.name.trim();
+          if (_isMissingName(name, user.id)) continue;
+          resolved[user.id] = name;
+        }
+      }
+    }
+
+    if (!mounted || resolved.isEmpty) return;
+    setState(() => _memberNames.addAll(resolved));
+  }
+
   // ── Helpers ────────────────────────────────────────────────────────────────
 
   String _displayName(String userId) {
     if (userId == widget.currentUserId) return 'You';
-    return widget.memberNames[userId] ?? 'Unknown';
+    final name = _memberNames[userId]?.trim();
+    if (name == null || _isMissingName(name, userId)) return 'Unknown';
+    return name;
   }
 
   /// Primary payer name + amount string, e.g. "You paid ₹210.00"
@@ -79,7 +158,8 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
     return e.splits.entries.map((entry) {
       final name = _displayName(entry.key);
       final owes = entry.value;
-      return '$name owes ${e.currencySymbol}${owes.toStringAsFixed(2)}';
+      final verb = name == 'You' ? 'owe' : 'owes';
+      return '$name $verb ${e.currencySymbol}${owes.toStringAsFixed(2)}';
     }).toList();
   }
 
@@ -237,7 +317,7 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
                                   .key
                               : '',
                           currentUserId: widget.currentUserId,
-                          memberNames: widget.memberNames,
+                          memberNames: _memberNames,
                         ),
                         ..._splitLines.asMap().entries.map((entry) {
                           final idx = entry.key;

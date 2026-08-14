@@ -15,6 +15,8 @@ import 'package:splitwise/features/home/presentation/bloc/home_bloc.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_event.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_state.dart';
 import 'package:splitwise/features/groups/presentation/bloc/add_group_members_cubit.dart';
+import 'package:splitwise/features/activity/presentation/bloc/activity_bloc.dart';
+import 'package:splitwise/features/activity/presentation/bloc/activity_event.dart';
 
 class AddGroupMembersPage extends StatefulWidget {
   final String groupId;
@@ -181,10 +183,16 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
   void _submitSelected(BuildContext context, List<UserModel> selectedUsers) {
     if (selectedUsers.isEmpty) return;
 
+    final authState = context.read<AuthBloc>().state;
+    final actorUserId = authState is Authenticated ? authState.user.id : '';
+    if (actorUserId.isEmpty) return;
+
     context.read<HomeBloc>().add(AddGroupMembersRequested(
           groupId: widget.groupId,
           memberIds: selectedUsers.map((u) => u.id).toList(),
+          actorUserId: actorUserId,
         ));
+    context.read<ActivityBloc>().add(const RefreshActivity());
 
     AppToast.show(context, '${selectedUsers.length} members added to the group!', type: ToastType.success);
     context.pop();

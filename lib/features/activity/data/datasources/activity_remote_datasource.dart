@@ -1,6 +1,7 @@
 import 'package:injectable/injectable.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/services/firestore_service.dart';
+import '../../../../core/utils/blocked_users_store.dart';
 import '../models/activity_event_model.dart';
 
 class ActivityPageRemoteResult {
@@ -69,8 +70,17 @@ class ActivityRemoteDataSourceImpl implements ActivityRemoteDataSource {
       );
     }
 
-    var items = await _loadSplitwiseDocumentEvents(userId)
-      ..sort((a, b) => b.performedAt.compareTo(a.performedAt));
+    final blockedIds = await BlockedUsersStore.idsBlockedBy(
+      _firestoreService,
+      userId,
+    );
+    var items = await _loadSplitwiseDocumentEvents(userId);
+    if (blockedIds.isNotEmpty) {
+      items = items
+          .where((event) => !blockedIds.contains(event.performedBy))
+          .toList();
+    }
+    items.sort((a, b) => b.performedAt.compareTo(a.performedAt));
 
     if (before != null) {
       items = items

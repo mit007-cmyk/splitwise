@@ -7,6 +7,7 @@ import '../../../expenses/domain/services/friend_ledger.dart';
 import '../../../home/domain/repositories/home_repository.dart';
 import '../../domain/entities/user_preview.dart';
 import '../../domain/repositories/friends_repository.dart';
+import '../../domain/services/friend_list_deduper.dart';
 
 class FriendsListState extends Equatable {
   final bool isLoading;
@@ -57,7 +58,7 @@ class FriendsListState extends Equatable {
       [isLoading, friends, balances, groupBreakdowns, selectedFilter, errorMessage];
 }
 
-@injectable
+@lazySingleton
 class FriendsListCubit extends Cubit<FriendsListState> {
   final FriendsRepository _friendsRepository;
   final HomeRepository _homeRepository;
@@ -89,6 +90,7 @@ class FriendsListCubit extends Cubit<FriendsListState> {
 
     final friendsResult = await _friendsRepository.getFriends(userId);
     final pendingResult = await _friendsRepository.getPendingContacts(userId);
+    final blockedResult = await _friendsRepository.getBlockedUsers(userId);
 
     if (friendsResult.isFailure || pendingResult.isFailure) {
       emit(
@@ -100,12 +102,16 @@ class FriendsListCubit extends Cubit<FriendsListState> {
       return;
     }
 
-    final merged = <UserPreview>[
-      ...friendsResult.dataOrThrow,
-      ...pendingResult.dataOrThrow,
-    ]..sort((a, b) => a.name.compareTo(b.name));
+    final blockedIds = blockedResult.isSuccess
+        ? blockedResult.dataOrThrow.map((user) => user.id).toSet()
+        : <String>{};
 
-    final computed = await _computeBalances(userId, merged);
+    final merged = FriendListDeduper.merge(
+      friends: friendsResult.dataOrThrow,
+      pending: pendingResult.dataOrThrow,
+    ).where((user) => !blockedIds.contains(user.id)).toList();
+
+    final computed = await _computeBalances(userId, merged, blockedIds);
 
     emit(
       state.copyWith(
@@ -124,16 +130,32 @@ class FriendsListCubit extends Cubit<FriendsListState> {
       })> _computeBalances(
     String userId,
     List<UserPreview> friends,
+    Set<String> blockedIds,
   ) async {
-    if (friends.isEmpty) return (balances: <String, double>{}, groupBreakdowns: <String, List<FriendGroupBalance>>{});
+    if (friends.isEmpty) {
+      return (
+        balances: <String, double>{},
+        groupBreakdowns: <String, List<FriendGroupBalance>>{},
+      );
+    }
 
     final groupsResult = await _homeRepository.getGroups(userId: userId);
     if (groupsResult.isFailure) {
-      return (balances: <String, double>{}, groupBreakdowns: <String, List<FriendGroupBalance>>{});
+      return (
+        balances: <String, double>{},
+        groupBreakdowns: <String, List<FriendGroupBalance>>{},
+      );
     }
-    final groups = groupsResult.dataOrThrow;
+
+    // Never count balances from groups that include anyone the user blocked.
+    final groups = groupsResult.dataOrThrow
+        .where((group) => !group.memberIds.any(blockedIds.contains))
+        .toList();
     if (groups.isEmpty) {
-      return (balances: <String, double>{}, groupBreakdowns: <String, List<FriendGroupBalance>>{});
+      return (
+        balances: <String, double>{},
+        groupBreakdowns: <String, List<FriendGroupBalance>>{},
+      );
     }
 
     final groupNames = <String, String>{
@@ -143,15 +165,24 @@ class FriendsListCubit extends Cubit<FriendsListState> {
     final expensesByGroup = <String, List<Expense>>{};
     await Future.wait(groups.map((group) async {
       final result = await _expenseRepository.getGroupExpenses(group.groupId);
-      expensesByGroup[group.groupId] = result.isSuccess ? result.dataOrThrow : const [];
+      final expenses = result.isSuccess ? result.dataOrThrow : const <Expense>[];
+      expensesByGroup[group.groupId] = expenses
+          .where((expense) {
+            final involved = {...expense.paidBy.keys, ...expense.splits.keys};
+            return !involved.any(blockedIds.contains);
+          })
+          .toList();
     }));
 
     final balances = <String, double>{};
     final groupBreakdowns = <String, List<FriendGroupBalance>>{};
     for (final friend in friends) {
+      if (blockedIds.contains(friend.id)) continue;
+
       final sharedExpenses = <Expense>[
         for (final group in groups)
-          if (group.memberIds.contains(friend.id)) ...?expensesByGroup[group.groupId],
+          if (group.memberIds.contains(friend.id))
+            ...?expensesByGroup[group.groupId],
       ];
       if (sharedExpenses.isEmpty) continue;
 
@@ -163,8 +194,9 @@ class FriendsListCubit extends Cubit<FriendsListState> {
       final total = FriendLedger.totalBalance(entries);
       if (total.abs() > 0.01) {
         balances[friend.id] = total;
-        final breakdown = FriendLedger.groupBalances(entries: entries, groupNames: groupNames)
-          ..sort((a, b) => b.amount.abs().compareTo(a.amount.abs()));
+        final breakdown =
+            FriendLedger.groupBalances(entries: entries, groupNames: groupNames)
+              ..sort((a, b) => b.amount.abs().compareTo(a.amount.abs()));
         groupBreakdowns[friend.id] = breakdown;
       }
     }

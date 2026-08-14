@@ -83,4 +83,82 @@ class ActivityEventWriter {
       'visibilityUserIds': memberIds,
     };
   }
+
+  /// Private to the blocker — the blocked user never sees this.
+  static Map<String, dynamic> userBlocked({
+    required String actorUserId,
+    required String blockedUserId,
+    required String blockedUserName,
+  }) {
+    return {
+      'type': 'user_blocked',
+      'entityType': 'user',
+      'entityId': blockedUserId,
+      'groupId': null,
+      'performedBy': actorUserId,
+      'performedAt': FieldValue.serverTimestamp(),
+      'metadata': {
+        'blockedUserId': blockedUserId,
+        'blockedUserName': blockedUserName,
+      },
+      'changedFields': const <String>[],
+      'visibilityUserIds': [actorUserId],
+    };
+  }
+
+  /// Private to the actor — the unblocked user is not notified.
+  static Map<String, dynamic> userUnblocked({
+    required String actorUserId,
+    required String unblockedUserId,
+    required String unblockedUserName,
+  }) {
+    return {
+      'type': 'user_unblocked',
+      'entityType': 'user',
+      'entityId': unblockedUserId,
+      'groupId': null,
+      'performedBy': actorUserId,
+      'performedAt': FieldValue.serverTimestamp(),
+      'metadata': {
+        'unblockedUserId': unblockedUserId,
+        'unblockedUserName': unblockedUserName,
+      },
+      'changedFields': const <String>[],
+      'visibilityUserIds': [actorUserId],
+    };
+  }
+
+  /// One event per added member: "You added Nupul K. to the group Test."
+  static Map<String, dynamic> memberAddedToGroup({
+    required String groupId,
+    required String groupName,
+    required String actorUserId,
+    required String memberUserId,
+    required String memberName,
+    required List<String> visibilityUserIds,
+  }) {
+    return {
+      'type': 'member_joined_group',
+      'entityType': 'group',
+      'entityId': groupId,
+      'groupId': groupId,
+      'performedBy': actorUserId,
+      'performedAt': FieldValue.serverTimestamp(),
+      'metadata': {
+        'groupName': groupName,
+        'memberUserId': memberUserId,
+        'memberName': memberName,
+      },
+      'changedFields': const <String>[],
+      'visibilityUserIds': visibilityUserIds,
+    };
+  }
+
+  static Future<void> appendDirect(
+    FirebaseFirestore firestore,
+    Map<String, dynamic> eventData,
+  ) async {
+    final eventId = _uuid.v4();
+    await eventsRef(firestore).set({eventId: eventData}, SetOptions(merge: true));
+  }
 }

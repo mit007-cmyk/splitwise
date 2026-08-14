@@ -44,6 +44,7 @@ class FriendDetailState extends Equatable {
     List<FriendExpenseEntry>? entries,
     Map<String, String>? groupNames,
     String? soleSharedGroupId,
+    bool clearSoleSharedGroupId = false,
     String? errorMessage,
   }) {
     return FriendDetailState(
@@ -51,7 +52,9 @@ class FriendDetailState extends Equatable {
       friend: friend ?? this.friend,
       entries: entries ?? this.entries,
       groupNames: groupNames ?? this.groupNames,
-      soleSharedGroupId: soleSharedGroupId ?? this.soleSharedGroupId,
+      soleSharedGroupId: clearSoleSharedGroupId
+          ? null
+          : (soleSharedGroupId ?? this.soleSharedGroupId),
       errorMessage: errorMessage,
     );
   }
@@ -107,7 +110,9 @@ class FriendDetailCubit extends Cubit<FriendDetailState> {
       friend: friend,
       entries: entries,
       groupNames: groupNames,
-      soleSharedGroupId: sharedGroups.length == 1 ? sharedGroups.first.groupId : null,
+      soleSharedGroupId:
+          sharedGroups.length == 1 ? sharedGroups.first.groupId : null,
+      clearSoleSharedGroupId: sharedGroups.length != 1,
     ));
   }
 }

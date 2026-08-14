@@ -183,4 +183,35 @@ class FriendsRepositoryImpl extends BaseRepository implements FriendsRepository 
   Future<Result<UserPreview?>> getUserById(String userId) {
     return safeCall(() => _remoteDataSource.getUserById(userId));
   }
+
+  @override
+  Future<Result<void>> blockUser({
+    required String currentUserId,
+    required String blockedUserId,
+  }) {
+    return safeCall(
+      () => _remoteDataSource.blockUser(
+        currentUserId: currentUserId,
+        blockedUserId: blockedUserId,
+      ),
+    );
+  }
+
+  @override
+  Future<Result<void>> unblockUser({
+    required String currentUserId,
+    required String blockedUserId,
+  }) {
+    return safeCall(
+      () => _remoteDataSource.unblockUser(
+        currentUserId: currentUserId,
+        blockedUserId: blockedUserId,
+      ),
+    );
+  }
+
+  @override
+  Future<Result<List<UserPreview>>> getBlockedUsers(String currentUserId) {
+    return safeCall(() => _remoteDataSource.getBlockedUsers(currentUserId));
+  }
 }

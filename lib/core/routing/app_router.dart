@@ -23,6 +23,7 @@ import 'package:splitwise/features/friends/presentation/pages/friends_page.dart'
 import 'package:splitwise/features/activity/presentation/pages/activity_page.dart';
 import 'package:splitwise/features/account/presentation/pages/account_page.dart';
 import 'package:splitwise/features/account/presentation/pages/account_settings_page.dart';
+import 'package:splitwise/features/account/presentation/pages/blocklist_page.dart';
 import 'package:splitwise/features/account/presentation/pages/email_settings_page.dart';
 import 'package:splitwise/features/account/presentation/pages/security_page.dart';
 import 'package:splitwise/features/account/presentation/pages/appearance_page.dart';
@@ -281,6 +282,11 @@ class AppRouter {
         path: RouteConstants.accountSettingsPath,
         name: RouteConstants.accountSettingsName,
         builder: (context, state) => const AccountSettingsPage(),
+      ),
+      GoRoute(
+        path: RouteConstants.blocklistPath,
+        name: RouteConstants.blocklistName,
+        builder: (context, state) => const BlocklistPage(),
       ),
       GoRoute(
         path: RouteConstants.emailSettingsPath,

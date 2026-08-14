@@ -51,6 +51,40 @@ class SupportEmailService {
     }
   }
 
+  Future<void> composeAbuseReport({
+    required String reporterEmail,
+    required String reporterUserId,
+    required String reportedUserId,
+    required String reportedUserName,
+  }) async {
+    final subject = 'Report user: $reportedUserName';
+    final body = [
+      'I would like to report a Splitwise user for abuse or harassment.',
+      '',
+      'Reported user: $reportedUserName',
+      'Reported user ID: $reportedUserId',
+      'Reporter email: $reporterEmail',
+      'Reporter user ID: $reporterUserId',
+      '',
+      'Please describe what happened:',
+      '',
+    ].join('\n');
+
+    final uri = Uri(
+      scheme: 'mailto',
+      path: AppConstants.abuseEmail,
+      query: _encodeQuery({
+        'subject': subject,
+        'body': body,
+      }),
+    );
+
+    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!launched) {
+      throw Exception('No email app available');
+    }
+  }
+
   Future<String> _resolveSupportCode(String userId) async {
     final cached = _hiveService.get<String>(
       AppConstants.hiveSettingsBox,

@@ -45,6 +45,7 @@ abstract class HomeRepository {
   Future<Result<void>> addGroupMembers({
     required String groupId,
     required List<String> memberIds,
+    required String actorUserId,
   });
 
   Future<Result<void>> editGroup({

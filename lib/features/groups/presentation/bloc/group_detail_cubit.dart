@@ -3,6 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../expenses/domain/entities/expense.dart';
 import '../../../expenses/domain/repositories/expense_repository.dart';
 import '../../../home/domain/repositories/home_repository.dart';
+import '../../../../core/di/di.dart';
+import '../../../../core/services/firestore_service.dart';
+import '../../../../core/utils/user_display_names.dart';
 
 class GroupDetailState extends Equatable {
   final bool isLoadingExpenses;
@@ -47,13 +50,14 @@ class GroupDetailCubit extends Cubit<GroupDetailState> {
 
   Future<void> loadExpenses(String groupId) async {
     emit(state.copyWith(isLoadingExpenses: true, expenseError: null));
-    
-    // Fetch users for resolving names
+
+    final names = await UserDisplayNames.load(getIt<FirestoreService>());
     final usersResult = await _homeRepository.getAllUsers();
-    final names = <String, String>{};
     if (usersResult.isSuccess) {
       for (final u in usersResult.dataOrThrow) {
-        names[u.id] = u.name;
+        if (!UserDisplayNames.looksLikeRawId(u.name, u.id)) {
+          names[u.id] = u.name.trim();
+        }
       }
     }
 
@@ -74,6 +78,7 @@ class GroupDetailCubit extends Cubit<GroupDetailState> {
       isLoadingExpenses: false,
       expenseError: 'Could not load expenses.',
       expenses: const [],
+      memberNames: names,
     ));
   }
 }

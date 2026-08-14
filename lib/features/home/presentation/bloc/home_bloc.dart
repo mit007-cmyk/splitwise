@@ -121,6 +121,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     final result = await _homeRepository.addGroupMembers(
       groupId: event.groupId,
       memberIds: event.memberIds,
+      actorUserId: event.actorUserId,
     );
 
     if (result is SuccessResult<void>) {

@@ -126,7 +126,6 @@ class _FriendsPageState extends State<FriendsPage> {
   void dispose() {
     _searchDebounce?.cancel();
     _searchController.dispose();
-    _cubit.close();
     super.dispose();
   }
 

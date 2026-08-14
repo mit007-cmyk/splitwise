@@ -77,6 +77,27 @@ class _FriendRecordPaymentPageState extends State<FriendRecordPaymentPage> {
       return;
     }
 
+    final groupId = widget.groupId?.trim() ?? '';
+    if (groupId.isEmpty) {
+      if (!mounted) return;
+      AppToast.show(
+        context,
+        'No shared group found to record this payment.',
+        type: ToastType.error,
+      );
+      return;
+    }
+
+    if (widget.currentUserId.trim().isEmpty || widget.friendId.trim().isEmpty) {
+      if (!mounted) return;
+      AppToast.show(
+        context,
+        'This balance cannot be settled. Please refresh and try again.',
+        type: ToastType.error,
+      );
+      return;
+    }
+
     _isSaving.value = true;
 
     // payer → the person sending the money.
@@ -90,7 +111,7 @@ class _FriendRecordPaymentPageState extends State<FriendRecordPaymentPage> {
 
     final expense = Expense(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
-      groupId: widget.groupId ?? '',
+      groupId: groupId,
       title: 'Settlement',
       category: 'Settlement',
       amount: amount,
@@ -106,9 +127,9 @@ class _FriendRecordPaymentPageState extends State<FriendRecordPaymentPage> {
     );
 
     final Result<void> result = await _expenseRepository.createExpense(expense);
+    if (!mounted) return;
     _isSaving.value = false;
 
-    if (!mounted) return;
     if (result.isSuccess) {
       AppToast.show(context, 'Payment recorded', type: ToastType.success);
       Navigator.of(context).pop(true);

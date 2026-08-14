@@ -1,8 +1,8 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:equatable/equatable.dart';
 import 'package:splitwise/features/auth/data/models/user_model.dart';
-import 'package:splitwise/features/friends/domain/entities/user_preview.dart';
 import 'package:splitwise/features/friends/domain/repositories/friends_repository.dart';
+import 'package:splitwise/features/friends/domain/services/friend_list_deduper.dart';
 
 class AddGroupMembersState extends Equatable {
   final List<UserModel> allUsers;
@@ -59,10 +59,10 @@ class AddGroupMembersCubit extends Cubit<AddGroupMembersState> {
     final friendsResult = await _friendsRepository.getFriends(currentUserId);
     final pendingResult = await _friendsRepository.getPendingContacts(currentUserId);
 
-    final previews = <UserPreview>[
-      if (friendsResult.isSuccess) ...friendsResult.dataOrThrow,
-      if (pendingResult.isSuccess) ...pendingResult.dataOrThrow,
-    ];
+    final previews = FriendListDeduper.merge(
+      friends: friendsResult.isSuccess ? friendsResult.dataOrThrow : const [],
+      pending: pendingResult.isSuccess ? pendingResult.dataOrThrow : const [],
+    );
 
     final users = previews
         .where((friend) => friend.id != currentUserId)

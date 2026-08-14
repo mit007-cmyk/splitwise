@@ -4,7 +4,9 @@ import 'package:uuid/uuid.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/services/firestore_service.dart';
 import '../../../../core/utils/activity_event_writer.dart';
+import '../../../../core/utils/blocked_users_store.dart';
 import '../../../../core/utils/debt_settlement.dart';
+import '../../../../core/utils/user_display_names.dart';
 import '../../../auth/data/models/user_model.dart';
 import '../../domain/entities/balance_summary.dart';
 import '../models/balance_summary_model.dart';
@@ -26,7 +28,11 @@ abstract class HomeRemoteDataSource {
     String? phone,
     String? email,
   });
-  Future<void> addGroupMembers({required String groupId, required List<String> memberIds});
+  Future<void> addGroupMembers({
+    required String groupId,
+    required List<String> memberIds,
+    required String actorUserId,
+  });
   Future<void> editGroup({required String groupId, required String name, required String type});
   Future<void> leaveGroup({required String groupId, required String userId});
   Future<void> deleteGroup({
@@ -123,7 +129,10 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
           list.add(UserModel(
             id: uId,
             email: uData['email'] as String? ?? uData['phone'] as String? ?? '',
-            name: uData['name'] as String? ?? uId.split('@')[0],
+            name: uData['name'] as String? ??
+                ((uData['email'] as String?)?.contains('@') == true
+                    ? (uData['email'] as String).split('@').first
+                    : 'Splitwise user'),
             photoUrl: uData['photoUrl'] as String?,
           ));
         }
@@ -160,7 +169,11 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
   }
 
   @override
-  Future<void> addGroupMembers({required String groupId, required List<String> memberIds}) async {
+  Future<void> addGroupMembers({
+    required String groupId,
+    required List<String> memberIds,
+    required String actorUserId,
+  }) async {
     final groupsDoc = await _firestoreService.getDocument('Splitwise', 'groups');
     final groupsData = groupsDoc.data();
     if (groupsData == null || !groupsData.containsKey(groupId)) {
@@ -172,14 +185,21 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
       throw Exception('Group not found');
     }
     final List<dynamic> currentMembers = List.from(groupMap['members'] as List? ?? []);
-    
+    final memberSet = currentMembers.map((e) => e.toString()).toSet();
+    final addedIds = <String>[];
+
     for (final id in memberIds) {
-      if (!currentMembers.contains(id)) {
-        currentMembers.add(id);
-      }
+      final trimmed = id.trim();
+      if (trimmed.isEmpty || memberSet.contains(trimmed)) continue;
+      memberSet.add(trimmed);
+      currentMembers.add(trimmed);
+      addedIds.add(trimmed);
     }
 
+    if (addedIds.isEmpty) return;
+
     groupMap['members'] = currentMembers;
+    final groupName = (groupMap['name'] as String?) ?? 'group';
 
     await _firestoreService.setDocument(
       'Splitwise',
@@ -189,6 +209,26 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
       },
       merge: true,
     );
+
+    final displayNames = await UserDisplayNames.load(_firestoreService);
+    final visibility = currentMembers
+        .map((id) => id.toString().trim())
+        .where((id) => id.isNotEmpty)
+        .toList();
+
+    for (final memberId in addedIds) {
+      await ActivityEventWriter.appendDirect(
+        _firestoreService.firestore,
+        ActivityEventWriter.memberAddedToGroup(
+          groupId: groupId,
+          groupName: groupName,
+          actorUserId: actorUserId,
+          memberUserId: memberId,
+          memberName: UserDisplayNames.resolve(displayNames, memberId),
+          visibilityUserIds: visibility,
+        ),
+      );
+    }
   }
 
   @override
@@ -303,21 +343,8 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
 
   @override
   Future<HomeSummaryModel> getHomeSummary(String userId) async {
-    // 1. Fetch user names first from 'Splitwise/users' document
-    final Map<String, String> allUserNames = {};
-    try {
-      final usersDoc = await _firestoreService.getDocument('Splitwise', 'users');
-      final usersData = usersDoc.data();
-      if (usersData != null) {
-        for (final entry in usersData.entries) {
-          final uId = entry.key;
-          final uData = _asStringKeyMap(entry.value);
-          if (uData != null) {
-            allUserNames[uId] = uData['name'] as String? ?? uId.split('@')[0];
-          }
-        }
-      }
-    } catch (_) {}
+    // 1. Resolve display names (users + pending contacts — never raw ids).
+    final allUserNames = await UserDisplayNames.load(_firestoreService);
 
     // 2. Fetch the groups document from Firestore 'Splitwise/groups'
     final DocumentSnapshot<Map<String, dynamic>> groupsDoc;
@@ -363,6 +390,11 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
       }
     } catch (_) {}
 
+    final blockedIds = await BlockedUsersStore.idsBlockedBy(
+      _firestoreService,
+      userId,
+    );
+
     for (final entry in groupsData.entries) {
       final groupId = entry.key;
       final groupData = _asStringKeyMap(entry.value);
@@ -380,13 +412,13 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
       }
 
       if (!memberIds.contains(userId)) continue;
+      if (memberIds.any(blockedIds.contains)) continue;
       final int memberCount = memberIds.length;
 
       // Get member names
       final Map<String, String> memberNames = {};
       for (final mId in memberIds) {
-        memberNames[mId] =
-            allUserNames[mId] ?? (mId.length > 5 ? mId.substring(0, 5) : mId);
+        memberNames[mId] = UserDisplayNames.resolve(allUserNames, mId);
       }
 
       // Map expenses.
@@ -459,12 +491,18 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
         // the minimal set of pairwise IOUs. A single-payer expense collapses
         // to exactly the same pairwise result the old logic produced.
         final involvedIds = {...paidByUser.keys, ...owedByUser.keys};
+        if (involvedIds.any(blockedIds.contains)) continue;
+
         final netForExpense = <String, double>{
           for (final id in involvedIds)
             id: (paidByUser[id] ?? 0.0) - (owedByUser[id] ?? 0.0),
         };
 
         for (final transfer in DebtSettlement.reduceToTransfers(netForExpense)) {
+          if (blockedIds.contains(transfer.fromUserId) ||
+              blockedIds.contains(transfer.toUserId)) {
+            continue;
+          }
           if (transfer.fromUserId == userId) {
             netBalances[transfer.toUserId] =
                 (netBalances[transfer.toUserId] ?? 0.0) - transfer.amount;
@@ -480,12 +518,12 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
 
       netBalances.forEach((otherId, balance) {
         if (otherId.trim().isEmpty) return;
+        if (blockedIds.contains(otherId)) return;
         if (balance.abs() > 0.01) {
           groupTotalBalance += balance;
           memberBalances.add(MemberBalanceModel(
             userId: otherId,
-            userName: memberNames[otherId] ??
-                (otherId.length > 5 ? otherId.substring(0, 5) : otherId),
+            userName: UserDisplayNames.resolve(memberNames, otherId),
             amount: balance.abs(),
             type: balance > 0 ? BalanceType.owed : BalanceType.owe,
           ));

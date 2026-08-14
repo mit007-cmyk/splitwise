@@ -73,14 +73,16 @@ class AddContactRequested extends HomeEvent {
 class AddGroupMembersRequested extends HomeEvent {
   final String groupId;
   final List<String> memberIds;
+  final String actorUserId;
 
   const AddGroupMembersRequested({
     required this.groupId,
     required this.memberIds,
+    required this.actorUserId,
   });
 
   @override
-  List<Object?> get props => [groupId, memberIds];
+  List<Object?> get props => [groupId, memberIds, actorUserId];
 }
 
 class EditGroupRequested extends HomeEvent {

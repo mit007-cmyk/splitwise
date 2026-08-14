@@ -6,14 +6,20 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/di.dart';
 import '../../../../core/routing/route_constants.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/services/support_email_service.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/avatar_widget.dart';
+import '../../../activity/presentation/bloc/activity_bloc.dart';
+import '../../../activity/presentation/bloc/activity_event.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../home/domain/entities/group_summary.dart';
 import '../../../home/domain/repositories/home_repository.dart';
+import '../../../home/presentation/bloc/home_bloc.dart';
+import '../../../home/presentation/bloc/home_event.dart';
 import '../../domain/entities/user_preview.dart';
 import '../../domain/repositories/friends_repository.dart';
+import '../bloc/friends_list_cubit.dart';
 
 class FriendSettingsPage extends StatefulWidget {
   final String friendId;
@@ -32,6 +38,7 @@ class _FriendSettingsPageState extends State<FriendSettingsPage> {
   List<GroupSummary> _sharedGroups = [];
   bool _isLoading = true;
   bool _isRemoving = false;
+  bool _isBlocking = false;
 
   @override
   void initState() {
@@ -69,8 +76,84 @@ class _FriendSettingsPageState extends State<FriendSettingsPage> {
     });
   }
 
-  void _showComingSoon() {
-    AppToast.show(context, 'Coming soon!', type: ToastType.info);
+  Future<void> _confirmBlockUser() async {
+    final friend = _friend;
+    final currentUserId = _currentUserId;
+    if (friend == null || currentUserId == null || _isBlocking) return;
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Block user'),
+        content: Text(
+          'Block ${friend.name}? They will be removed from your friends list, '
+          'groups you share will be hidden, and you will not get activity from them. '
+          'They will not be notified. Expense history is kept.\n\n'
+          'You can unblock them later from Account settings → Manage your blocklist.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(dialogContext).colorScheme.error,
+            ),
+            child: const Text('Block'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _isBlocking = true);
+    final result = await getIt<FriendsRepository>().blockUser(
+      currentUserId: currentUserId,
+      blockedUserId: friend.id,
+    );
+    if (!mounted) return;
+
+    if (result.isFailure) {
+      setState(() => _isBlocking = false);
+      AppToast.show(context, 'Could not block user.', type: ToastType.error);
+      return;
+    }
+
+    AppToast.show(
+      context,
+      '${friend.name} has been blocked.',
+      type: ToastType.success,
+    );
+    context.read<HomeBloc>().add(const RefreshHome());
+    context.read<ActivityBloc>().add(const RefreshActivity());
+    getIt<FriendsListCubit>().load(currentUserId);
+    context.pop();
+    context.pop();
+  }
+
+  Future<void> _reportUser() async {
+    final friend = _friend;
+    final authState = context.read<AuthBloc>().state;
+    if (friend == null || authState is! Authenticated) return;
+
+    try {
+      await getIt<SupportEmailService>().composeAbuseReport(
+        reporterEmail: authState.user.email,
+        reporterUserId: authState.user.id,
+        reportedUserId: friend.id,
+        reportedUserName: friend.name,
+      );
+    } catch (_) {
+      if (!mounted) return;
+      AppToast.show(
+        context,
+        'Could not open email. Write to ${AppConstants.abuseEmail}.',
+        type: ToastType.error,
+      );
+    }
   }
 
   void _showSharedGroupsBlockedDialog() {
@@ -196,9 +279,9 @@ class _FriendSettingsPageState extends State<FriendSettingsPage> {
     final scheme = context.colorScheme;
 
     return AbsorbPointer(
-      absorbing: _isRemoving,
+      absorbing: _isRemoving || _isBlocking,
       child: Opacity(
-        opacity: _isRemoving ? 0.6 : 1,
+        opacity: (_isRemoving || _isBlocking) ? 0.6 : 1,
         child: ListView(
           padding: EdgeInsets.symmetric(vertical: AppDimensions.lg.h),
           children: [
@@ -284,13 +367,13 @@ class _FriendSettingsPageState extends State<FriendSettingsPage> {
               title: 'Block user',
               subtitle:
                   'Remove this user from your friends list, hide any groups you share, and suppress future expenses/notifications from them.',
-              onTap: _showComingSoon,
+              onTap: _confirmBlockUser,
             ),
             _SettingsActionTile(
               icon: Icons.report_gmailerrorred_outlined,
               title: 'Report user',
               subtitle: 'Flag an abusive, suspicious, or spam account.',
-              onTap: _showComingSoon,
+              onTap: _reportUser,
             ),
           ],
         ),

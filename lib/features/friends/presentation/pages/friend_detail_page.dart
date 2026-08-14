@@ -18,6 +18,7 @@ import '../../../../core/widgets/app_toast.dart';
 import '../widgets/add_expense_extended_fab.dart';
 import '../widgets/friend_action_pill.dart';
 import '../widgets/friend_expenses_empty_state.dart';
+import 'friend_record_payment_page.dart';
 
 class FriendDetailPage extends StatefulWidget {
   final String friendId;
@@ -226,26 +227,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                       children: [
                         FriendActionPill(
                           label: 'Settle up',
-                          onTap: () {
-                            final authState =
-                                context.read<AuthBloc>().state;
-                            if (authState is! Authenticated) return;
-                            context.pushNamed(
-                              RouteConstants.friendRecordPaymentName,
-                              pathParameters: {'friendId': friend.id},
-                              queryParameters: {
-                                'currentUserId': authState.user.id,
-                                'friendName': friend.name,
-                                if (friend.email != null)
-                                  'friendEmail': friend.email!,
-                                if (friend.photoUrl != null)
-                                  'friendPhotoUrl': friend.photoUrl!,
-                                'balance': balance.toStringAsFixed(2),
-                                if (state.soleSharedGroupId != null)
-                                  'groupId': state.soleSharedGroupId!,
-                              },
-                            );
-                          },
+                          onTap: () => _openSettleUp(context, state, friend),
                         ),
                         FriendActionPill(
                           label: 'Remind...',
@@ -531,5 +513,69 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
 
   void _showComingSoon(BuildContext context) {
     AppToast.show(context, 'Coming soon!', type: ToastType.info);
+  }
+
+  /// Prefer the sole shared group, otherwise the group with the largest
+  /// outstanding balance so the settlement expense is always attached to a
+  /// real group (empty groupId settlements never clear the friend balance).
+  String? _resolveSettleGroupId(FriendDetailState state) {
+    if (state.soleSharedGroupId != null &&
+        state.soleSharedGroupId!.trim().isNotEmpty) {
+      return state.soleSharedGroupId;
+    }
+    if (state.groupBalances.isNotEmpty) {
+      return state.groupBalances.first.groupId;
+    }
+    for (final entry in state.entries) {
+      final groupId = entry.expense.groupId.trim();
+      if (groupId.isNotEmpty) return groupId;
+    }
+    return null;
+  }
+
+  Future<void> _openSettleUp(
+    BuildContext context,
+    FriendDetailState state,
+    UserPreview friend,
+  ) async {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! Authenticated) {
+      AppToast.show(context, 'Please log in again.', type: ToastType.error);
+      return;
+    }
+
+    final balance = state.totalBalance;
+    if (balance.abs() < 0.01) {
+      AppToast.show(context, 'You are already settled up.', type: ToastType.info);
+      return;
+    }
+
+    final groupId = _resolveSettleGroupId(state);
+    if (groupId == null || groupId.isEmpty) {
+      AppToast.show(
+        context,
+        'No shared group found to record this payment.',
+        type: ToastType.error,
+      );
+      return;
+    }
+
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => FriendRecordPaymentPage(
+          currentUserId: authState.user.id,
+          friendId: friend.id,
+          friendName: friend.name,
+          friendEmail: friend.email,
+          friendPhotoUrl: friend.photoUrl,
+          balance: balance,
+          groupId: groupId,
+        ),
+      ),
+    );
+
+    if (saved == true && mounted) {
+      _load();
+    }
   }
 }

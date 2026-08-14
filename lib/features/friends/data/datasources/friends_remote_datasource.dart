@@ -85,4 +85,18 @@ abstract class FriendsRemoteDataSource {
   });
 
   Future<UserPreview?> getUserById(String userId);
+
+  Future<void> blockUser({
+    required String currentUserId,
+    required String blockedUserId,
+  });
+
+  Future<void> unblockUser({
+    required String currentUserId,
+    required String blockedUserId,
+  });
+
+  Future<List<UserPreview>> getBlockedUsers(String currentUserId);
+
+  Future<Set<String>> getBlockedUserIds(String currentUserId);
 }

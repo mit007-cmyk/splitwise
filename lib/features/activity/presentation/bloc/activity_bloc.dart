@@ -1,8 +1,11 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import '../../../../core/di/di.dart';
 import '../../../../core/errors/result.dart';
+import '../../../../core/services/firestore_service.dart';
+import '../../../../core/utils/user_display_names.dart';
 import '../../../auth/domain/repositories/auth_repository.dart';
-import '../../domain/entities/activity_page_result.dart';
 import '../../../home/domain/repositories/home_repository.dart';
+import '../../domain/entities/activity_page_result.dart';
 import '../../domain/repositories/activity_repository.dart';
 import 'activity_event.dart';
 import 'activity_state.dart';
@@ -72,14 +75,17 @@ class ActivityBloc extends Bloc<ActivityTimelineEvent, ActivityState> {
   }
 
   Future<void> _fetchUsersIfNeeded(Emitter<ActivityState> emit) async {
-    if (state.userNames.isNotEmpty) return;
+    final names = await UserDisplayNames.load(getIt<FirestoreService>());
+    // Also merge getAllUsers in case UserDisplayNames misses anything.
     final usersResult = await _homeRepository.getAllUsers();
     if (usersResult.isSuccess) {
-      final names = <String, String>{
-        for (final u in usersResult.dataOrThrow) u.id: u.name,
-      };
-      emit(state.copyWith(userNames: names));
+      for (final u in usersResult.dataOrThrow) {
+        if (!UserDisplayNames.looksLikeRawId(u.name, u.id)) {
+          names[u.id] = u.name.trim();
+        }
+      }
     }
+    emit(state.copyWith(userNames: {...state.userNames, ...names}));
   }
 
   Future<String?> _resolveCurrentUserId() async {

@@ -17,7 +17,9 @@ enum ActivityEventType {
   settlementDeleted('settlement_deleted'),
   commentAdded('comment_added'),
   commentEdited('comment_edited'),
-  commentDeleted('comment_deleted');
+  commentDeleted('comment_deleted'),
+  userBlocked('user_blocked'),
+  userUnblocked('user_unblocked');
 
   final String value;
   const ActivityEventType(this.value);

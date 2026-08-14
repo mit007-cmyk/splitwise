@@ -7,6 +7,8 @@ import '../../../../core/services/app_logger.dart';
 import '../../../../core/services/firestore_service.dart';
 import '../../../../core/utils/friend_code_generator.dart';
 import '../../../../core/utils/friend_code_parser.dart';
+import '../../../../core/utils/activity_event_writer.dart';
+import '../../../../core/utils/blocked_users_store.dart';
 import '../../../../core/utils/friendship_id_helper.dart';
 import '../../../auth/data/models/user_model.dart';
 import '../../domain/entities/friend_code_info.dart';
@@ -337,6 +339,10 @@ class FriendsRemoteDataSourceImpl implements FriendsRemoteDataSource {
       throw const ServerException(message: 'You cannot add yourself as a friend');
     }
 
+    if (await _isBlockedEither(fromUserId, toUserId)) {
+      throw const ServerException(message: 'This user is unavailable');
+    }
+
     if (await areFriends(fromUserId, toUserId)) {
       throw const ServerException(message: 'You are already friends');
     }
@@ -470,6 +476,7 @@ class FriendsRemoteDataSourceImpl implements FriendsRemoteDataSource {
     final data = doc.data();
     if (data == null) return [];
 
+    final blockedIds = await getBlockedUserIds(userId);
     final requests = <FriendRequest>[];
     for (final entry in data.entries) {
       if (entry.value is! Map) continue;
@@ -480,6 +487,7 @@ class FriendsRemoteDataSourceImpl implements FriendsRemoteDataSource {
           model.status != FriendRequestStatus.pending.name) {
         continue;
       }
+      if (blockedIds.contains(model.fromUserId)) continue;
 
       final fromUser = await _readUserRecord(model.fromUserId);
       requests.add(
@@ -512,18 +520,26 @@ class FriendsRemoteDataSourceImpl implements FriendsRemoteDataSource {
       if (otherId != null) friendUserIds.add(otherId);
     }
 
+    final blockedIds = await getBlockedUserIds(userId);
     final friends = <UserPreview>[];
     for (final friendId in friendUserIds) {
+      if (blockedIds.contains(friendId)) continue;
       final userData = await _readUserRecord(friendId);
-      if (userData == null) continue;
+      final rawName = userData?['name'] as String?;
+      final name = (rawName != null &&
+              rawName.trim().isNotEmpty &&
+              rawName.trim() != friendId)
+          ? rawName.trim()
+          : 'Splitwise user';
       friends.add(
         UserPreview(
           id: friendId,
-          name: (userData['name'] as String?) ?? 'Splitwise user',
-          email: userData['email'] as String?,
-          phone: userData['phone'] as String?,
-          photoUrl: userData['photoUrl'] as String?,
-          friendCode: (userData['friendCode'] as String?) ?? '',
+          name: name,
+          email: userData?['email'] as String?,
+          phone: userData?['phone'] as String?,
+          photoUrl: userData?['photoUrl'] as String?,
+          friendCode: (userData?['friendCode'] as String?) ?? '',
+          isPending: userData?['isPendingUser'] == true,
         ),
       );
     }
@@ -539,6 +555,10 @@ class FriendsRemoteDataSourceImpl implements FriendsRemoteDataSource {
   }) async {
     if (currentUserId == friendUserId) {
       throw const ServerException(message: 'You cannot add yourself as a friend');
+    }
+
+    if (await _isBlockedEither(currentUserId, friendUserId)) {
+      throw const ServerException(message: 'This user is unavailable');
     }
 
     await _createFriendship(currentUserId, friendUserId);
@@ -847,15 +867,28 @@ class FriendsRemoteDataSourceImpl implements FriendsRemoteDataSource {
       FirestorePaths.users,
     );
     final usersData = usersDoc.data();
+    final blockedIds = await getBlockedUserIds(ownerUserId);
 
     final items = <UserPreview>[];
+    final seenEmails = <String>{};
+    final seenPhones = <String>{};
     for (final entry in data.entries) {
       if (entry.value is! Map) continue;
       final map = Map<String, dynamic>.from(entry.value as Map);
       if ((map['ownerUserId'] as String?) != ownerUserId) continue;
       if ((map['status'] as String?) != 'pending') continue;
+      // Already linked to a real account — don't show as a second friends row.
+      if (map['friendUserId'] != null) continue;
 
       final id = (map['id'] as String?) ?? entry.key;
+      if (blockedIds.contains(id)) continue;
+
+      final email = (map['email'] as String?)?.trim().toLowerCase();
+      final phoneDigits =
+          (map['phone'] as String?)?.replaceAll(RegExp(r'\D'), '').trim() ?? '';
+      if (email != null && email.isNotEmpty && !seenEmails.add(email)) continue;
+      if (phoneDigits.length >= 8 && !seenPhones.add(phoneDigits)) continue;
+
       final shadowUser = usersData?[id];
       final friendCode = shadowUser is Map
           ? (shadowUser['friendCode'] as String?) ?? ''
@@ -921,6 +954,7 @@ class FriendsRemoteDataSourceImpl implements FriendsRemoteDataSource {
           entryPhoneDigits == normalizedPhoneDigits;
 
       if (!emailMatches && !phoneMatches) continue;
+      if (await _isBlockedEither(ownerUserId, userId)) continue;
 
       await _createFriendship(ownerUserId, userId);
 
@@ -957,6 +991,159 @@ class FriendsRemoteDataSourceImpl implements FriendsRemoteDataSource {
       friendCode: (userData['friendCode'] as String?) ?? '',
       isPending: userData['isPendingUser'] == true,
     );
+  }
+
+  @override
+  Future<Set<String>> getBlockedUserIds(String currentUserId) {
+    return BlockedUsersStore.idsBlockedBy(_firestoreService, currentUserId);
+  }
+
+  @override
+  Future<void> blockUser({
+    required String currentUserId,
+    required String blockedUserId,
+  }) async {
+    if (currentUserId == blockedUserId) {
+      throw const ServerException(message: 'You cannot block yourself');
+    }
+
+    final blockedPreview = await getUserById(blockedUserId);
+    final blockedUserName =
+        (blockedPreview?.name.trim().isNotEmpty ?? false)
+            ? blockedPreview!.name.trim()
+            : 'Splitwise user';
+
+    final id = BlockedUsersStore.blockId(currentUserId, blockedUserId);
+    await _firestoreService.setDocument(
+      FirestorePaths.root,
+      FirestorePaths.blockedUsers,
+      {
+        id: {
+          'id': id,
+          'ownerId': currentUserId,
+          'blockedUserId': blockedUserId,
+          'blockedUserName': blockedUserName,
+          'createdAt': FieldValue.serverTimestamp(),
+        },
+      },
+      merge: true,
+    );
+
+    await removeFriend(
+      currentUserId: currentUserId,
+      friendUserId: blockedUserId,
+    );
+
+    await ActivityEventWriter.appendDirect(
+      _firestoreService.firestore,
+      ActivityEventWriter.userBlocked(
+        actorUserId: currentUserId,
+        blockedUserId: blockedUserId,
+        blockedUserName: blockedUserName,
+      ),
+    );
+  }
+
+  @override
+  Future<void> unblockUser({
+    required String currentUserId,
+    required String blockedUserId,
+  }) async {
+    final id = BlockedUsersStore.blockId(currentUserId, blockedUserId);
+
+    String? savedName;
+    try {
+      final blockedDoc = await _firestoreService.getDocument(
+        FirestorePaths.root,
+        FirestorePaths.blockedUsers,
+      );
+      final raw = blockedDoc.data()?[id];
+      if (raw is Map) {
+        savedName = (raw['blockedUserName'] as String?)?.trim();
+      }
+    } catch (_) {}
+
+    try {
+      await _firestoreService.updateDocument(
+        FirestorePaths.root,
+        FirestorePaths.blockedUsers,
+        {id: FieldValue.delete()},
+      );
+    } catch (_) {}
+
+    // Blocking removes the friendship — restore it on unblock so the person
+    // reappears on Friends and shared balances resolve to a real profile.
+    final existing = await _readUserRecord(blockedUserId);
+    final existingName = (existing?['name'] as String?)?.trim();
+    final needsName = existing == null ||
+        existingName == null ||
+        existingName.isEmpty ||
+        existingName == blockedUserId;
+
+    if (needsName && savedName != null && savedName.isNotEmpty) {
+      await _firestoreService.setDocument(
+        FirestorePaths.root,
+        FirestorePaths.users,
+        {
+          blockedUserId: {
+            'id': blockedUserId,
+            'name': savedName,
+            if (existing == null) 'createdAt': FieldValue.serverTimestamp(),
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
+        },
+        merge: true,
+      );
+    }
+
+    await _createFriendship(currentUserId, blockedUserId);
+
+    final unblockedName = (savedName != null && savedName.isNotEmpty)
+        ? savedName
+        : ((existing?['name'] as String?)?.trim().isNotEmpty == true
+            ? (existing!['name'] as String).trim()
+            : 'Splitwise user');
+
+    await ActivityEventWriter.appendDirect(
+      _firestoreService.firestore,
+      ActivityEventWriter.userUnblocked(
+        actorUserId: currentUserId,
+        unblockedUserId: blockedUserId,
+        unblockedUserName: unblockedName,
+      ),
+    );
+  }
+
+  @override
+  Future<List<UserPreview>> getBlockedUsers(String currentUserId) async {
+    final nameById = await BlockedUsersStore.namesBlockedBy(
+      _firestoreService,
+      currentUserId,
+    );
+    final users = <UserPreview>[];
+    for (final entry in nameById.entries) {
+      final preview = await getUserById(entry.key);
+      if (preview != null && preview.name.trim().isNotEmpty) {
+        users.add(preview);
+      } else {
+        users.add(
+          UserPreview(
+            id: entry.key,
+            name: entry.value,
+            friendCode: '',
+          ),
+        );
+      }
+    }
+    users.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    return users;
+  }
+
+  Future<bool> _isBlockedEither(String userIdA, String userIdB) async {
+    final aBlocked = await getBlockedUserIds(userIdA);
+    if (aBlocked.contains(userIdB)) return true;
+    final bBlocked = await getBlockedUserIds(userIdB);
+    return bBlocked.contains(userIdA);
   }
 
   Future<FriendRequestModel?> _readFriendRequest(String requestId) async {

@@ -42,12 +42,35 @@ class _ActivityPageState extends State<ActivityPage> {
     return state.userNames[actorId] ?? 'Splitwise user';
   }
 
+  String _personName(
+    ActivityState state,
+    String currentUserId,
+    String userId, {
+    String? fallback,
+  }) {
+    if (userId == currentUserId) return 'You';
+    final fromState = state.userNames[userId]?.trim();
+    if (fromState != null && fromState.isNotEmpty) return fromState;
+    final trimmed = fallback?.trim();
+    if (trimmed != null && trimmed.isNotEmpty) return trimmed;
+    return 'Splitwise user';
+  }
+
+  bool _isSettlement(ActivityEvent event) {
+    final category = (event.metadata['category'] as String?)?.toLowerCase() ?? '';
+    return category == 'settlement' ||
+        event.type == ActivityEventType.settlementAdded;
+  }
+
   String _line1(ActivityState state, String currentUserId, ActivityEvent event) {
     final actor = _actorName(state, currentUserId, event.performedBy);
     final title = (event.metadata['title'] as String?) ?? 'expense';
     final groupName = (event.metadata['groupName'] as String?) ?? 'group';
     switch (event.type) {
       case ActivityEventType.expenseCreated:
+        if (_isSettlement(event)) {
+          return _settlementLine(state, currentUserId, event, actor, groupName);
+        }
         return '$actor added "$title" in "$groupName".';
       case ActivityEventType.expenseUpdated:
         return '$actor edited "$title" in "$groupName".';
@@ -59,8 +82,200 @@ class _ActivityPageState extends State<ActivityPage> {
         return '$actor created the group "$groupName".';
       case ActivityEventType.groupDeleted:
         return '$actor deleted the group "$groupName".';
+      case ActivityEventType.memberJoinedGroup:
+        final memberId = (event.metadata['memberUserId'] as String?) ?? '';
+        final memberName = _personName(
+          state,
+          currentUserId,
+          memberId,
+          fallback: event.metadata['memberName'] as String?,
+        );
+        return '$actor added $memberName to the group "$groupName".';
+      case ActivityEventType.userBlocked:
+        final name = _personName(
+          state,
+          currentUserId,
+          event.entityId,
+          fallback: event.metadata['blockedUserName'] as String?,
+        );
+        return '$actor blocked $name. This notification is only visible to you.';
+      case ActivityEventType.userUnblocked:
+        final name = _personName(
+          state,
+          currentUserId,
+          event.entityId,
+          fallback: event.metadata['unblockedUserName'] as String?,
+        );
+        return '$actor unblocked $name. This notification is only visible to you.';
       default:
         return '$actor performed ${event.type.value.replaceAll('_', ' ')}.';
+    }
+  }
+
+  String _settlementLine(
+    ActivityState state,
+    String currentUserId,
+    ActivityEvent event,
+    String actor,
+    String groupName,
+  ) {
+    final participants = event.metadata['participants'];
+    String? otherId;
+    if (participants is List) {
+      for (final id in participants) {
+        final value = id.toString();
+        if (value.isNotEmpty && value != event.performedBy) {
+          otherId = value;
+          break;
+        }
+      }
+    }
+    final otherName = otherId == null
+        ? 'Splitwise user'
+        : _personName(state, currentUserId, otherId);
+    final direction = (event.metadata['netDirection'] as String?) ?? '';
+    if (direction == 'owe') {
+      return '$actor recorded a payment from $otherName in "$groupName".';
+    }
+    return '$actor paid $otherName in "$groupName".';
+  }
+
+  InlineSpan _line1Span(
+    BuildContext context,
+    ActivityState state,
+    String currentUserId,
+    ActivityEvent event,
+  ) {
+    final base = context.textTheme.bodyMedium?.copyWith(
+      color: context.colorScheme.onSurface,
+      height: 1.25,
+    );
+    final bold = base?.copyWith(fontWeight: FontWeight.w700);
+
+    TextSpan boldText(String text) => TextSpan(text: text, style: bold);
+    TextSpan plain(String text) => TextSpan(text: text, style: base);
+
+    final actor = _actorName(state, currentUserId, event.performedBy);
+    final title = (event.metadata['title'] as String?) ?? 'expense';
+    final groupName = (event.metadata['groupName'] as String?) ?? 'group';
+
+    switch (event.type) {
+      case ActivityEventType.userBlocked:
+        final name = _personName(
+          state,
+          currentUserId,
+          event.entityId,
+          fallback: event.metadata['blockedUserName'] as String?,
+        );
+        return TextSpan(
+          style: base,
+          children: [
+            boldText(actor),
+            plain(' blocked '),
+            boldText(name),
+            plain('. This notification is only visible to you.'),
+          ],
+        );
+      case ActivityEventType.userUnblocked:
+        final name = _personName(
+          state,
+          currentUserId,
+          event.entityId,
+          fallback: event.metadata['unblockedUserName'] as String?,
+        );
+        return TextSpan(
+          style: base,
+          children: [
+            boldText(actor),
+            plain(' unblocked '),
+            boldText(name),
+            plain('. This notification is only visible to you.'),
+          ],
+        );
+      case ActivityEventType.memberJoinedGroup:
+        final memberId = (event.metadata['memberUserId'] as String?) ?? '';
+        final memberName = _personName(
+          state,
+          currentUserId,
+          memberId,
+          fallback: event.metadata['memberName'] as String?,
+        );
+        return TextSpan(
+          style: base,
+          children: [
+            boldText(actor),
+            plain(' added '),
+            plain(memberName),
+            plain(' to the group '),
+            boldText('"$groupName"'),
+            plain('.'),
+          ],
+        );
+      case ActivityEventType.groupCreated:
+        return TextSpan(
+          style: base,
+          children: [
+            boldText(actor),
+            plain(' created the group '),
+            boldText('"$groupName"'),
+            plain('.'),
+          ],
+        );
+      case ActivityEventType.expenseCreated:
+        if (_isSettlement(event)) {
+          final participants = event.metadata['participants'];
+          String? otherId;
+          if (participants is List) {
+            for (final id in participants) {
+              final value = id.toString();
+              if (value.isNotEmpty && value != event.performedBy) {
+                otherId = value;
+                break;
+              }
+            }
+          }
+          final otherName = otherId == null
+              ? 'Splitwise user'
+              : _personName(state, currentUserId, otherId);
+          final direction = (event.metadata['netDirection'] as String?) ?? '';
+          if (direction == 'owe') {
+            return TextSpan(
+              style: base,
+              children: [
+                boldText(actor),
+                plain(' recorded a payment from '),
+                boldText(otherName),
+                plain(' in '),
+                boldText('"$groupName"'),
+                plain('.'),
+              ],
+            );
+          }
+          return TextSpan(
+            style: base,
+            children: [
+              boldText(actor),
+              plain(' paid '),
+              boldText(otherName),
+              plain(' in '),
+              boldText('"$groupName"'),
+              plain('.'),
+            ],
+          );
+        }
+        return TextSpan(
+          style: base,
+          children: [
+            boldText(actor),
+            plain(' added '),
+            boldText('"$title"'),
+            plain(' in '),
+            boldText('"$groupName"'),
+            plain('.'),
+          ],
+        );
+      default:
+        return TextSpan(text: _line1(state, currentUserId, event), style: base);
     }
   }
 
@@ -74,6 +289,14 @@ class _ActivityPageState extends State<ActivityPage> {
     final symbol = (event.metadata['currencySymbol'] as String?) ?? '';
     final direction = (event.metadata['netDirection'] as String?) ?? '';
     if (amount == null || amount <= 0) return null;
+    if (_isSettlement(event)) {
+      if (direction == 'owed') {
+        return 'You paid $symbol${amount.toStringAsFixed(2)}';
+      }
+      if (direction == 'owe') {
+        return 'You received $symbol${amount.toStringAsFixed(2)}';
+      }
+    }
     if (direction == 'owed') return 'You get back $symbol${amount.toStringAsFixed(2)}';
     if (direction == 'owe') return 'You owe $symbol${amount.toStringAsFixed(2)}';
     return null;
@@ -82,9 +305,17 @@ class _ActivityPageState extends State<ActivityPage> {
   TextStyle _line2Style(BuildContext context, ActivityEvent event) {
     final direction = (event.metadata['netDirection'] as String?) ?? '';
     final isDeleted = _isDeletedExpenseEvent(event);
-    final amountColor = direction == 'owe'
-        ? context.appColors.negativeBalanceColor
-        : context.appColors.positiveBalanceColor;
+    final isSettlement = _isSettlement(event);
+    final Color amountColor;
+    if (isSettlement) {
+      amountColor = direction == 'owe'
+          ? context.appColors.negativeBalanceColor
+          : context.appColors.positiveBalanceColor;
+    } else {
+      amountColor = direction == 'owe'
+          ? context.appColors.negativeBalanceColor
+          : context.appColors.positiveBalanceColor;
+    }
 
     return context.textTheme.bodyMedium!.copyWith(
       color: isDeleted ? amountColor.withValues(alpha: 0.75) : amountColor,
@@ -95,14 +326,52 @@ class _ActivityPageState extends State<ActivityPage> {
     );
   }
 
-  String _dateHeader(DateTime date) {
+  String _relativeTimestamp(DateTime date) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final d = DateTime(date.year, date.month, date.day);
     final diff = today.difference(d).inDays;
-    if (diff == 0) return 'Today';
-    if (diff == 1) return 'Yesterday';
-    return DateFormat('dd MMM yyyy').format(date);
+    final time = DateFormat('h:mm a').format(date).toLowerCase();
+    if (diff == 0) return 'Today, $time';
+    if (diff == 1) return 'Yesterday, $time';
+    if (diff < 7) return '$diff days ago, $time';
+    return '${DateFormat('dd MMM yyyy').format(date)}, $time';
+  }
+
+  IconData _iconForEvent(ActivityEvent event) {
+    if (_isSettlement(event)) return Icons.payments_outlined;
+    switch (event.type) {
+      case ActivityEventType.groupCreated:
+      case ActivityEventType.groupDeleted:
+      case ActivityEventType.memberJoinedGroup:
+      case ActivityEventType.memberLeftGroup:
+        return Icons.list_alt_rounded;
+      case ActivityEventType.userBlocked:
+      case ActivityEventType.userUnblocked:
+        return Icons.person_off_outlined;
+      case ActivityEventType.expenseCreated:
+      case ActivityEventType.expenseUpdated:
+      case ActivityEventType.expenseDeleted:
+      case ActivityEventType.expenseRestored:
+        return Icons.restaurant_outlined;
+      default:
+        return Icons.receipt_long_rounded;
+    }
+  }
+
+  Color _iconBgForEvent(BuildContext context, ActivityEvent event) {
+    final scheme = context.colorScheme;
+    if (_isSettlement(event)) return scheme.primary.withValues(alpha: 0.2);
+    switch (event.type) {
+      case ActivityEventType.userBlocked:
+      case ActivityEventType.userUnblocked:
+        return scheme.primary.withValues(alpha: 0.18);
+      case ActivityEventType.groupCreated:
+      case ActivityEventType.memberJoinedGroup:
+        return const Color(0xFF6B2D3C).withValues(alpha: 0.55);
+      default:
+        return scheme.primaryContainer.withValues(alpha: 0.55);
+    }
   }
 
   Future<void> _openEvent(BuildContext context, ActivityState state, ActivityEvent event) async {
@@ -191,37 +460,27 @@ class _ActivityPageState extends State<ActivityPage> {
             }
 
             final widgets = <Widget>[];
-            String? lastHeader;
             for (final item in state.items) {
-              final header = _dateHeader(item.performedAt);
-              if (header != lastHeader) {
-                widgets.add(
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(
-                      AppDimensions.lg.w,
-                      AppDimensions.md.h,
-                      AppDimensions.lg.w,
-                      AppDimensions.sm.h,
-                    ),
-                    child: Text(
-                      header,
-                      style: context.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: context.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                );
-                lastHeader = header;
-              }
               final line2 = _line2(item);
               widgets.add(
                 ListTile(
                   onTap: () => _openEvent(context, state, item),
-                  leading: const CircleAvatar(
-                    child: Icon(Icons.receipt_long_rounded),
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: AppDimensions.lg.w,
+                    vertical: 4.h,
                   ),
-                  title: Text(_line1(state, currentUserId, item)),
+                  leading: CircleAvatar(
+                    radius: 22.r,
+                    backgroundColor: _iconBgForEvent(context, item),
+                    child: Icon(
+                      _iconForEvent(item),
+                      color: context.colorScheme.onSurface,
+                      size: 22.r,
+                    ),
+                  ),
+                  title: Text.rich(
+                    _line1Span(context, state, currentUserId, item),
+                  ),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -231,8 +490,10 @@ class _ActivityPageState extends State<ActivityPage> {
                           style: _line2Style(context, item),
                         ),
                       Text(
-                        DateFormat('h:mm a').format(item.performedAt),
-                        style: context.textTheme.bodySmall,
+                        _relativeTimestamp(item.performedAt),
+                        style: context.textTheme.bodySmall?.copyWith(
+                          color: context.colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ],
                   ),
