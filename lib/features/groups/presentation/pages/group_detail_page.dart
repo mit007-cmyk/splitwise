@@ -87,6 +87,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
         currentUserId: _currentUserId,
         memberNames: detailState.memberNames,
         memberIds: group.memberIds,
+        simplifyDebts: group.simplifyDebts,
       );
     }
     return group.memberBalances;

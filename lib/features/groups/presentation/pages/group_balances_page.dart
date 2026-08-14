@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -7,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/di/di.dart';
 import '../../../../core/utils/context_extension.dart';
 import '../../../../core/utils/debt_settlement.dart';
+import '../../../../core/utils/group_balance_calculator.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -30,7 +30,6 @@ class GroupBalancesPage extends StatefulWidget {
 class _GroupBalancesPageState extends State<GroupBalancesPage> {
   late final GroupDetailCubit _cubit;
   final Set<String> _expandedMemberIds = {};
-  bool _isSimplifyDebtsEnabled = false;
 
   String get _currentUserId {
     final authState = context.read<AuthBloc>().state;
@@ -79,72 +78,11 @@ class _GroupBalancesPageState extends State<GroupBalancesPage> {
     required List<String> memberIds,
     required bool simplify,
   }) {
-    final validExpenses = expenses.where((e) => !e.isDeleted).toList();
-
-    // 1. Calculate overall net balance for each member
-    final netByUser = <String, double>{
-      for (final mId in memberIds) mId: 0.0,
-    };
-
-    for (final exp in validExpenses) {
-      final owedByUser = <String, double>{};
-      if (exp.splits.isNotEmpty) {
-        exp.splits.forEach((id, val) => owedByUser[id] = val);
-      } else {
-        final equal = exp.amount / memberIds.length;
-        for (final id in memberIds) {
-          owedByUser[id] = equal;
-        }
-      }
-      final paidByUser = exp.paidBy;
-      final involved = {...paidByUser.keys, ...owedByUser.keys};
-
-      for (final id in involved) {
-        final net = (paidByUser[id] ?? 0.0) - (owedByUser[id] ?? 0.0);
-        netByUser[id] = (netByUser[id] ?? 0.0) + net;
-      }
-    }
-
-    if (simplify) {
-      return DebtSettlement.reduceToTransfers(netByUser);
-    } else {
-      // Aggregate pairwise transfers of each expense
-      final aggregated = <String, Map<String, double>>{}; // fromUserId -> {toUserId -> amount}
-      for (final exp in validExpenses) {
-        final owedByUser = <String, double>{};
-        if (exp.splits.isNotEmpty) {
-          exp.splits.forEach((id, val) => owedByUser[id] = val);
-        } else {
-          final equal = exp.amount / memberIds.length;
-          for (final id in memberIds) {
-            owedByUser[id] = equal;
-          }
-        }
-        final paidByUser = exp.paidBy;
-        final involved = {...paidByUser.keys, ...owedByUser.keys};
-        final netForExpense = <String, double>{
-          for (final id in involved)
-            id: (paidByUser[id] ?? 0.0) - (owedByUser[id] ?? 0.0),
-        };
-        final transfers = DebtSettlement.reduceToTransfers(netForExpense);
-        for (final t in transfers) {
-          final from = t.fromUserId;
-          final to = t.toUserId;
-          aggregated.putIfAbsent(from, () => {})[to] =
-              (aggregated[from]?[to] ?? 0.0) + t.amount;
-        }
-      }
-
-      final List<SettlementTransfer> result = [];
-      aggregated.forEach((from, toMap) {
-        toMap.forEach((to, amount) {
-          if (amount > 0.01) {
-            result.add(SettlementTransfer(fromUserId: from, toUserId: to, amount: amount));
-          }
-        });
-      });
-      return result;
-    }
+    return GroupBalanceCalculator.computeTransfers(
+      expenses: expenses,
+      memberIds: memberIds,
+      simplifyDebts: simplify,
+    );
   }
 
   void _triggerRemind(String fromName, String toName, double amount) {
@@ -182,7 +120,9 @@ class _GroupBalancesPageState extends State<GroupBalancesPage> {
   Widget build(BuildContext context) {
     final theme = context.theme;
 
-    return BlocBuilder<GroupDetailCubit, GroupDetailState>(
+    return BlocBuilder<HomeBloc, HomeState>(
+      builder: (context, homeState) {
+        return BlocBuilder<GroupDetailCubit, GroupDetailState>(
       bloc: _cubit,
       builder: (context, detailState) {
         if (detailState.isLoadingExpenses) {
@@ -202,15 +142,15 @@ class _GroupBalancesPageState extends State<GroupBalancesPage> {
         final memberNameMap = detailState.memberNames;
         final expenses = detailState.expenses;
 
-          // Find current group info
           List<String> memberIds = [];
+          var simplifyDebts = true;
 
-          final homeState = context.read<HomeBloc>().state;
           if (homeState is HomeLoaded) {
             final groupIndex = homeState.summary.groups.indexWhere((g) => g.groupId == widget.groupId);
             if (groupIndex != -1) {
               final g = homeState.summary.groups[groupIndex];
               memberIds = g.memberIds;
+              simplifyDebts = g.simplifyDebts;
             }
           }
 
@@ -218,48 +158,20 @@ class _GroupBalancesPageState extends State<GroupBalancesPage> {
             memberIds = memberNameMap.keys.toList();
           }
 
-          // Calculate dynamic overall net balance for each user
-          final netBalances = <String, double>{
-            for (final mId in memberIds) mId: 0.0,
-          };
-          for (final exp in expenses.where((e) => !e.isDeleted)) {
-            final owedByUser = <String, double>{};
-            if (exp.splits.isNotEmpty) {
-              exp.splits.forEach((id, val) => owedByUser[id] = val);
-            } else {
-              final equal = exp.amount / memberIds.length;
-              for (final id in memberIds) {
-                owedByUser[id] = equal;
-              }
-            }
-            final paidByUser = exp.paidBy;
-            final involved = {...paidByUser.keys, ...owedByUser.keys};
-
-            for (final id in involved) {
-              final net = (paidByUser[id] ?? 0.0) - (owedByUser[id] ?? 0.0);
-              netBalances[id] = (netBalances[id] ?? 0.0) + net;
-            }
-          }
-
-          // Calculate simplified vs non-simplified counts
-          final simplifiedTransfers = _calculateRepayments(
-            expenses: expenses,
+          final shares = expenses
+              .where((e) => !e.isDeleted)
+              .map((e) => ExpenseShare.fromExpense(e, memberIds: memberIds))
+              .toList();
+          final netBalances = GroupBalanceCalculator.netByUser(
+            expenses: shares,
             memberIds: memberIds,
-            simplify: true,
-          );
-          final nonSimplifiedTransfers = _calculateRepayments(
-            expenses: expenses,
-            memberIds: memberIds,
-            simplify: false,
           );
 
           final activeTransfers = _calculateRepayments(
             expenses: expenses,
             memberIds: memberIds,
-            simplify: _isSimplifyDebtsEnabled,
+            simplify: simplifyDebts,
           );
-
-          final int savedCount = math.max(3, nonSimplifiedTransfers.length - simplifiedTransfers.length);
 
           return Scaffold(
             appBar: AppBar(
@@ -272,20 +184,21 @@ class _GroupBalancesPageState extends State<GroupBalancesPage> {
             body: SafeArea(
               child: ListView.builder(
                 padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-                itemCount: memberIds.length,
+                itemCount: memberIds.length + 1,
                 itemBuilder: (context, index) {
-                  final memberId = memberIds[index];
+                  if (index == 0) {
+                    return _buildSimplifyBanner(context, simplifyDebts);
+                  }
+
+                  final memberId = memberIds[index - 1];
                   final name = memberNameMap[memberId] ?? memberId;
                   final net = netBalances[memberId] ?? 0.0;
                   final isExpanded = _expandedMemberIds.contains(memberId);
-              
-                  // Filters transfers related to this member
-                  final List<SettlementTransfer> memberTransfers = [];
-                  if (net > 0.01) {
-                    memberTransfers.addAll(activeTransfers.where((t) => t.toUserId == memberId));
-                  } else if (net < -0.01) {
-                    memberTransfers.addAll(activeTransfers.where((t) => t.fromUserId == memberId));
-                  }
+
+                  final memberTransfers = activeTransfers
+                      .where((t) =>
+                          t.fromUserId == memberId || t.toUserId == memberId)
+                      .toList();
               
                   // Text display format
                   final Widget balanceText;
@@ -521,6 +434,47 @@ class _GroupBalancesPageState extends State<GroupBalancesPage> {
             ),
           );
       },
+    );
+      },
+    );
+  }
+
+  Widget _buildSimplifyBanner(BuildContext context, bool simplifyDebts) {
+    final theme = context.theme;
+    return Padding(
+      padding: EdgeInsets.only(bottom: 12.h),
+      child: Container(
+        padding: EdgeInsets.all(12.r),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(12.r),
+          border: Border.all(
+            color: theme.colorScheme.outline.withValues(alpha: 0.35),
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              simplifyDebts ? Icons.auto_fix_high_rounded : Icons.account_tree_outlined,
+              size: 18.sp,
+              color: theme.colorScheme.primary,
+            ),
+            SizedBox(width: 10.w),
+            Expanded(
+              child: Text(
+                simplifyDebts
+                    ? 'Simplify debts is on. These repayments are combined so the group can settle with the fewest payments. Totals owed do not change.'
+                    : 'Simplify debts is off. These are the original pairwise debts from each expense.',
+                style: context.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

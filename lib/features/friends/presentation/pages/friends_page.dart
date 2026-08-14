@@ -372,6 +372,7 @@ class _FriendsPageState extends State<FriendsPage> {
           ),
           floatingActionButton: AddExpenseExtendedFab(onExpenseAdded: _load),
           body: BlocConsumer<FriendsListCubit, FriendsListState>(
+            bloc: _cubit,
             listener: (context, state) {
               if (state.errorMessage != null) {
                 AppToast.show(context, state.errorMessage!, type: ToastType.error);

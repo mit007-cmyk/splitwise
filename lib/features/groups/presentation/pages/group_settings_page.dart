@@ -20,6 +20,7 @@ import 'package:splitwise/features/activity/presentation/bloc/activity_event.dar
 import 'package:splitwise/features/home/presentation/bloc/home_bloc.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_event.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_state.dart';
+import '../../../friends/presentation/bloc/friends_list_cubit.dart';
 
 class GroupSettingsPage extends StatefulWidget {
   final String groupId;
@@ -36,7 +37,9 @@ class GroupSettingsPage extends StatefulWidget {
 class _GroupSettingsPageState extends State<GroupSettingsPage> {
   List<UserModel> _allUsers = [];
   bool _isLoadingUsers = true;
-  bool _simplifyDebts = false;
+  bool _simplifyDebts = true;
+  bool _simplifyHydrated = false;
+  bool _updatingSimplify = false;
 
   @override
   void initState() {
@@ -114,6 +117,49 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
       name: 'Splitwise user',
       email: '',
     );
+  }
+
+  Future<void> _onSimplifyDebtsChanged(bool enabled) async {
+    final previous = _simplifyDebts;
+    setState(() {
+      _simplifyDebts = enabled;
+      _updatingSimplify = true;
+    });
+
+    final result = await getIt<HomeRepository>().updateSimplifyDebts(
+      groupId: widget.groupId,
+      enabled: enabled,
+    );
+    if (!mounted) return;
+
+    if (result.isFailure) {
+      setState(() {
+        _simplifyDebts = previous;
+        _updatingSimplify = false;
+      });
+      AppToast.show(
+        context,
+        'Could not update simplify debts. Please try again.',
+        type: ToastType.error,
+      );
+      return;
+    }
+
+    context.read<HomeBloc>().add(const RefreshHome());
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated) {
+      getIt<FriendsListCubit>().load(authState.user.id);
+    }
+    AppToast.show(
+      context,
+      enabled
+          ? 'Simplify debts is on. Balances now show the fewest repayments.'
+          : 'Simplify debts is off. Balances now show original pairwise debts.',
+      type: ToastType.success,
+    );
+    if (mounted) {
+      setState(() => _updatingSimplify = false);
+    }
   }
 
   Color _getGroupColor(String name) {
@@ -393,6 +439,11 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
           }
           final group = state.summary.groups[groupIndex];
 
+          if (!_simplifyHydrated) {
+            _simplifyDebts = group.simplifyDebts;
+            _simplifyHydrated = true;
+          }
+
           // Get current authenticated user ID
           String currentUserId = '';
           final authState = context.read<AuthBloc>().state;
@@ -614,11 +665,9 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
                       ),
                       AppSwitch(
                         value: _simplifyDebts,
-                        onChanged: (val) {
-                          setState(() {
-                            _simplifyDebts = val;
-                          });
-                        },
+                        onChanged: _updatingSimplify
+                            ? null
+                            : (val) => _onSimplifyDebtsChanged(val),
                       ),
                     ],
                   ),

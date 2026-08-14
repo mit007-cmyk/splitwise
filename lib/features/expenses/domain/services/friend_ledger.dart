@@ -1,4 +1,5 @@
 import '../../../../core/utils/debt_settlement.dart';
+import '../../../../core/utils/group_balance_calculator.dart';
 import '../entities/expense.dart';
 
 /// A single expense's contribution to the running balance between the
@@ -82,6 +83,49 @@ class FriendLedger {
 
   static double totalBalance(List<FriendExpenseEntry> entries) =>
       entries.fold(0.0, (sum, entry) => sum + entry.amount);
+
+  /// Net between [currentUserId] and [friendId] inside one group, using that
+  /// group's simplify-debts setting so friend totals match group balances.
+  static FriendGroupBalance? balanceInGroup({
+    required String groupId,
+    required String groupName,
+    required List<Expense> expenses,
+    required List<String> memberIds,
+    required bool simplifyDebts,
+    required String currentUserId,
+    required String friendId,
+  }) {
+    final valid = expenses.where((expense) => !expense.isDeleted).toList();
+    if (valid.isEmpty) return null;
+
+    final transfers = GroupBalanceCalculator.computeTransfers(
+      expenses: valid,
+      memberIds: memberIds,
+      simplifyDebts: simplifyDebts,
+    );
+    final amount = GroupBalanceCalculator.signedBalanceBetween(
+      transfers: transfers,
+      currentUserId: currentUserId,
+      otherUserId: friendId,
+    );
+    if (amount.abs() <= DebtSettlement.epsilon) return null;
+
+    final lastActivityDate = valid
+        .map((expense) => expense.date)
+        .reduce((a, b) => a.isAfter(b) ? a : b);
+    final latest = valid.reduce(
+      (a, b) => b.date.isAfter(a.date) ? b : a,
+    );
+
+    return FriendGroupBalance(
+      groupId: groupId,
+      groupName: groupName,
+      amount: amount,
+      currencySymbol: latest.currencySymbol,
+      lastActivityDate: lastActivityDate,
+      expenseCount: valid.length,
+    );
+  }
 
   /// Collapses [entries] into one row per group, the same way Splitwise's
   /// friend detail screen breaks a total balance down "for {group}". Groups

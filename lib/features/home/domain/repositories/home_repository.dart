@@ -54,6 +54,11 @@ abstract class HomeRepository {
     required String type,
   });
 
+  Future<Result<void>> updateSimplifyDebts({
+    required String groupId,
+    required bool enabled,
+  });
+
   Future<Result<void>> leaveGroup({
     required String groupId,
     required String userId,

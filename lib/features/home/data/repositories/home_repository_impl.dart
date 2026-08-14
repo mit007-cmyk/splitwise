@@ -102,6 +102,7 @@ class HomeRepositoryImpl implements HomeRepository {
         'type': type,
         'createdBy': userId,
         'members': [userId],
+        'simplifyDebts': true,
         'createdAt': FieldValue.serverTimestamp(),
         'expenses': {},
       };
@@ -217,6 +218,26 @@ class HomeRepositoryImpl implements HomeRepository {
       return Result.success(null);
     } catch (e) {
       return Result.failure(ServerFailure('Failed to edit group: $e'));
+    }
+  }
+
+  @override
+  Future<Result<void>> updateSimplifyDebts({
+    required String groupId,
+    required bool enabled,
+  }) async {
+    try {
+      final isOnline = await _connectivityService.isConnected;
+      if (!isOnline) {
+        return Result.failure(const NetworkFailure('Cannot update this setting while offline.'));
+      }
+      await _remoteDataSource.updateSimplifyDebts(
+        groupId: groupId,
+        enabled: enabled,
+      );
+      return Result.success(null);
+    } catch (e) {
+      return Result.failure(ServerFailure('Failed to update simplify debts: $e'));
     }
   }
 

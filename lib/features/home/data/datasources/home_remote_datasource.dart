@@ -5,7 +5,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/services/firestore_service.dart';
 import '../../../../core/utils/activity_event_writer.dart';
 import '../../../../core/utils/blocked_users_store.dart';
-import '../../../../core/utils/debt_settlement.dart';
+import '../../../../core/utils/group_balance_calculator.dart';
 import '../../../../core/utils/user_display_names.dart';
 import '../../../auth/data/models/user_model.dart';
 import '../../domain/entities/balance_summary.dart';
@@ -34,6 +34,7 @@ abstract class HomeRemoteDataSource {
     required String actorUserId,
   });
   Future<void> editGroup({required String groupId, required String name, required String type});
+  Future<void> updateSimplifyDebts({required String groupId, required bool enabled});
   Future<void> leaveGroup({required String groupId, required String userId});
   Future<void> deleteGroup({
     required String groupId,
@@ -107,6 +108,7 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
           'type': type,
           'createdBy': memberIds.isNotEmpty ? memberIds.first : '',
           'members': memberIds,
+          'simplifyDebts': true,
           'createdAt': FieldValue.serverTimestamp(),
         },
       },
@@ -249,6 +251,33 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
     }
     groupMap['name'] = name;
     groupMap['type'] = type;
+
+    await _firestoreService.setDocument(
+      'Splitwise',
+      'groups',
+      {
+        groupId: groupMap,
+      },
+      merge: true,
+    );
+  }
+
+  @override
+  Future<void> updateSimplifyDebts({
+    required String groupId,
+    required bool enabled,
+  }) async {
+    final groupsDoc = await _firestoreService.getDocument('Splitwise', 'groups');
+    final groupsData = groupsDoc.data();
+    if (groupsData == null || !groupsData.containsKey(groupId)) {
+      throw Exception('Group not found');
+    }
+
+    final groupMap = _asStringKeyMap(groupsData[groupId]);
+    if (groupMap == null) {
+      throw Exception('Group not found');
+    }
+    groupMap['simplifyDebts'] = enabled;
 
     await _firestoreService.setDocument(
       'Splitwise',
@@ -453,14 +482,10 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
         }
       }
 
-      // Net balances map
-      final Map<String, double> netBalances = {};
-
+      final shares = <ExpenseShare>[];
       for (final expense in expenses) {
         final totalAmount = (expense['amount'] as num?)?.toDouble() ?? 0.0;
 
-        // Splits: userId -> amount owed. Falls back to an equal split
-        // across all group members when the expense doesn't specify one.
         final Map<String, double> owedByUser = {};
         if (_asStringKeyMap(expense['splits']) != null) {
           _readAmountMap(expense['splits'], (id, amount) {
@@ -473,8 +498,6 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
           }
         }
 
-        // Paid: userId -> amount paid. Supports both the multi-payer
-        // `paidBy` map and the legacy single `paidById` string field.
         final Map<String, double> paidByUser = {};
         if (_asStringKeyMap(expense['paidBy']) != null) {
           _readAmountMap(expense['paidBy'], (id, amount) {
@@ -487,48 +510,33 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
           }
         }
 
-        // Net (paid - owed) per person touched by this expense, reduced to
-        // the minimal set of pairwise IOUs. A single-payer expense collapses
-        // to exactly the same pairwise result the old logic produced.
         final involvedIds = {...paidByUser.keys, ...owedByUser.keys};
         if (involvedIds.any(blockedIds.contains)) continue;
 
-        final netForExpense = <String, double>{
-          for (final id in involvedIds)
-            id: (paidByUser[id] ?? 0.0) - (owedByUser[id] ?? 0.0),
-        };
-
-        for (final transfer in DebtSettlement.reduceToTransfers(netForExpense)) {
-          if (blockedIds.contains(transfer.fromUserId) ||
-              blockedIds.contains(transfer.toUserId)) {
-            continue;
-          }
-          if (transfer.fromUserId == userId) {
-            netBalances[transfer.toUserId] =
-                (netBalances[transfer.toUserId] ?? 0.0) - transfer.amount;
-          } else if (transfer.toUserId == userId) {
-            netBalances[transfer.fromUserId] =
-                (netBalances[transfer.fromUserId] ?? 0.0) + transfer.amount;
-          }
-        }
+        shares.add(ExpenseShare(paidBy: paidByUser, owedBy: owedByUser));
       }
 
-      final List<MemberBalanceModel> memberBalances = [];
-      double groupTotalBalance = 0.0;
+      final simplifyDebts = groupData['simplifyDebts'] as bool? ?? true;
+      final transfers = GroupBalanceCalculator.computeTransfersFromShares(
+        expenses: shares,
+        memberIds: memberIds,
+        simplifyDebts: simplifyDebts,
+      );
+      final computedBalances = GroupBalanceCalculator.memberBalancesFromTransfers(
+        transfers: transfers,
+        currentUserId: userId,
+        memberNames: memberNames,
+        excludedUserIds: blockedIds,
+      );
 
-      netBalances.forEach((otherId, balance) {
-        if (otherId.trim().isEmpty) return;
-        if (blockedIds.contains(otherId)) return;
-        if (balance.abs() > 0.01) {
-          groupTotalBalance += balance;
-          memberBalances.add(MemberBalanceModel(
-            userId: otherId,
-            userName: UserDisplayNames.resolve(memberNames, otherId),
-            amount: balance.abs(),
-            type: balance > 0 ? BalanceType.owed : BalanceType.owe,
-          ));
-        }
-      });
+      final List<MemberBalanceModel> memberBalances = computedBalances
+          .map(MemberBalanceModel.fromEntity)
+          .toList();
+      double groupTotalBalance = 0.0;
+      for (final balance in memberBalances) {
+        groupTotalBalance +=
+            balance.type == BalanceType.owed ? balance.amount : -balance.amount;
+      }
 
       final BalanceType groupBalanceType;
       if (groupTotalBalance > 0.01) {
@@ -550,6 +558,7 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
         memberIds: memberIds,
         groupType: groupType,
         lastExpenseDate: lastExpenseDate,
+        simplifyDebts: simplifyDebts,
       ));
 
       overallNetBalance += groupTotalBalance;

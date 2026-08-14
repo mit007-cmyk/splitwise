@@ -13,6 +13,7 @@ class FriendDetailState extends Equatable {
   final bool isLoading;
   final UserPreview? friend;
   final List<FriendExpenseEntry> entries;
+  final List<FriendGroupBalance> groupBalances;
   final Map<String, String> groupNames;
   final String? soleSharedGroupId;
   final String? errorMessage;
@@ -21,6 +22,7 @@ class FriendDetailState extends Equatable {
     required this.isLoading,
     this.friend,
     this.entries = const [],
+    this.groupBalances = const [],
     this.groupNames = const {},
     this.soleSharedGroupId,
     this.errorMessage,
@@ -28,20 +30,14 @@ class FriendDetailState extends Equatable {
 
   factory FriendDetailState.initial() => const FriendDetailState(isLoading: true);
 
-  double get totalBalance => FriendLedger.totalBalance(entries);
-
-  /// Per-group breakdown of [totalBalance], sorted by size — powers the
-  /// "{friend} owes you ₹x in "{group}"" lines under the header balance.
-  List<FriendGroupBalance> get groupBalances {
-    final balances = FriendLedger.groupBalances(entries: entries, groupNames: groupNames)
-      ..sort((a, b) => b.amount.abs().compareTo(a.amount.abs()));
-    return balances;
-  }
+  double get totalBalance =>
+      groupBalances.fold(0.0, (sum, row) => sum + row.amount);
 
   FriendDetailState copyWith({
     bool? isLoading,
     UserPreview? friend,
     List<FriendExpenseEntry>? entries,
+    List<FriendGroupBalance>? groupBalances,
     Map<String, String>? groupNames,
     String? soleSharedGroupId,
     bool clearSoleSharedGroupId = false,
@@ -51,6 +47,7 @@ class FriendDetailState extends Equatable {
       isLoading: isLoading ?? this.isLoading,
       friend: friend ?? this.friend,
       entries: entries ?? this.entries,
+      groupBalances: groupBalances ?? this.groupBalances,
       groupNames: groupNames ?? this.groupNames,
       soleSharedGroupId: clearSoleSharedGroupId
           ? null
@@ -60,8 +57,15 @@ class FriendDetailState extends Equatable {
   }
 
   @override
-  List<Object?> get props =>
-      [isLoading, friend, entries, groupNames, soleSharedGroupId, errorMessage];
+  List<Object?> get props => [
+        isLoading,
+        friend,
+        entries,
+        groupBalances,
+        groupNames,
+        soleSharedGroupId,
+        errorMessage,
+      ];
 }
 
 @injectable
@@ -92,23 +96,43 @@ class FriendDetailCubit extends Cubit<FriendDetailState> {
         : const <GroupSummary>[];
 
     final groupNames = <String, String>{};
-    final allExpenses = <Expense>[];
+    final expensesByGroup = <String, List<Expense>>{};
     await Future.wait(sharedGroups.map((group) async {
       groupNames[group.groupId] = group.groupName;
       final result = await _expenseRepository.getGroupExpenses(group.groupId);
-      if (result.isSuccess) allExpenses.addAll(result.dataOrThrow);
+      expensesByGroup[group.groupId] =
+          result.isSuccess ? result.dataOrThrow : const <Expense>[];
     }));
 
+    final allExpenses = [
+      for (final expenses in expensesByGroup.values) ...expenses,
+    ];
     final entries = FriendLedger.build(
       expenses: allExpenses,
       currentUserId: currentUserId,
       friendId: friendId,
     );
 
+    final groupBalances = <FriendGroupBalance>[];
+    for (final group in sharedGroups) {
+      final row = FriendLedger.balanceInGroup(
+        groupId: group.groupId,
+        groupName: group.groupName,
+        expenses: expensesByGroup[group.groupId] ?? const <Expense>[],
+        memberIds: group.memberIds,
+        simplifyDebts: group.simplifyDebts,
+        currentUserId: currentUserId,
+        friendId: friendId,
+      );
+      if (row != null) groupBalances.add(row);
+    }
+    groupBalances.sort((a, b) => b.amount.abs().compareTo(a.amount.abs()));
+
     emit(state.copyWith(
       isLoading: false,
       friend: friend,
       entries: entries,
+      groupBalances: groupBalances,
       groupNames: groupNames,
       soleSharedGroupId:
           sharedGroups.length == 1 ? sharedGroups.first.groupId : null,

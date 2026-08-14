@@ -36,6 +36,10 @@ class GroupSummary extends Equatable {
   final String groupType;
   final DateTime? lastExpenseDate;
 
+  /// When true, group balances are reduced to the fewest repayments.
+  /// Underlying expenses are never changed.
+  final bool simplifyDebts;
+
   const GroupSummary({
     required this.groupId,
     required this.groupName,
@@ -47,6 +51,7 @@ class GroupSummary extends Equatable {
     required this.memberIds,
     required this.groupType,
     this.lastExpenseDate,
+    this.simplifyDebts = true,
   });
 
   @override
@@ -61,5 +66,6 @@ class GroupSummary extends Equatable {
         memberIds,
         groupType,
         lastExpenseDate,
+        simplifyDebts,
       ];
 }

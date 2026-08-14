@@ -79,6 +79,9 @@ class GroupSummaryModel extends GroupSummary {
   final String groupType;
   @override
   final DateTime? lastExpenseDate;
+  @override
+  @JsonKey(defaultValue: true)
+  final bool simplifyDebts;
 
   const GroupSummaryModel({
     required this.groupId,
@@ -91,6 +94,7 @@ class GroupSummaryModel extends GroupSummary {
     required this.memberIds,
     required this.groupType,
     this.lastExpenseDate,
+    this.simplifyDebts = true,
   }) : super(
           groupId: groupId,
           groupName: groupName,
@@ -102,6 +106,7 @@ class GroupSummaryModel extends GroupSummary {
           memberIds: memberIds,
           groupType: groupType,
           lastExpenseDate: lastExpenseDate,
+          simplifyDebts: simplifyDebts,
         );
 
   factory GroupSummaryModel.fromJson(Map<String, dynamic> json) => _$GroupSummaryModelFromJson(json);
@@ -125,6 +130,7 @@ class GroupSummaryModel extends GroupSummary {
       memberIds: entity.memberIds,
       groupType: entity.groupType,
       lastExpenseDate: entity.lastExpenseDate,
+      simplifyDebts: entity.simplifyDebts,
     );
   }
 
