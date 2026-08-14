@@ -143,7 +143,7 @@ class FriendsRepositoryImpl extends BaseRepository implements FriendsRepository 
   }
 
   @override
-  Future<Result<void>> createPendingContact({
+  Future<Result<String>> createPendingContact({
     required String ownerUserId,
     required String displayName,
     String? email,

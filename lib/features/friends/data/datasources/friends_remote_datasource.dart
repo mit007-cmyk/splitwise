@@ -66,7 +66,7 @@ abstract class FriendsRemoteDataSource {
     String? phone,
   });
 
-  Future<void> createPendingContact({
+  Future<String> createPendingContact({
     required String ownerUserId,
     required String displayName,
     String? email,

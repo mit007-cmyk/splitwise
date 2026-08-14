@@ -59,7 +59,7 @@ abstract class FriendsRepository {
     String? phone,
   });
 
-  Future<Result<void>> createPendingContact({
+  Future<Result<String>> createPendingContact({
     required String ownerUserId,
     required String displayName,
     String? email,

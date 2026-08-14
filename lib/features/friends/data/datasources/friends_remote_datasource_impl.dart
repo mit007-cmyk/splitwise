@@ -731,7 +731,7 @@ class FriendsRemoteDataSourceImpl implements FriendsRemoteDataSource {
   }
 
   @override
-  Future<void> createPendingContact({
+  Future<String> createPendingContact({
     required String ownerUserId,
     required String displayName,
     String? email,
@@ -851,6 +851,8 @@ class FriendsRemoteDataSourceImpl implements FriendsRemoteDataSource {
       },
       merge: true,
     );
+
+    return id;
   }
 
   @override

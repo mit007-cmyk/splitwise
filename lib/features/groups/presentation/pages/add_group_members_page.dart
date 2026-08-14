@@ -4,19 +4,19 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/di.dart';
+import '../../../../core/services/contacts_service.dart';
 import '../../../../core/utils/context_extension.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/data/models/user_model.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import 'package:splitwise/features/friends/domain/repositories/friends_repository.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_bloc.dart';
-import 'package:splitwise/features/home/presentation/bloc/home_event.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_state.dart';
+import 'package:splitwise/features/groups/domain/entities/group_member_invite.dart';
 import 'package:splitwise/features/groups/presentation/bloc/add_group_members_cubit.dart';
-import 'package:splitwise/features/activity/presentation/bloc/activity_bloc.dart';
-import 'package:splitwise/features/activity/presentation/bloc/activity_event.dart';
+import 'package:splitwise/features/groups/presentation/pages/add_group_members_review_page.dart';
+import 'package:splitwise/features/groups/presentation/pages/group_member_invite_form_page.dart';
 
 class AddGroupMembersPage extends StatefulWidget {
   final String groupId;
@@ -45,11 +45,27 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
     return '';
   }
 
-  void _reloadFriends(BuildContext context, AddGroupMembersCubit cubit) {
-    cubit.init(
-      currentUserId: _currentUserId(context),
-      existingMemberIds: _getExistingMemberIds(context),
+  Future<void> _openNewContact(BuildContext context, AddGroupMembersCubit cubit) async {
+    final invite = await Navigator.of(context).push<GroupMemberInvite>(
+      MaterialPageRoute(
+        builder: (_) => const GroupMemberInviteFormPage(),
+      ),
     );
+    if (invite == null || !context.mounted) return;
+    cubit.upsertInvite(invite);
+  }
+
+  Future<void> _openReview(BuildContext context) async {
+    final cubit = context.read<AddGroupMembersCubit>();
+    final added = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => BlocProvider.value(
+          value: cubit,
+          child: AddGroupMembersReviewPage(groupId: widget.groupId),
+        ),
+      ),
+    );
+    if (added == true && context.mounted) context.pop();
   }
 
   List<String> _getExistingMemberIds(BuildContext context) {
@@ -101,7 +117,7 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
       );
     }
 
-    final isSelected = state.selectedUsers.any((u) => u.id == user.id);
+    final isSelected = state.selected.any((invite) => invite.key == user.id);
     if (isSelected) {
       return Icon(
         Icons.check,
@@ -113,7 +129,7 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
   }
 
   Widget _buildSelectedUsersTray(BuildContext context, AddGroupMembersState state) {
-    if (state.selectedUsers.isEmpty) return const SizedBox.shrink();
+    if (state.selected.isEmpty) return const SizedBox.shrink();
 
     final cubit = context.read<AddGroupMembersCubit>();
 
@@ -127,9 +143,9 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: EdgeInsets.symmetric(horizontal: 16.w),
-            itemCount: state.selectedUsers.length,
+            itemCount: state.selected.length,
             itemBuilder: (context, index) {
-              final user = state.selectedUsers[index];
+              final invite = state.selected[index];
 
               return Padding(
                 padding: EdgeInsets.only(right: 16.w),
@@ -138,12 +154,12 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
                     Stack(
                       clipBehavior: Clip.none,
                       children: [
-                        _buildUserAvatar(user, radius: 20),
+                        inviteLeadingAvatar(context, invite, radius: 20),
                         Positioned(
                           right: -4.w,
                           top: -4.h,
                           child: GestureDetector(
-                            onTap: () => cubit.deselectUser(user.id),
+                            onTap: () => cubit.deselect(invite.key),
                             child: CircleAvatar(
                               radius: 8.r,
                               backgroundColor: context.colorScheme.onSurfaceVariant,
@@ -161,7 +177,7 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
                     SizedBox(
                       width: 50.w,
                       child: Text(
-                        user.name.split(' ')[0],
+                        invite.shortLabel,
                         style: context.textTheme.bodySmall?.copyWith(
                           fontSize: 10.sp,
                           overflow: TextOverflow.ellipsis,
@@ -180,32 +196,16 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
     );
   }
 
-  void _submitSelected(BuildContext context, List<UserModel> selectedUsers) {
-    if (selectedUsers.isEmpty) return;
-
-    final authState = context.read<AuthBloc>().state;
-    final actorUserId = authState is Authenticated ? authState.user.id : '';
-    if (actorUserId.isEmpty) return;
-
-    context.read<HomeBloc>().add(AddGroupMembersRequested(
-          groupId: widget.groupId,
-          memberIds: selectedUsers.map((u) => u.id).toList(),
-          actorUserId: actorUserId,
-        ));
-    context.read<ActivityBloc>().add(const RefreshActivity());
-
-    AppToast.show(context, '${selectedUsers.length} members added to the group!', type: ToastType.success);
-    context.pop();
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
     final existingMemberIds = _getExistingMemberIds(context);
 
     return BlocProvider<AddGroupMembersCubit>(
-      create: (context) => AddGroupMembersCubit(getIt<FriendsRepository>())
-        ..init(
+      create: (context) => AddGroupMembersCubit(
+        getIt<FriendsRepository>(),
+        getIt<ContactsService>(),
+      )..init(
           currentUserId: _currentUserId(context),
           existingMemberIds: existingMemberIds,
         ),
@@ -271,11 +271,7 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
                             children: [
                               // Trigger to go to Add Friend
                               InkWell(
-                                onTap: () async {
-                                  await context.push('/add-friend');
-                                  // Refresh lists when returning
-                                  _reloadFriends(context, cubit);
-                                },
+                                onTap: () => _openNewContact(context, cubit),
                                 child: Padding(
                                   padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
                                   child: Row(
@@ -342,7 +338,72 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
                                     onTap: () => cubit.toggleSelection(user),
                                   );
                                 }),
-                              ] else if (_searchController.text.isNotEmpty) ...[
+                              ],
+
+                              if (state.filteredContacts.isNotEmpty) ...[
+                                Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                                  child: Text(
+                                    'From your contacts',
+                                    style: context.textTheme.bodySmall?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: theme.colorScheme.onSurfaceVariant.withOpacity(0.7),
+                                    ),
+                                  ),
+                                ),
+                                ...state.filteredContacts.map((contact) {
+                                  final contactKey = 'contact:${contact.id}';
+                                  final isSelected = cubit.isSelectedKey(contactKey);
+                                  return ListTile(
+                                    leading: CircleAvatar(
+                                      radius: 22.r,
+                                      backgroundColor: theme.colorScheme.surfaceContainerHighest,
+                                      child: Icon(
+                                        contact.phone != null
+                                            ? Icons.phone
+                                            : Icons.email_outlined,
+                                        color: theme.colorScheme.onSurfaceVariant,
+                                        size: 20.r,
+                                      ),
+                                    ),
+                                    title: Text(
+                                      contact.displayName,
+                                      style: context.textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                    subtitle: contact.subtitle.isNotEmpty
+                                        ? Text(
+                                            contact.subtitle,
+                                            style: context.textTheme.bodySmall?.copyWith(
+                                              color: theme.colorScheme.onSurfaceVariant
+                                                  .withOpacity(0.7),
+                                            ),
+                                          )
+                                        : null,
+                                    trailing: isSelected
+                                        ? Icon(
+                                            Icons.check,
+                                            color: theme.colorScheme.primary,
+                                          )
+                                        : null,
+                                    contentPadding: EdgeInsets.symmetric(
+                                      horizontal: 16.w,
+                                      vertical: 4.h,
+                                    ),
+                                    onTap: () => cubit.toggleContact(contact),
+                                  );
+                                }),
+                              ],
+
+                              if (state.isLoadingContacts)
+                                Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 24.h),
+                                  child: const Center(child: CircularProgressIndicator()),
+                                )
+                              else if (_searchController.text.isNotEmpty &&
+                                  state.filteredUsers.isEmpty &&
+                                  state.filteredContacts.isEmpty) ...[
                                 Padding(
                                   padding: EdgeInsets.symmetric(vertical: 32.h),
                                   child: Center(
@@ -366,10 +427,10 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
                 padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: state.selectedUsers.isEmpty
+                    backgroundColor: state.selected.isEmpty
                         ? theme.colorScheme.onSurface.withOpacity(0.08)
                         : theme.colorScheme.primary,
-                    foregroundColor: state.selectedUsers.isEmpty
+                    foregroundColor: state.selected.isEmpty
                         ? theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.4)
                         : theme.colorScheme.onPrimary,
                     minimumSize: Size(double.infinity, 48.h),
@@ -378,7 +439,7 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
                     ),
                     elevation: 0,
                   ),
-                  onPressed: state.selectedUsers.isEmpty ? null : () => _submitSelected(context, state.selectedUsers),
+                  onPressed: state.selected.isEmpty ? null : () => _openReview(context),
                   child: Text(
                     'Next',
                     style: TextStyle(
