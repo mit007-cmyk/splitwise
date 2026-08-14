@@ -61,6 +61,10 @@ class RouteConstants {
   static const String groupSettingsPath = '/group-detail/:groupId/settings';
   static const String groupSettingsName = 'group-settings';
 
+  /// Personal default split editor (paid-by + split template for new expenses).
+  static const String groupDefaultSplitPath = '/group-detail/:groupId/default-split';
+  static const String groupDefaultSplitName = 'group-default-split';
+
   static const String editGroupPath = '/group-detail/:groupId/edit';
   static const String editGroupName = 'edit-group';
 

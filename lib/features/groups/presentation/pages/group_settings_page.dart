@@ -21,6 +21,7 @@ import 'package:splitwise/features/home/presentation/bloc/home_bloc.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_event.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_state.dart';
 import '../../../friends/presentation/bloc/friends_list_cubit.dart';
+import '../../domain/repositories/group_user_settings_repository.dart';
 
 class GroupSettingsPage extends StatefulWidget {
   final String groupId;
@@ -40,6 +41,8 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
   bool _simplifyDebts = true;
   bool _simplifyHydrated = false;
   bool _updatingSimplify = false;
+  String _defaultSplitSummary = 'Paid by you and split equally';
+  bool _defaultSplitSummaryLoaded = false;
 
   @override
   void initState() {
@@ -160,6 +163,52 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
     if (mounted) {
       setState(() => _updatingSimplify = false);
     }
+  }
+
+  Future<void> _loadDefaultSplitSummary(String userId, GroupSummary group) async {
+    // Step: show saved personal default split on the settings row.
+    final result = await getIt<GroupUserSettingsRepository>().getDefaultSplit(
+      groupId: widget.groupId,
+      userId: userId,
+    );
+    if (!mounted) return;
+
+    if (result.isSuccess && result.dataOrThrow != null) {
+      final def = result.dataOrThrow!;
+      var resolvedPayer = def.paidByUserId == userId ? 'you' : 'someone';
+      if (def.paidByUserId != userId) {
+        for (final user in _allUsers) {
+          if (user.id == def.paidByUserId) {
+            resolvedPayer = user.name;
+            break;
+          }
+        }
+      }
+      setState(() {
+        _defaultSplitSummary = def.summaryLabel(resolvedPayer);
+      });
+    }
+  }
+
+  Future<void> _openDefaultSplit() async {
+    // Step: open default-split editor; reload summary after save.
+    final saved = await context.pushNamed<bool>(
+      RouteConstants.groupDefaultSplitName,
+      pathParameters: {'groupId': widget.groupId},
+    );
+    if (!mounted || saved != true) return;
+
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! Authenticated) return;
+
+    final homeState = context.read<HomeBloc>().state;
+    if (homeState is! HomeLoaded) return;
+    final groupIndex =
+        homeState.summary.groups.indexWhere((g) => g.groupId == widget.groupId);
+    if (groupIndex == -1) return;
+
+    await _loadDefaultSplitSummary(authState.user.id, homeState.summary.groups[groupIndex]);
+    setState(() => _defaultSplitSummaryLoaded = true);
   }
 
   Color _getGroupColor(String name) {
@@ -439,16 +488,20 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
           }
           final group = state.summary.groups[groupIndex];
 
+          String currentUserId = '';
+          final authState = context.read<AuthBloc>().state;
+          if (authState is Authenticated) {
+            currentUserId = authState.user.id;
+          }
+
           if (!_simplifyHydrated) {
             _simplifyDebts = group.simplifyDebts;
             _simplifyHydrated = true;
           }
 
-          // Get current authenticated user ID
-          String currentUserId = '';
-          final authState = context.read<AuthBloc>().state;
-          if (authState is Authenticated) {
-            currentUserId = authState.user.id;
+          if (currentUserId.isNotEmpty && !_defaultSplitSummaryLoaded) {
+            _defaultSplitSummaryLoaded = true;
+            _loadDefaultSplitSummary(currentUserId, group);
           }
 
           return Scaffold(
@@ -701,41 +754,22 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
                   ),
                 ),
 
+                // Step 2: Default split — personal template, prefills Add Expense only.
                 ListTile(
                   leading: Padding(
                     padding: EdgeInsets.only(top: 4.h),
                     child: Icon(Icons.dehaze_rounded, color: theme.colorScheme.onSurface),
                   ),
-                  title: Row(
-                    children: [
-                      Text(
-                        'Default split',
-                        style: context.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      SizedBox(width: 8.w),
-                      Container(
-                        padding: EdgeInsets.symmetric(horizontal: 6.w, vertical: 2.h),
-                        decoration: BoxDecoration(
-                          color: Colors.purple.withOpacity(0.15),
-                          borderRadius: BorderRadius.circular(4.r),
-                        ),
-                        child: Text(
-                          'PRO',
-                          style: TextStyle(
-                            color: Colors.purpleAccent,
-                            fontSize: 10.sp,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
+                  title: Text(
+                    'Default split',
+                    style: context.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                   subtitle: Padding(
                     padding: EdgeInsets.only(top: 4.h),
                     child: Text(
-                      'Paid by you and split equally\n\nNew expenses you add to this group will default to this setting, which is personal, not group-wide.',
+                      '$_defaultSplitSummary\n\nNew expenses you add to this group will default to this setting, which is personal, not group-wide.',
                       style: TextStyle(
                         color: theme.colorScheme.onSurfaceVariant.withOpacity(0.6),
                         fontSize: 12.sp,
@@ -743,6 +777,7 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
                       ),
                     ),
                   ),
+                  onTap: _openDefaultSplit,
                 ),
 
                 ListTile(

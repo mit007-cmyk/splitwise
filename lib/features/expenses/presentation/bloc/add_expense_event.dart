@@ -187,3 +187,21 @@ class QuickSplitPresetApplied extends AddExpenseEvent {
   @override
   List<Object?> get props => [payerId, splitType, splitValueTexts];
 }
+
+/// Applies a saved default-split template to the Add Expense / settings editor.
+class DefaultSplitApplied extends AddExpenseEvent {
+  final String paidByUserId;
+  final SplitType splitType;
+  final Set<String> selectedParticipantIds;
+  final Map<String, String> splitValueTexts;
+
+  const DefaultSplitApplied({
+    required this.paidByUserId,
+    required this.splitType,
+    required this.selectedParticipantIds,
+    this.splitValueTexts = const {},
+  });
+
+  @override
+  List<Object?> get props => [paidByUserId, splitType, selectedParticipantIds, splitValueTexts];
+}

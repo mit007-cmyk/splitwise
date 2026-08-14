@@ -12,6 +12,7 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../friends/domain/repositories/friends_repository.dart';
 import '../../../home/domain/repositories/home_repository.dart';
+import '../../../groups/domain/repositories/group_user_settings_repository.dart';
 import '../../domain/entities/expense.dart';
 import '../../domain/entities/split_type.dart';
 import '../../domain/repositories/expense_repository.dart';
@@ -68,6 +69,7 @@ class _AddExpensePageState extends State<AddExpensePage> {
       expenseRepository: getIt<ExpenseRepository>(),
       homeRepository: getIt<HomeRepository>(),
       friendsRepository: getIt<FriendsRepository>(),
+      groupUserSettingsRepository: getIt<GroupUserSettingsRepository>(),
       currentUserId: currentUserId,
       currentUserName: currentUserName,
     )..add(

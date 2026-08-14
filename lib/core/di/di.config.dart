@@ -11,6 +11,12 @@
 import 'package:get_it/get_it.dart' as _i174;
 import 'package:injectable/injectable.dart' as _i526;
 
+import '../../features/activity/data/datasources/activity_remote_datasource.dart'
+    as _i747;
+import '../../features/activity/data/repositories/activity_repository_impl.dart'
+    as _i8;
+import '../../features/activity/domain/repositories/activity_repository.dart'
+    as _i387;
 import '../../features/auth/data/datasources/auth_local_datasource.dart'
     as _i992;
 import '../../features/auth/data/datasources/auth_remote_datasource.dart'
@@ -51,6 +57,12 @@ import '../../features/friends/presentation/bloc/friend_invite_cubit.dart'
 import '../../features/friends/presentation/bloc/friends_list_cubit.dart'
     as _i787;
 import '../../features/friends/presentation/bloc/my_code_cubit.dart' as _i938;
+import '../../features/groups/data/datasources/group_user_settings_remote_datasource.dart'
+    as _i3;
+import '../../features/groups/data/repositories/group_user_settings_repository_impl.dart'
+    as _i174;
+import '../../features/groups/domain/repositories/group_user_settings_repository.dart'
+    as _i278;
 import '../../features/home/data/datasources/home_local_datasource.dart'
     as _i314;
 import '../../features/home/data/datasources/home_remote_datasource.dart'
@@ -117,8 +129,12 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i992.AuthLocalDataSourceImpl(gh<_i1047.HiveService>()));
     gh.lazySingleton<_i611.ThemeCubit>(
         () => _i611.ThemeCubit(gh<_i1047.HiveService>()));
+    gh.lazySingleton<_i747.ActivityRemoteDataSource>(
+        () => _i747.ActivityRemoteDataSourceImpl(gh<_i52.FirestoreService>()));
     gh.lazySingleton<_i30.FriendsRepository>(
         () => _i120.FriendsRepositoryImpl(gh<_i252.FriendsRemoteDataSource>()));
+    gh.lazySingleton<_i3.GroupUserSettingsRemoteDataSource>(() =>
+        _i3.GroupUserSettingsRemoteDataSourceImpl(gh<_i52.FirestoreService>()));
     gh.lazySingleton<_i161.AuthRemoteDataSource>(
         () => _i161.AuthRemoteDataSourceImpl(
               gh<_i1047.HiveService>(),
@@ -141,6 +157,11 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i848.ExpenseRemoteDataSourceImpl(gh<_i52.FirestoreService>()));
     gh.factory<_i437.AddFriendSearchCubit>(
         () => _i437.AddFriendSearchCubit(gh<_i1008.ContactsService>()));
+    gh.lazySingleton<_i278.GroupUserSettingsRepository>(() =>
+        _i174.GroupUserSettingsRepositoryImpl(
+            gh<_i3.GroupUserSettingsRemoteDataSource>()));
+    gh.lazySingleton<_i387.ActivityRepository>(
+        () => _i8.ActivityRepositoryImpl(gh<_i747.ActivityRemoteDataSource>()));
     gh.lazySingleton<_i0.HomeRepository>(() => _i76.HomeRepositoryImpl(
           gh<_i278.HomeRemoteDataSource>(),
           gh<_i314.HomeLocalDataSource>(),
@@ -158,6 +179,10 @@ extension GetItInjectableX on _i174.GetIt {
           gh<_i0.HomeRepository>(),
           gh<_i787.AuthRepository>(),
           gh<_i47.ConnectivityService>(),
+        ));
+    gh.lazySingleton<_i787.FriendsListCubit>(() => _i787.FriendsListCubit(
+          gh<_i30.FriendsRepository>(),
+          gh<_i0.HomeRepository>(),
         ));
     gh.lazySingleton<_i17.GetCurrentUserUseCase>(
         () => _i17.GetCurrentUserUseCase(gh<_i787.AuthRepository>()));
@@ -180,11 +205,6 @@ extension GetItInjectableX on _i174.GetIt {
           gh<_i17.GetCurrentUserUseCase>(),
           gh<_i281.WatchAuthStatusUseCase>(),
           gh<_i57.LoginWithGoogleUseCase>(),
-        ));
-    gh.factory<_i787.FriendsListCubit>(() => _i787.FriendsListCubit(
-          gh<_i30.FriendsRepository>(),
-          gh<_i0.HomeRepository>(),
-          gh<_i939.ExpenseRepository>(),
         ));
     gh.factory<_i866.FriendDetailCubit>(() => _i866.FriendDetailCubit(
           gh<_i30.FriendsRepository>(),

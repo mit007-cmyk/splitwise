@@ -18,6 +18,7 @@ import 'package:splitwise/features/groups/presentation/pages/group_balances_page
 import 'package:splitwise/features/friends/presentation/pages/add_friend_page.dart';
 import 'package:splitwise/features/friends/presentation/pages/add_friend_search_page.dart';
 import 'package:splitwise/features/groups/presentation/pages/group_settings_page.dart';
+import 'package:splitwise/features/groups/presentation/pages/group_default_split_page.dart';
 import 'package:splitwise/features/groups/presentation/pages/edit_group_page.dart';
 import 'package:splitwise/features/friends/presentation/pages/friends_page.dart';
 import 'package:splitwise/features/activity/presentation/pages/activity_page.dart';
@@ -268,6 +269,14 @@ class AppRouter {
         builder: (context, state) {
           final groupId = state.pathParameters['groupId'] ?? '';
           return GroupSettingsPage(groupId: groupId);
+        },
+      ),
+      GoRoute(
+        path: RouteConstants.groupDefaultSplitPath,
+        name: RouteConstants.groupDefaultSplitName,
+        builder: (context, state) {
+          final groupId = state.pathParameters['groupId'] ?? '';
+          return GroupDefaultSplitPage(groupId: groupId);
         },
       ),
       GoRoute(

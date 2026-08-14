@@ -35,6 +35,8 @@ class FirestorePaths {
   static const String friendRequests = 'friend_requests';
   static const String pendingContacts = 'pending_contacts';
   static const String blockedUsers = 'blocked_users';
+  /// Per-user group prefs (default split template: `{groupId}|{userId}` keys).
+  static const String groupUserSettings = 'group_user_settings';
   static const String app = 'app';
   static const String emailConfiguration = 'email_configuration';
   static const String securityDetails = 'security_details';

@@ -8,6 +8,7 @@ import '../../domain/entities/expense.dart';
 import '../../domain/entities/expense_participant.dart';
 import '../../domain/entities/split_type.dart';
 import '../../domain/repositories/expense_repository.dart';
+import '../../../groups/domain/repositories/group_user_settings_repository.dart';
 import '../../domain/services/direct_group.dart';
 import 'add_expense_event.dart';
 import 'add_expense_state.dart';
@@ -16,6 +17,7 @@ class AddExpenseBloc extends Bloc<AddExpenseEvent, AddExpenseState> {
   final ExpenseRepository _expenseRepository;
   final HomeRepository _homeRepository;
   final FriendsRepository _friendsRepository;
+  final GroupUserSettingsRepository _groupUserSettingsRepository;
   static const _uuid = Uuid();
 
   /// The full app user directory (fetched once in [_onInit]), keyed by user
@@ -34,11 +36,13 @@ class AddExpenseBloc extends Bloc<AddExpenseEvent, AddExpenseState> {
     required ExpenseRepository expenseRepository,
     required HomeRepository homeRepository,
     required FriendsRepository friendsRepository,
+    required GroupUserSettingsRepository groupUserSettingsRepository,
     required String currentUserId,
     required String currentUserName,
   })  : _expenseRepository = expenseRepository,
         _homeRepository = homeRepository,
         _friendsRepository = friendsRepository,
+        _groupUserSettingsRepository = groupUserSettingsRepository,
         super(AddExpenseState.initial(
           currentUserId: currentUserId,
           currentUserName: currentUserName,
@@ -68,6 +72,7 @@ class AddExpenseBloc extends Bloc<AddExpenseEvent, AddExpenseState> {
     on<SaveExpenseRequested>(_onSaveRequested);
     on<DeleteExpenseRequested>(_onDeleteRequested);
     on<QuickSplitPresetApplied>(_onQuickSplitPresetApplied);
+    on<DefaultSplitApplied>(_onDefaultSplitApplied);
   }
 
   Future<void> _onInit(InitAddExpense event, Emitter<AddExpenseState> emit) async {
@@ -123,6 +128,7 @@ class AddExpenseBloc extends Bloc<AddExpenseEvent, AddExpenseState> {
 
     if (initialGroup != null) {
       _applyGroup(initialGroup, emit);
+      await _applyDefaultSplit(initialGroup.groupId, emit);
     }
   }
 
@@ -162,7 +168,7 @@ class AddExpenseBloc extends Bloc<AddExpenseEvent, AddExpenseState> {
     ));
   }
 
-  void _onGroupSelected(GroupSelected event, Emitter<AddExpenseState> emit) {
+  Future<void> _onGroupSelected(GroupSelected event, Emitter<AddExpenseState> emit) async {
     GroupSummary? group;
     for (final g in state.availableGroups) {
       if (g.groupId == event.groupId) {
@@ -173,6 +179,7 @@ class AddExpenseBloc extends Bloc<AddExpenseEvent, AddExpenseState> {
     if (group == null) return;
 
     _applyGroup(group, emit);
+    await _applyDefaultSplit(group.groupId, emit);
   }
 
   void _applyGroup(GroupSummary group, Emitter<AddExpenseState> emit) {
@@ -197,6 +204,55 @@ class AddExpenseBloc extends Bloc<AddExpenseEvent, AddExpenseState> {
       members: members,
       selectedParticipantIds: members.map((m) => m.id).toSet(),
       singlePayerId: payerId,
+      payerAmountTexts: const {},
+    ));
+  }
+
+  Future<void> _applyDefaultSplit(String groupId, Emitter<AddExpenseState> emit) async {
+    // Step: load personal default split and prefill payer + split (not on edit).
+    if (state.isDirectExpense || state.isEditMode) return;
+
+    final result = await _groupUserSettingsRepository.getDefaultSplit(
+      groupId: groupId,
+      userId: state.currentUserId,
+    );
+    if (result.isFailure || result.dataOrThrow == null) return;
+
+    final def = result.dataOrThrow!;
+    final memberIds = state.members.map((m) => m.id).toSet();
+    if (!def.isValidForMembers(memberIds)) return;
+
+    final selected = def.selectedParticipantIds.where(memberIds.contains).toSet();
+    final splitTexts = def.splitType == SplitType.unequally
+        ? def.splitValueTextsForAmount(state.amount)
+        : def.splitValueTexts;
+
+    emit(state.copyWith(
+      singlePayerId: memberIds.contains(def.paidByUserId)
+          ? def.paidByUserId
+          : state.singlePayerId,
+      splitType: def.splitType,
+      splitValueTexts: {
+        for (final entry in splitTexts.entries)
+          if (memberIds.contains(entry.key)) entry.key: entry.value,
+      },
+      selectedParticipantIds: selected.isEmpty ? memberIds : selected,
+      isMultiplePayers: false,
+      payerAmountTexts: const {},
+    ));
+  }
+
+  void _onDefaultSplitApplied(
+    DefaultSplitApplied event,
+    Emitter<AddExpenseState> emit,
+  ) {
+    // Step: apply saved template when opening the default-split settings page.
+    emit(state.copyWith(
+      isMultiplePayers: false,
+      singlePayerId: event.paidByUserId,
+      splitType: event.splitType,
+      splitValueTexts: event.splitValueTexts,
+      selectedParticipantIds: event.selectedParticipantIds,
       payerAmountTexts: const {},
     ));
   }
