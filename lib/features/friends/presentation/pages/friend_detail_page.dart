@@ -20,6 +20,7 @@ import '../../../../core/widgets/app_toast.dart';
 import '../widgets/add_expense_extended_fab.dart';
 import '../widgets/friend_action_pill.dart';
 import '../widgets/friend_expenses_empty_state.dart';
+import '../widgets/friend_reminder_sheet.dart';
 import 'friend_record_payment_page.dart';
 
 class FriendDetailPage extends StatefulWidget {
@@ -233,7 +234,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                         ),
                         FriendActionPill(
                           label: 'Remind...',
-                          onTap: () => _showComingSoon(context),
+                          onTap: () => _openRemindSheet(context, state, friend),
                         ),
                         FriendActionPill(
                           label: 'Charts',
@@ -527,6 +528,32 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
 
   void _showComingSoon(BuildContext context) {
     AppToast.show(context, 'Coming soon!', type: ToastType.info);
+  }
+
+  Future<void> _openRemindSheet(
+    BuildContext context,
+    FriendDetailState state,
+    UserPreview friend,
+  ) async {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! Authenticated) {
+      AppToast.show(context, 'Please log in again.', type: ToastType.error);
+      return;
+    }
+
+    if (state.groupBalances.isEmpty) {
+      AppToast.show(context, 'You are all settled up.', type: ToastType.info);
+      return;
+    }
+
+    await FriendReminderSheet.show(
+      context,
+      friendName: friend.name,
+      outstandingBalanceCount: state.groupBalances.length,
+      currentUserId: authState.user.id,
+      currentUserName: authState.user.name,
+      currentUserPhotoUrl: authState.user.photoUrl,
+    );
   }
 
   /// CSV of every expense shared with this friend, with one net column per
