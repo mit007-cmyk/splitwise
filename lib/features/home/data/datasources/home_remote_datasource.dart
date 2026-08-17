@@ -5,6 +5,7 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/services/firestore_service.dart';
 import '../../../../core/utils/activity_event_writer.dart';
 import '../../../../core/utils/blocked_users_store.dart';
+import '../../../../core/utils/currency_amount.dart';
 import '../../../../core/utils/group_balance_calculator.dart';
 import '../../../../core/utils/user_display_names.dart';
 import '../../../auth/data/models/user_model.dart';
@@ -395,7 +396,7 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
     }
 
     final List<GroupSummaryModel> groupsList = [];
-    double overallNetBalance = 0.0;
+    final overallAmounts = <CurrencyAmount>[];
     final topLevelExpensesByGroup = <String, List<Map<String, dynamic>>>{};
 
     // Preferred schema: Splitwise/expenses document (expense id -> map).
@@ -513,7 +514,15 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
         final involvedIds = {...paidByUser.keys, ...owedByUser.keys};
         if (involvedIds.any(blockedIds.contains)) continue;
 
-        shares.add(ExpenseShare(paidBy: paidByUser, owedBy: owedByUser));
+        final currencyCode = (expense['currencyCode'] as String?)?.trim();
+        final currencySymbol = (expense['currencySymbol'] as String?)?.trim();
+        shares.add(ExpenseShare(
+          paidBy: paidByUser,
+          owedBy: owedByUser,
+          currencyCode: currencyCode == null || currencyCode.isEmpty ? 'INR' : currencyCode,
+          currencySymbol:
+              currencySymbol == null || currencySymbol.isEmpty ? '₹' : currencySymbol,
+        ));
       }
 
       final simplifyDebts = groupData['simplifyDebts'] as bool? ?? true;
@@ -532,26 +541,33 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
       final List<MemberBalanceModel> memberBalances = computedBalances
           .map(MemberBalanceModel.fromEntity)
           .toList();
-      double groupTotalBalance = 0.0;
-      for (final balance in memberBalances) {
-        groupTotalBalance +=
-            balance.type == BalanceType.owed ? balance.amount : -balance.amount;
-      }
-
+      final currencyTotals = MultiCurrency.netByCurrency(
+        memberBalances.map(
+          (balance) => CurrencyAmount(
+            amount: balance.signedAmount,
+            currencyCode: balance.currencyCode,
+            currencySymbol: balance.currencySymbol,
+          ),
+        ),
+      );
+      final hasOwed = currencyTotals.any((item) => item.isOwed);
+      final hasOwe = currencyTotals.any((item) => item.isOwe);
       final BalanceType groupBalanceType;
-      if (groupTotalBalance > 0.01) {
+      if (currencyTotals.isEmpty) {
+        groupBalanceType = BalanceType.settled;
+      } else if (hasOwed && !hasOwe) {
         groupBalanceType = BalanceType.owed;
-      } else if (groupTotalBalance < -0.01) {
+      } else if (hasOwe && !hasOwed) {
         groupBalanceType = BalanceType.owe;
       } else {
-        groupBalanceType = BalanceType.settled;
+        groupBalanceType = BalanceType.owed;
       }
 
       groupsList.add(GroupSummaryModel(
         groupId: groupId,
         groupName: groupName,
         groupImage: groupImage,
-        totalBalance: groupTotalBalance.abs(),
+        totalBalance: currencyTotals.isEmpty ? 0.0 : currencyTotals.first.amount.abs(),
         balanceType: groupBalanceType,
         memberBalances: memberBalances,
         memberCount: memberCount,
@@ -561,23 +577,13 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
         simplifyDebts: simplifyDebts,
       ));
 
-      overallNetBalance += groupTotalBalance;
+      overallAmounts.addAll(currencyTotals);
     }
 
-    final BalanceType overallBalanceType;
-    if (overallNetBalance > 0.01) {
-      overallBalanceType = BalanceType.owed;
-    } else if (overallNetBalance < -0.01) {
-      overallBalanceType = BalanceType.owe;
-    } else {
-      overallBalanceType = BalanceType.settled;
-    }
+    final overall = BalanceSummary.fromAmounts(overallAmounts);
 
     return HomeSummaryModel(
-      overallBalance: BalanceSummaryModel(
-        amount: overallNetBalance.abs(),
-        type: overallBalanceType,
-      ),
+      overallBalance: BalanceSummaryModel.fromEntity(overall),
       groups: groupsList,
     );
   }

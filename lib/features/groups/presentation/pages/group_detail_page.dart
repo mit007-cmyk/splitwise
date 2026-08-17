@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import '../../../../core/di/di.dart';
 import '../../../../core/utils/group_balance_calculator.dart';
 import '../../../../core/utils/user_display_names.dart';
+import '../../../../core/utils/currency_amount.dart';
 import '../../../../core/routing/route_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/context_extension.dart';
@@ -243,29 +244,26 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
     }
     if (unsettled.length == 1) {
       final balance = unsettled.first;
-      final value = '₹${balance.amount.toStringAsFixed(2)}';
       return balance.type == BalanceType.owed
-          ? '${balance.userName} owes you $value'
-          : 'You owe ${balance.userName} $value';
+          ? '${balance.userName} owes you ${balance.formattedAmount}'
+          : 'You owe ${balance.userName} ${balance.formattedAmount}';
     }
 
-    double owedTotal = 0.0;
-    double oweTotal = 0.0;
-    for (final balance in unsettled) {
-      if (balance.type == BalanceType.owed) {
-        owedTotal += balance.amount;
-      } else if (balance.type == BalanceType.owe) {
-        oweTotal += balance.amount;
-      }
-    }
-
-    if (owedTotal > 0.01 && oweTotal > 0.01) {
-      return 'You are owed ₹${owedTotal.toStringAsFixed(2)} and owe ₹${oweTotal.toStringAsFixed(2)}';
-    }
-    if (owedTotal > 0.01) {
-      return 'You are owed ₹${owedTotal.toStringAsFixed(2)} overall';
-    }
-    return 'You owe ₹${oweTotal.toStringAsFixed(2)} overall';
+    final totals = MultiCurrency.netByCurrency(
+      unsettled.map(
+        (balance) => CurrencyAmount(
+          amount: balance.signedAmount,
+          currencyCode: balance.currencyCode,
+          currencySymbol: balance.currencySymbol,
+        ),
+      ),
+    );
+    return MultiCurrency.overallLabel(
+      amounts: totals,
+      owedPrefix: 'You are owed',
+      owePrefix: 'You owe',
+      settled: 'You are all settled up in this group.',
+    );
   }
 
   Color _overallColor(BuildContext context, List<MemberBalance> balances) {
@@ -319,11 +317,10 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
   List<String> _balanceBreakdown(List<MemberBalance> balances) {
     final lines = <String>[];
     for (final balance in _unsettledBalances(balances)) {
-      final amount = '₹${balance.amount.toStringAsFixed(2)}';
       lines.add(
         balance.type == BalanceType.owed
-            ? '${balance.userName} owes you $amount'
-            : 'You owe ${balance.userName} $amount',
+            ? '${balance.userName} owes you ${balance.formattedAmount}'
+            : 'You owe ${balance.userName} ${balance.formattedAmount}',
       );
     }
     return lines;

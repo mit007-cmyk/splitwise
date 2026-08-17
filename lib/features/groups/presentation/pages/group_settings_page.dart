@@ -7,12 +7,12 @@ import '../../../../core/di/di.dart';
 import '../../../../core/routing/route_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/utils/currency_amount.dart';
 import '../../../../core/widgets/app_switch.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/data/models/user_model.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
-import 'package:splitwise/features/home/domain/entities/balance_summary.dart';
 import 'package:splitwise/features/home/domain/entities/group_summary.dart';
 import 'package:splitwise/features/home/domain/repositories/home_repository.dart';
 import 'package:splitwise/features/activity/presentation/bloc/activity_bloc.dart';
@@ -627,25 +627,32 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
                     final bool isMe = user.id == currentUserId;
                     final displayName = isMe ? '${user.name} (you)' : user.name;
 
-                    MemberBalance? balanceEntry;
-                    for (final balance in group.memberBalances) {
-                      if (balance.userId == mId) {
-                        balanceEntry = balance;
-                        break;
-                      }
-                    }
-
+                    final memberBalances = group.memberBalances
+                        .where((balance) => balance.userId == mId)
+                        .toList();
+                    final totals = MultiCurrency.netByCurrency(
+                      memberBalances.map(
+                        (balance) => CurrencyAmount(
+                          amount: balance.signedAmount,
+                          currencyCode: balance.currencyCode,
+                          currencySymbol: balance.currencySymbol,
+                        ),
+                      ),
+                    );
                     final String balanceLabel;
                     final Color balanceColor;
-                    if (balanceEntry == null) {
+                    if (totals.isEmpty) {
                       balanceLabel = 'settled up';
                       balanceColor = context.appColors.settledBalanceColor;
-                    } else if (balanceEntry.type == BalanceType.owed) {
-                      balanceLabel = 'owes ₹${balanceEntry.amount.toStringAsFixed(2)}';
+                    } else if (totals.every((item) => item.isOwed)) {
+                      balanceLabel = 'owes ${MultiCurrency.join(totals)}';
                       balanceColor = context.appColors.positiveBalanceColor;
-                    } else {
-                      balanceLabel = 'you owe ₹${balanceEntry.amount.toStringAsFixed(2)}';
+                    } else if (totals.every((item) => item.isOwe)) {
+                      balanceLabel = 'you owe ${MultiCurrency.join(totals)}';
                       balanceColor = context.appColors.negativeBalanceColor;
+                    } else {
+                      balanceLabel = MultiCurrency.overallLabel(amounts: totals);
+                      balanceColor = theme.colorScheme.onSurface;
                     }
 
                     return ListTile(
@@ -681,7 +688,7 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
                                 context,
                                 groupId: widget.groupId,
                                 member: user,
-                                isSettled: balanceEntry == null,
+                                isSettled: totals.isEmpty,
                                 balanceLabel: balanceLabel,
                                 balanceColor: balanceColor,
                               ),

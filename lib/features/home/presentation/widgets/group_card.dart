@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/utils/currency_amount.dart';
 import '../../domain/entities/balance_summary.dart';
 import '../../domain/entities/group_summary.dart';
 
@@ -26,22 +27,32 @@ class GroupCard extends StatelessWidget {
     final theme = context.theme;
 
     final colors = context.appColors;
+    final totals = MultiCurrency.netByCurrency(
+      group.memberBalances.map(
+        (split) => CurrencyAmount(
+          amount: split.signedAmount,
+          currencyCode: split.currencyCode,
+          currencySymbol: split.currencySymbol,
+        ),
+      ),
+    );
+    final hasOwed = totals.any((item) => item.isOwed);
+    final hasOwe = totals.any((item) => item.isOwe);
 
     final Color balanceColor;
     final String balanceLabel;
-    switch (group.balanceType) {
-      case BalanceType.owed:
-        balanceColor = colors.positiveBalanceColor;
-        balanceLabel = 'you are owed ₹${group.totalBalance.toStringAsFixed(2)}';
-        break;
-      case BalanceType.owe:
-        balanceColor = colors.negativeBalanceColor;
-        balanceLabel = 'you owe ₹${group.totalBalance.toStringAsFixed(2)}';
-        break;
-      case BalanceType.settled:
-        balanceColor = colors.settledBalanceColor;
-        balanceLabel = 'settled up';
-        break;
+    if (totals.isEmpty) {
+      balanceColor = colors.settledBalanceColor;
+      balanceLabel = 'settled up';
+    } else if (hasOwed && hasOwe) {
+      balanceColor = theme.colorScheme.onSurface;
+      balanceLabel = MultiCurrency.overallLabel(amounts: totals);
+    } else if (hasOwed) {
+      balanceColor = colors.positiveBalanceColor;
+      balanceLabel = 'you are owed ${MultiCurrency.join(totals)}';
+    } else {
+      balanceColor = colors.negativeBalanceColor;
+      balanceLabel = 'you owe ${MultiCurrency.join(totals)}';
     }
 
     return InkWell(
@@ -99,10 +110,10 @@ class GroupCard extends StatelessWidget {
                       final String splitText;
                       final Color splitColor;
                       if (split.type == BalanceType.owed) {
-                        splitText = '${split.userName} owes you ₹${split.amount.toStringAsFixed(2)}';
+                        splitText = '${split.userName} owes you ${split.formattedAmount}';
                         splitColor = colors.positiveBalanceColor;
                       } else {
-                        splitText = 'You owe ${split.userName} ₹${split.amount.toStringAsFixed(2)}';
+                        splitText = 'You owe ${split.userName} ${split.formattedAmount}';
                         splitColor = colors.negativeBalanceColor;
                       }
 

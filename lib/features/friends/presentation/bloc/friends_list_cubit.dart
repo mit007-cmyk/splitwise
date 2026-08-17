@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
+import '../../../../core/utils/currency_amount.dart';
 import '../../../expenses/domain/services/friend_ledger.dart';
 import '../../../home/domain/entities/balance_summary.dart';
 import '../../../home/domain/repositories/home_repository.dart';
@@ -32,7 +33,29 @@ class FriendsListState extends Equatable {
     );
   }
 
-  double get overallBalance => balances.values.fold(0.0, (sum, value) => sum + value);
+  List<CurrencyAmount> get overallAmounts {
+    return MultiCurrency.netByCurrency(
+      groupBreakdowns.values.expand((rows) => rows).map(
+            (row) => CurrencyAmount(
+              amount: row.amount,
+              currencyCode: row.currencyCode,
+              currencySymbol: row.currencySymbol,
+            ),
+          ),
+    );
+  }
+
+  List<CurrencyAmount> amountsFor(String friendId) {
+    return MultiCurrency.netByCurrency(
+      (groupBreakdowns[friendId] ?? const []).map(
+        (row) => CurrencyAmount(
+          amount: row.amount,
+          currencyCode: row.currencyCode,
+          currencySymbol: row.currencySymbol,
+        ),
+      ),
+    );
+  }
 
   FriendsListState copyWith({
     bool? isLoading,
@@ -194,17 +217,22 @@ class FriendsListCubit extends Cubit<FriendsListState> {
                 groupId: group.groupId,
                 groupName: group.groupName,
                 amount: signed,
-                currencySymbol: '₹',
+                currencyCode: memberBalance.currencyCode,
+                currencySymbol: memberBalance.currencySymbol,
                 lastActivityDate: group.lastExpenseDate ?? DateTime.now(),
                 expenseCount: 1,
               ),
             );
-        balances[friendId] = (balances[friendId] ?? 0.0) + signed;
+        if (signed.abs() > 0.01) {
+          balances[friendId] = 1.0;
+        }
       }
     }
 
-    balances.removeWhere((_, amount) => amount.abs() <= 0.01);
-    groupBreakdowns.removeWhere((friendId, _) => !balances.containsKey(friendId));
+    balances.removeWhere((friendId, _) =>
+        (groupBreakdowns[friendId] ?? const []).every((row) => row.amount.abs() <= 0.01));
+    groupBreakdowns.removeWhere((friendId, rows) =>
+        rows.every((row) => row.amount.abs() <= 0.01) || !balances.containsKey(friendId));
     for (final breakdown in groupBreakdowns.values) {
       breakdown.sort((a, b) => b.amount.abs().compareTo(a.amount.abs()));
     }

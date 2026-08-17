@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/utils/currency_amount.dart';
 import '../../../../core/widgets/filter_popup_button.dart';
 import '../../domain/entities/balance_summary.dart';
 
@@ -19,30 +20,29 @@ class OverallBalanceCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
-
     final colors = context.appColors;
+    final amounts = balance.displayAmounts;
+    final hasOwed = amounts.any((item) => item.isOwed);
+    final hasOwe = amounts.any((item) => item.isOwe);
 
     final Color amountColor;
-    final String prefixLabel;
-    final String amountText;
-
-    switch (balance.type) {
-      case BalanceType.owed:
-        amountColor = colors.positiveBalanceColor;
-        prefixLabel = 'Overall, you are owed ';
-        amountText = '₹${balance.amount.toStringAsFixed(2)}';
-        break;
-      case BalanceType.owe:
-        amountColor = colors.negativeBalanceColor;
-        prefixLabel = 'Overall, you owe ';
-        amountText = '₹${balance.amount.toStringAsFixed(2)}';
-        break;
-      case BalanceType.settled:
-        amountColor = colors.settledBalanceColor;
-        prefixLabel = "You're all settled up";
-        amountText = '';
-        break;
+    if (amounts.isEmpty) {
+      amountColor = colors.settledBalanceColor;
+    } else if (hasOwed && hasOwe) {
+      amountColor = theme.colorScheme.onSurface;
+    } else if (hasOwed) {
+      amountColor = colors.positiveBalanceColor;
+    } else {
+      amountColor = colors.negativeBalanceColor;
     }
+
+    final label = MultiCurrency.overallLabel(
+      amounts: amounts,
+      owedPrefix: 'you are owed',
+      owePrefix: 'you owe',
+      settled: "You're all settled up",
+      overall: amounts.isNotEmpty,
+    );
 
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
@@ -50,23 +50,11 @@ class OverallBalanceCard extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Expanded(
-            child: RichText(
-              text: TextSpan(
-                style: context.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: theme.colorScheme.onSurface,
-                ),
-                children: [
-                  TextSpan(text: prefixLabel),
-                  if (amountText.isNotEmpty)
-                    TextSpan(
-                      text: amountText,
-                      style: TextStyle(
-                        color: amountColor,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                ],
+            child: Text(
+              label,
+              style: context.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: amountColor,
               ),
             ),
           ),

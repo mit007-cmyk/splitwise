@@ -11,6 +11,7 @@ import '../../../../core/utils/context_extension.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/avatar_widget.dart';
 import '../../../../core/widgets/filter_popup_button.dart';
+import '../../../../core/utils/currency_amount.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../expenses/domain/services/friend_ledger.dart';
@@ -98,14 +99,14 @@ class _FriendsPageState extends State<FriendsPage> {
         }
         return false;
       }
-      final balance = state.balances[friend.id] ?? 0.0;
+      final rows = state.groupBreakdowns[friend.id] ?? const [];
       switch (state.selectedFilter) {
         case 'outstanding':
-          return balance.abs() > 0.01;
+          return rows.any((row) => row.amount.abs() > 0.01);
         case 'owe':
-          return balance < -0.01;
+          return rows.any((row) => row.amount < -0.01);
         case 'owed':
-          return balance > 0.01;
+          return rows.any((row) => row.amount > 0.01);
         default:
           return true;
       }
@@ -129,11 +130,10 @@ class _FriendsPageState extends State<FriendsPage> {
     super.dispose();
   }
 
-  Widget _buildOverallBalance(BuildContext context, double overallBalance) {
+  Widget _buildOverallBalance(BuildContext context, List<CurrencyAmount> amounts) {
     final scheme = context.colorScheme;
     final appColors = context.appColors;
-
-    if (overallBalance.abs() < 0.01) {
+    if (amounts.isEmpty) {
       return RichText(
         text: TextSpan(
           style: context.textTheme.bodyLarge?.copyWith(color: scheme.onSurface),
@@ -145,29 +145,32 @@ class _FriendsPageState extends State<FriendsPage> {
       );
     }
 
-    final isOwed = overallBalance > 0;
-    return RichText(
-      text: TextSpan(
-        style: context.textTheme.bodyLarge?.copyWith(color: scheme.onSurface),
-        children: [
-          TextSpan(text: isOwed ? 'Overall, you are owed ' : 'Overall, you owe '),
-          TextSpan(
-            text: '₹${overallBalance.abs().toStringAsFixed(2)}',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: isOwed ? appColors.positiveBalanceColor : appColors.negativeBalanceColor,
-            ),
-          ),
-        ],
+    final hasOwed = amounts.any((item) => item.isOwed);
+    final hasOwe = amounts.any((item) => item.isOwe);
+    final color = hasOwed && hasOwe
+        ? scheme.onSurface
+        : hasOwed
+            ? appColors.positiveBalanceColor
+            : appColors.negativeBalanceColor;
+    return Text(
+      MultiCurrency.overallLabel(
+        amounts: amounts,
+        owedPrefix: 'you are owed',
+        owePrefix: 'you owe',
+        overall: true,
+      ),
+      style: context.textTheme.bodyLarge?.copyWith(
+        color: color,
+        fontWeight: FontWeight.w600,
       ),
     );
   }
 
-  Widget _buildFriendBalance(BuildContext context, double? balance) {
+  Widget _buildFriendBalance(BuildContext context, List<CurrencyAmount> amounts) {
     final scheme = context.colorScheme;
     final appColors = context.appColors;
 
-    if (balance == null || balance.abs() < 0.01) {
+    if (amounts.isEmpty) {
       return Text(
         'settled up',
         style: context.textTheme.bodySmall?.copyWith(
@@ -176,7 +179,14 @@ class _FriendsPageState extends State<FriendsPage> {
       );
     }
 
-    final isOwed = balance > 0;
+    final sorted = MultiCurrency.sort(amounts);
+    final summary = MultiCurrency.friendSummary(sorted);
+    final primary = sorted.firstWhere(
+      (item) => item.formatted == summary.text,
+      orElse: () => sorted.first,
+    );
+    final isOwed = primary.isOwed;
+    final suffix = summary.hasMore ? '*' : '';
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       mainAxisSize: MainAxisSize.min,
@@ -186,7 +196,7 @@ class _FriendsPageState extends State<FriendsPage> {
           style: context.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
         ),
         Text(
-          '₹${balance.abs().toStringAsFixed(2)}',
+          '${summary.text}$suffix',
           style: context.textTheme.bodyMedium?.copyWith(
             fontWeight: FontWeight.bold,
             color: isOwed ? appColors.positiveBalanceColor : appColors.negativeBalanceColor,
@@ -224,10 +234,18 @@ class _FriendsPageState extends State<FriendsPage> {
   Widget _buildFriendTile(
     BuildContext context,
     UserPreview friend,
-    double? balance,
     List<FriendGroupBalance> breakdown,
   ) {
     final scheme = context.colorScheme;
+    final amounts = MultiCurrency.netByCurrency(
+      breakdown.map(
+        (row) => CurrencyAmount(
+          amount: row.amount,
+          currencyCode: row.currencyCode,
+          currencySymbol: row.currencySymbol,
+        ),
+      ),
+    );
     final lines = _breakdownLines(friend.name, breakdown);
 
     return InkWell(
@@ -264,7 +282,7 @@ class _FriendsPageState extends State<FriendsPage> {
                           ),
                         ),
                       ),
-                      _buildFriendBalance(context, balance),
+                      _buildFriendBalance(context, amounts),
                     ],
                   ),
                   for (final line in lines)
@@ -446,7 +464,7 @@ class _FriendsPageState extends State<FriendsPage> {
                     ),
                     child: Row(
                       children: [
-                        Expanded(child: _buildOverallBalance(context, state.overallBalance)),
+                        Expanded(child: _buildOverallBalance(context, state.overallAmounts)),
                         FilterPopupButton(
                           selectedFilter: state.selectedFilter,
                           options: FilterPopupButton.friendFilters,
@@ -474,7 +492,6 @@ class _FriendsPageState extends State<FriendsPage> {
                       (friend) => _buildFriendTile(
                         context,
                         friend,
-                        state.balances[friend.id],
                         state.groupBreakdowns[friend.id] ?? const [],
                       ),
                     ),

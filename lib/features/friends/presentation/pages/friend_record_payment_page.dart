@@ -25,6 +25,8 @@ class FriendRecordPaymentPage extends StatefulWidget {
   /// Positive  → you are owed (friend owes you).
   /// Negative  → you owe the friend.
   final double balance;
+  final String currencyCode;
+  final String currencySymbol;
 
   /// Optional: the sole shared group to record the settlement against.
   final String? groupId;
@@ -35,6 +37,8 @@ class FriendRecordPaymentPage extends StatefulWidget {
     required this.friendId,
     required this.friendName,
     required this.balance,
+    this.currencyCode = 'INR',
+    this.currencySymbol = '₹',
     this.friendEmail,
     this.friendPhotoUrl,
     this.groupId,
@@ -115,8 +119,8 @@ class _FriendRecordPaymentPageState extends State<FriendRecordPaymentPage> {
       title: 'Settlement',
       category: 'Settlement',
       amount: amount,
-      currencyCode: 'INR',
-      currencySymbol: '₹',
+      currencyCode: widget.currencyCode,
+      currencySymbol: widget.currencySymbol,
       date: DateTime.now(),
       notes: 'Settlement with ${widget.friendName}',
       paidBy: paidBy,
@@ -221,8 +225,8 @@ class _FriendRecordPaymentPageState extends State<FriendRecordPaymentPage> {
                   const TextInputType.numberWithOptions(decimal: true),
               textAlign: TextAlign.center,
               style: context.textTheme.displaySmall,
-              decoration: const InputDecoration(
-                prefixText: '₹',
+              decoration: InputDecoration(
+                prefixText: widget.currencySymbol,
                 border: InputBorder.none,
               ),
             ),

@@ -6,16 +6,27 @@ class MemberBalance extends Equatable {
   final String userName;
   final double amount;
   final BalanceType type;
+  final String currencyCode;
+  final String currencySymbol;
 
   const MemberBalance({
     required this.userId,
     required this.userName,
     required this.amount,
     required this.type,
+    this.currencyCode = 'INR',
+    this.currencySymbol = '₹',
   });
 
+  String get formattedAmount => '$currencySymbol${amount.toStringAsFixed(2)}';
+
+  double get signedAmount =>
+      type == BalanceType.owed ? amount : -amount;
+
+
   @override
-  List<Object?> get props => [userId, userName, amount, type];
+  List<Object?> get props =>
+      [userId, userName, amount, type, currencyCode, currencySymbol];
 }
 
 class GroupSummary extends Equatable {
@@ -68,4 +79,10 @@ class GroupSummary extends Equatable {
         lastExpenseDate,
         simplifyDebts,
       ];
+
+  bool get hasOwedBalances =>
+      memberBalances.any((b) => b.type == BalanceType.owed && b.amount > 0.01);
+
+  bool get hasOweBalances =>
+      memberBalances.any((b) => b.type == BalanceType.owe && b.amount > 0.01);
 }

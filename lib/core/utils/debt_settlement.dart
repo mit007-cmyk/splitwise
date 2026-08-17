@@ -53,10 +53,29 @@ class SettlementTransfer {
   final String fromUserId;
   final String toUserId;
   final double amount;
+  final String currencyCode;
+  final String currencySymbol;
 
   const SettlementTransfer({
     required this.fromUserId,
     required this.toUserId,
     required this.amount,
+    this.currencyCode = 'INR',
+    this.currencySymbol = '₹',
   });
+
+  String get formattedAmount => '$currencySymbol${amount.toStringAsFixed(2)}';
+
+  SettlementTransfer withCurrency({
+    required String currencyCode,
+    required String currencySymbol,
+  }) {
+    return SettlementTransfer(
+      fromUserId: fromUserId,
+      toUserId: toUserId,
+      amount: amount,
+      currencyCode: currencyCode,
+      currencySymbol: currencySymbol,
+    );
+  }
 }

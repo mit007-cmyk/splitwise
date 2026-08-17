@@ -8,10 +8,14 @@ import 'user_display_names.dart';
 class ExpenseShare {
   final Map<String, double> paidBy;
   final Map<String, double> owedBy;
+  final String currencyCode;
+  final String currencySymbol;
 
   const ExpenseShare({
     required this.paidBy,
     required this.owedBy,
+    this.currencyCode = 'INR',
+    this.currencySymbol = '₹',
   });
 
   factory ExpenseShare.fromExpense(
@@ -25,6 +29,8 @@ class ExpenseShare {
         amount: expense.amount,
         memberIds: memberIds,
       ),
+      currencyCode: expense.currencyCode,
+      currencySymbol: expense.currencySymbol,
     );
   }
 }
@@ -84,12 +90,32 @@ class GroupBalanceCalculator {
     required List<String> memberIds,
     required bool simplifyDebts,
   }) {
-    if (simplifyDebts) {
-      return DebtSettlement.reduceToTransfers(
-        netByUser(expenses: expenses, memberIds: memberIds),
-      );
+    final byCurrency = <String, List<ExpenseShare>>{};
+    for (final expense in expenses) {
+      final code = expense.currencyCode.trim().isEmpty ? 'INR' : expense.currencyCode;
+      byCurrency.putIfAbsent(code, () => []).add(expense);
     }
-    return _pairwiseTransfers(expenses, memberIds);
+
+    final transfers = <SettlementTransfer>[];
+    byCurrency.forEach((code, shares) {
+      final symbol = shares.first.currencySymbol.trim().isEmpty
+          ? '₹'
+          : shares.first.currencySymbol;
+      final inner = simplifyDebts
+          ? DebtSettlement.reduceToTransfers(
+              netByUser(expenses: shares, memberIds: memberIds),
+            )
+          : _pairwiseTransfers(shares, memberIds);
+      transfers.addAll(
+        inner.map(
+          (transfer) => transfer.withCurrency(
+            currencyCode: code,
+            currencySymbol: symbol,
+          ),
+        ),
+      );
+    });
+    return transfers;
   }
 
   static List<SettlementTransfer> computeTransfers({
@@ -133,33 +159,58 @@ class GroupBalanceCalculator {
     required Map<String, String> memberNames,
     Set<String> excludedUserIds = const {},
   }) {
-    final netBalances = <String, double>{};
+    final netBalances = <String, Map<String, double>>{};
+    final currencyMeta = <String, ({String code, String symbol})>{};
 
     for (final transfer in transfers) {
       if (excludedUserIds.contains(transfer.fromUserId) ||
           excludedUserIds.contains(transfer.toUserId)) {
         continue;
       }
+      final code = transfer.currencyCode.trim().isEmpty ? 'INR' : transfer.currencyCode;
+      currencyMeta[code] = (
+        code: code,
+        symbol: transfer.currencySymbol.trim().isEmpty ? '₹' : transfer.currencySymbol,
+      );
+      double signedFor(String otherId) {
+        if (transfer.fromUserId == currentUserId && transfer.toUserId == otherId) {
+          return -transfer.amount;
+        }
+        if (transfer.toUserId == currentUserId && transfer.fromUserId == otherId) {
+          return transfer.amount;
+        }
+        return 0.0;
+      }
+
+      void add(String otherId, double delta) {
+        if (otherId.trim().isEmpty || delta.abs() <= 0) return;
+        netBalances.putIfAbsent(otherId, () => {});
+        netBalances[otherId]![code] = (netBalances[otherId]![code] ?? 0.0) + delta;
+      }
+
       if (transfer.fromUserId == currentUserId) {
-        netBalances[transfer.toUserId] =
-            (netBalances[transfer.toUserId] ?? 0.0) - transfer.amount;
+        add(transfer.toUserId, signedFor(transfer.toUserId));
       } else if (transfer.toUserId == currentUserId) {
-        netBalances[transfer.fromUserId] =
-            (netBalances[transfer.fromUserId] ?? 0.0) + transfer.amount;
+        add(transfer.fromUserId, signedFor(transfer.fromUserId));
       }
     }
 
     final memberBalances = <MemberBalance>[];
-    netBalances.forEach((otherId, balance) {
+    netBalances.forEach((otherId, byCurrency) {
       if (otherId.trim().isEmpty) return;
       if (excludedUserIds.contains(otherId)) return;
-      if (balance.abs() <= DebtSettlement.epsilon) return;
-      memberBalances.add(MemberBalance(
-        userId: otherId,
-        userName: UserDisplayNames.resolve(memberNames, otherId),
-        amount: balance.abs(),
-        type: balance > 0 ? BalanceType.owed : BalanceType.owe,
-      ));
+      byCurrency.forEach((code, balance) {
+        if (balance.abs() <= DebtSettlement.epsilon) return;
+        final meta = currencyMeta[code];
+        memberBalances.add(MemberBalance(
+          userId: otherId,
+          userName: UserDisplayNames.resolve(memberNames, otherId),
+          amount: balance.abs(),
+          type: balance > 0 ? BalanceType.owed : BalanceType.owe,
+          currencyCode: meta?.code ?? code,
+          currencySymbol: meta?.symbol ?? '₹',
+        ));
+      });
     });
 
     return memberBalances;
@@ -171,9 +222,15 @@ class GroupBalanceCalculator {
     required List<SettlementTransfer> transfers,
     required String currentUserId,
     required String otherUserId,
+    String? currencyCode,
   }) {
     var amount = 0.0;
     for (final transfer in transfers) {
+      if (currencyCode != null &&
+          currencyCode.isNotEmpty &&
+          transfer.currencyCode != currencyCode) {
+        continue;
+      }
       if (transfer.fromUserId == currentUserId &&
           transfer.toUserId == otherUserId) {
         amount -= transfer.amount;
@@ -183,6 +240,43 @@ class GroupBalanceCalculator {
       }
     }
     return amount;
+  }
+
+  static List<({double amount, String currencyCode, String currencySymbol})>
+      signedBalancesByCurrency({
+    required List<SettlementTransfer> transfers,
+    required String currentUserId,
+    required String otherUserId,
+  }) {
+    final byCode = <String, ({double amount, String symbol})>{};
+    for (final transfer in transfers) {
+      final code = transfer.currencyCode.trim().isEmpty ? 'INR' : transfer.currencyCode;
+      var delta = 0.0;
+      if (transfer.fromUserId == currentUserId &&
+          transfer.toUserId == otherUserId) {
+        delta = -transfer.amount;
+      } else if (transfer.fromUserId == otherUserId &&
+          transfer.toUserId == currentUserId) {
+        delta = transfer.amount;
+      } else {
+        continue;
+      }
+      final existing = byCode[code];
+      byCode[code] = (
+        amount: (existing?.amount ?? 0.0) + delta,
+        symbol: transfer.currencySymbol.trim().isEmpty ? '₹' : transfer.currencySymbol,
+      );
+    }
+    return byCode.entries
+        .where((entry) => entry.value.amount.abs() > DebtSettlement.epsilon)
+        .map(
+          (entry) => (
+            amount: entry.value.amount,
+            currencyCode: entry.key,
+            currencySymbol: entry.value.symbol,
+          ),
+        )
+        .toList();
   }
 
   static List<SettlementTransfer> _pairwiseTransfers(

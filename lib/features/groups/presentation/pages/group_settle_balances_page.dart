@@ -60,7 +60,7 @@ class GroupSettleBalancesPage extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    '₹${balance.amount.toStringAsFixed(2)}',
+                    balance.formattedAmount,
                     style: context.textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: isOwed ? appColors.positiveBalanceColor : appColors.negativeBalanceColor,

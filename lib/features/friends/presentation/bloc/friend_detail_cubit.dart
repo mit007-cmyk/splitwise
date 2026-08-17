@@ -1,6 +1,7 @@
 import 'package:equatable/equatable.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:injectable/injectable.dart';
+import '../../../../core/utils/currency_amount.dart';
 import '../../../expenses/domain/entities/expense.dart';
 import '../../../expenses/domain/repositories/expense_repository.dart';
 import '../../../expenses/domain/services/friend_ledger.dart';
@@ -30,8 +31,17 @@ class FriendDetailState extends Equatable {
 
   factory FriendDetailState.initial() => const FriendDetailState(isLoading: true);
 
-  double get totalBalance =>
-      groupBalances.fold(0.0, (sum, row) => sum + row.amount);
+  List<CurrencyAmount> get overallAmounts => MultiCurrency.netByCurrency(
+        groupBalances.map(
+          (row) => CurrencyAmount(
+            amount: row.amount,
+            currencyCode: row.currencyCode,
+            currencySymbol: row.currencySymbol,
+          ),
+        ),
+      );
+
+  bool get isSettled => overallAmounts.isEmpty;
 
   FriendDetailState copyWith({
     bool? isLoading,
@@ -115,16 +125,17 @@ class FriendDetailCubit extends Cubit<FriendDetailState> {
 
     final groupBalances = <FriendGroupBalance>[];
     for (final group in sharedGroups) {
-      final row = FriendLedger.balanceInGroup(
-        groupId: group.groupId,
-        groupName: group.groupName,
-        expenses: expensesByGroup[group.groupId] ?? const <Expense>[],
-        memberIds: group.memberIds,
-        simplifyDebts: group.simplifyDebts,
-        currentUserId: currentUserId,
-        friendId: friendId,
+      groupBalances.addAll(
+        FriendLedger.balancesInGroup(
+          groupId: group.groupId,
+          groupName: group.groupName,
+          expenses: expensesByGroup[group.groupId] ?? const <Expense>[],
+          memberIds: group.memberIds,
+          simplifyDebts: group.simplifyDebts,
+          currentUserId: currentUserId,
+          friendId: friendId,
+        ),
       );
-      if (row != null) groupBalances.add(row);
     }
     groupBalances.sort((a, b) => b.amount.abs().compareTo(a.amount.abs()));
 

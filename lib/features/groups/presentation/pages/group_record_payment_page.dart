@@ -74,8 +74,8 @@ class _GroupRecordPaymentPageState extends State<GroupRecordPaymentPage> {
       title: 'Settlement',
       category: 'Settlement',
       amount: amount,
-      currencyCode: 'INR',
-      currencySymbol: '₹',
+      currencyCode: widget.balance.currencyCode,
+      currencySymbol: widget.balance.currencySymbol,
       date: DateTime.now(),
       notes: 'Settlement with ${widget.balance.userName}',
       paidBy: paidBy,
@@ -140,8 +140,8 @@ class _GroupRecordPaymentPageState extends State<GroupRecordPaymentPage> {
               keyboardType: const TextInputType.numberWithOptions(decimal: true),
               textAlign: TextAlign.center,
               style: context.textTheme.displaySmall,
-              decoration: const InputDecoration(
-                prefixText: '₹',
+              decoration: InputDecoration(
+                prefixText: widget.balance.currencySymbol,
                 border: InputBorder.none,
               ),
             ),

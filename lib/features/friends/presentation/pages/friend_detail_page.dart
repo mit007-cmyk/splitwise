@@ -8,6 +8,7 @@ import '../../../../core/di/di.dart';
 import '../../../../core/routing/route_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/utils/currency_amount.dart';
 import '../../../../core/widgets/avatar_widget.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -98,7 +99,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
     final appColors = context.appColors;
     final heroColor = _heroColor(friend.name);
     final heroColorDark = _heroColorDark(friend.name);
-    final balance = state.totalBalance;
+    final overallAmounts = state.overallAmounts;
 
     return RefreshIndicator(
       onRefresh: () async => _load(),
@@ -212,7 +213,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                                 context,
                                 state,
                                 friend.name,
-                                balance,
+                                overallAmounts,
                               ),
                             ],
                           ),
@@ -276,16 +277,19 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
     BuildContext context,
     FriendDetailState state,
     String friendName,
-    double balance,
+    List<CurrencyAmount> amounts,
   ) {
     final scheme = context.colorScheme;
     final appColors = context.appColors;
     final breakdown = state.groupBalances;
-    final isSettled = balance.abs() < 0.01;
-    final isOwed = balance > 0;
+    final isSettled = amounts.isEmpty;
+    final hasOwed = amounts.any((item) => item.isOwed);
+    final hasOwe = amounts.any((item) => item.isOwe);
     final balanceColor = isSettled
         ? scheme.onSurfaceVariant.withValues(alpha: 0.75)
-        : isOwed
+        : hasOwed && hasOwe
+        ? scheme.onSurface
+        : hasOwed
         ? appColors.positiveBalanceColor
         : appColors.negativeBalanceColor;
 
@@ -299,9 +303,13 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
               child: Text(
                 isSettled
                     ? 'You are all settled up.'
-                    : isOwed
-                    ? 'You are owed ₹${balance.abs().toStringAsFixed(2)} overall'
-                    : 'You owe ₹${balance.abs().toStringAsFixed(2)} overall',
+                    : MultiCurrency.overallLabel(
+                        amounts: amounts,
+                        owedPrefix: 'You are owed',
+                        owePrefix: 'You owe',
+                        settled: 'You are all settled up.',
+                      ) +
+                        (amounts.length == 1 ? ' overall' : ''),
                 style: context.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                   color: balanceColor,
@@ -544,12 +552,13 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
       return;
     }
 
-    final balance = state.totalBalance;
-    if (balance.abs() < 0.01) {
+    if (state.isSettled) {
       AppToast.show(context, 'You are already settled up.', type: ToastType.info);
       return;
     }
 
+    final amounts = state.overallAmounts;
+    final toSettle = amounts.first;
     final groupId = _resolveSettleGroupId(state);
     if (groupId == null || groupId.isEmpty) {
       AppToast.show(
@@ -568,7 +577,9 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
           friendName: friend.name,
           friendEmail: friend.email,
           friendPhotoUrl: friend.photoUrl,
-          balance: balance,
+          balance: toSettle.amount,
+          currencyCode: toSettle.currencyCode,
+          currencySymbol: toSettle.currencySymbol,
           groupId: groupId,
         ),
       ),

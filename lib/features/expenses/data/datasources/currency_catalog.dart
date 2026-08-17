@@ -104,4 +104,15 @@ class CurrencyCatalog {
       orElse: () => defaultCurrency,
     );
   }
+
+  static String normalizeCode(String? code) {
+    final trimmed = (code ?? '').trim().toUpperCase();
+    return trimmed.isEmpty ? defaultCurrency.code : trimmed;
+  }
+
+  static String symbolFor(String? code, [String? fallbackSymbol]) {
+    final symbol = (fallbackSymbol ?? '').trim();
+    if (symbol.isNotEmpty) return symbol;
+    return byCode(normalizeCode(code)).symbol;
+  }
 }

@@ -5,6 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/di.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/utils/currency_amount.dart';
 import '../../../../core/utils/debt_settlement.dart';
 import '../../../../core/utils/group_balance_calculator.dart';
 import '../../../../core/widgets/app_toast.dart';
@@ -85,13 +86,20 @@ class _GroupBalancesPageState extends State<GroupBalancesPage> {
     );
   }
 
-  void _triggerRemind(String fromName, String toName, double amount) {
-    final text = 'Hey! Just a reminder that $fromName owes $toName ₹${amount.toStringAsFixed(2)} on Splitwise.';
+  void _triggerRemind(String fromName, String toName, double amount, String symbol) {
+    final text = 'Hey! Just a reminder that $fromName owes $toName $symbol${amount.toStringAsFixed(2)} on Splitwise.';
     Clipboard.setData(ClipboardData(text: text));
     AppToast.show(context, 'Reminder copied to clipboard!', type: ToastType.success);
   }
 
-  Future<void> _triggerSettleUp(String fromId, String toId, double amount, Map<String, String> memberNameMap) async {
+  Future<void> _triggerSettleUp(
+    String fromId,
+    String toId,
+    double amount,
+    Map<String, String> memberNameMap, {
+    String currencyCode = 'INR',
+    String currencySymbol = '₹',
+  }) async {
     final isFromMe = fromId == _currentUserId;
     final otherId = isFromMe ? toId : fromId;
     final balance = MemberBalance(
@@ -99,6 +107,8 @@ class _GroupBalancesPageState extends State<GroupBalancesPage> {
       userName: memberNameMap[otherId] ?? otherId,
       amount: amount,
       type: isFromMe ? BalanceType.owe : BalanceType.owed,
+      currencyCode: currencyCode,
+      currencySymbol: currencySymbol,
     );
 
     final recorded = await Navigator.of(context).push<bool>(
@@ -162,10 +172,31 @@ class _GroupBalancesPageState extends State<GroupBalancesPage> {
               .where((e) => !e.isDeleted)
               .map((e) => ExpenseShare.fromExpense(e, memberIds: memberIds))
               .toList();
-          final netBalances = GroupBalanceCalculator.netByUser(
-            expenses: shares,
-            memberIds: memberIds,
-          );
+          final netsByMember = <String, List<CurrencyAmount>>{};
+          final byCurrency = <String, List<ExpenseShare>>{};
+          for (final share in shares) {
+            final code = share.currencyCode.trim().isEmpty ? 'INR' : share.currencyCode;
+            byCurrency.putIfAbsent(code, () => []).add(share);
+          }
+          byCurrency.forEach((code, currencyShares) {
+            final symbol = currencyShares.first.currencySymbol.trim().isEmpty
+                ? '₹'
+                : currencyShares.first.currencySymbol;
+            final nets = GroupBalanceCalculator.netByUser(
+              expenses: currencyShares,
+              memberIds: memberIds,
+            );
+            nets.forEach((memberId, net) {
+              if (net.abs() <= DebtSettlement.epsilon) return;
+              netsByMember.putIfAbsent(memberId, () => []).add(
+                    CurrencyAmount(
+                      amount: net,
+                      currencyCode: code,
+                      currencySymbol: symbol,
+                    ),
+                  );
+            });
+          });
 
           final activeTransfers = _calculateRepayments(
             expenses: expenses,
@@ -192,17 +223,20 @@ class _GroupBalancesPageState extends State<GroupBalancesPage> {
 
                   final memberId = memberIds[index - 1];
                   final name = memberNameMap[memberId] ?? memberId;
-                  final net = netBalances[memberId] ?? 0.0;
+                  final memberNets = MultiCurrency.sort(netsByMember[memberId] ?? const []);
                   final isExpanded = _expandedMemberIds.contains(memberId);
 
                   final memberTransfers = activeTransfers
                       .where((t) =>
                           t.fromUserId == memberId || t.toUserId == memberId)
                       .toList();
+
+                  final getsBack = memberNets.where((item) => item.isOwed).toList();
+                  final owes = memberNets.where((item) => item.isOwe).toList();
               
                   // Text display format
                   final Widget balanceText;
-                  if (net > 0.01) {
+                  if (getsBack.isNotEmpty && owes.isNotEmpty) {
                     balanceText = RichText(
                       text: TextSpan(
                         style: context.textTheme.titleMedium?.copyWith(
@@ -215,7 +249,37 @@ class _GroupBalancesPageState extends State<GroupBalancesPage> {
                           ),
                           const TextSpan(text: ' gets back '),
                           TextSpan(
-                            text: '₹${net.toStringAsFixed(2)}',
+                            text: MultiCurrency.join(getsBack),
+                            style: const TextStyle(
+                              color: Color(0xFF2FB285),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const TextSpan(text: ' and owes '),
+                          TextSpan(
+                            text: MultiCurrency.join(owes),
+                            style: const TextStyle(
+                              color: Color(0xFFFF8A65),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  } else if (getsBack.isNotEmpty) {
+                    balanceText = RichText(
+                      text: TextSpan(
+                        style: context.textTheme.titleMedium?.copyWith(
+                          color: theme.colorScheme.onSurface,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: name,
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          const TextSpan(text: ' gets back '),
+                          TextSpan(
+                            text: MultiCurrency.join(getsBack),
                             style: const TextStyle(
                               color: Color(0xFF2FB285),
                               fontWeight: FontWeight.bold,
@@ -225,7 +289,7 @@ class _GroupBalancesPageState extends State<GroupBalancesPage> {
                         ],
                       ),
                     );
-                  } else if (net < -0.01) {
+                  } else if (owes.isNotEmpty) {
                     balanceText = RichText(
                       text: TextSpan(
                         style: context.textTheme.titleMedium?.copyWith(
@@ -238,7 +302,7 @@ class _GroupBalancesPageState extends State<GroupBalancesPage> {
                           ),
                           const TextSpan(text: ' owes '),
                           TextSpan(
-                            text: '₹${net.abs().toStringAsFixed(2)}',
+                            text: MultiCurrency.join(owes),
                             style: const TextStyle(
                               color: Color(0xFFFF8A65),
                               fontWeight: FontWeight.bold,
@@ -358,7 +422,7 @@ class _GroupBalancesPageState extends State<GroupBalancesPage> {
                                                   ),
                                                   const TextSpan(text: ' owes '),
                                                   TextSpan(
-                                                    text: '₹${transfer.amount.toStringAsFixed(2)}',
+                                                    text: transfer.formattedAmount,
                                                     style: const TextStyle(
                                                       color: Color(0xFF2FB285),
                                                       fontWeight: FontWeight.bold,
@@ -376,7 +440,12 @@ class _GroupBalancesPageState extends State<GroupBalancesPage> {
                                             Row(
                                               children: [
                                                 OutlinedButton(
-                                                  onPressed: () => _triggerRemind(tFromName, tToName, transfer.amount),
+                                                  onPressed: () => _triggerRemind(
+                                                    tFromName,
+                                                    tToName,
+                                                    transfer.amount,
+                                                    transfer.currencySymbol,
+                                                  ),
                                                   style: OutlinedButton.styleFrom(
                                                     padding: EdgeInsets.symmetric(horizontal: 16.w),
                                                     minimumSize: Size(0, 32.h),
@@ -399,6 +468,8 @@ class _GroupBalancesPageState extends State<GroupBalancesPage> {
                                                     transfer.toUserId,
                                                     transfer.amount,
                                                     memberNameMap,
+                                                    currencyCode: transfer.currencyCode,
+                                                    currencySymbol: transfer.currencySymbol,
                                                   ),
                                                   style: OutlinedButton.styleFrom(
                                                     padding: EdgeInsets.symmetric(horizontal: 16.w),

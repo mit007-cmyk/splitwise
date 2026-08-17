@@ -16,17 +16,27 @@ class MemberBalanceModel extends MemberBalance {
   @override
   @JsonKey(fromJson: _typeFromJson, toJson: _typeToJson)
   final BalanceType type;
+  @override
+  @JsonKey(defaultValue: 'INR')
+  final String currencyCode;
+  @override
+  @JsonKey(defaultValue: '₹')
+  final String currencySymbol;
 
   const MemberBalanceModel({
     required this.userId,
     required this.userName,
     required this.amount,
     required this.type,
+    this.currencyCode = 'INR',
+    this.currencySymbol = '₹',
   }) : super(
           userId: userId,
           userName: userName,
           amount: amount,
           type: type,
+          currencyCode: currencyCode,
+          currencySymbol: currencySymbol,
         );
 
   factory MemberBalanceModel.fromJson(Map<String, dynamic> json) => _$MemberBalanceModelFromJson(json);
@@ -42,6 +52,8 @@ class MemberBalanceModel extends MemberBalance {
       userName: entity.userName,
       amount: entity.amount,
       type: entity.type,
+      currencyCode: entity.currencyCode,
+      currencySymbol: entity.currencySymbol,
     );
   }
 

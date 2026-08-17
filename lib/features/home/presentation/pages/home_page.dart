@@ -18,7 +18,6 @@ import '../bloc/home_state.dart';
 import '../widgets/overall_balance_card.dart';
 import '../widgets/group_card.dart';
 import '../widgets/skeleton_loaders.dart';
-import '../../domain/entities/balance_summary.dart';
 import '../../domain/entities/group_summary.dart';
 
 class HomePage extends StatefulWidget {
@@ -193,13 +192,13 @@ class _HomePageState extends State<HomePage> {
         if (_isSearching) return true;
         if (state.selectedFilter == 'all') return true;
         if (state.selectedFilter == 'owe') {
-          return group.balanceType == BalanceType.owe;
+          return group.hasOweBalances;
         }
         if (state.selectedFilter == 'owed') {
-          return group.balanceType == BalanceType.owed;
+          return group.hasOwedBalances;
         }
         if (state.selectedFilter == 'settled') {
-          return group.balanceType == BalanceType.settled;
+          return !group.hasOweBalances && !group.hasOwedBalances;
         }
         return true;
       }).toList();
