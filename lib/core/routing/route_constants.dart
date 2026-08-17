@@ -49,6 +49,9 @@ class RouteConstants {
   static const String groupBalancesPath = '/group-detail/:groupId/balances';
   static const String groupBalancesName = 'group-balances';
 
+  static const String groupTotalsPath = '/group-detail/:groupId/totals';
+  static const String groupTotalsName = 'group-totals';
+
   static const String addFriendPath = '/add-friend';
   static const String addFriendName = 'add-friend';
 

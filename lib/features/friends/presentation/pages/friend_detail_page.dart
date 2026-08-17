@@ -8,6 +8,7 @@ import '../../../../core/di/di.dart';
 import '../../../../core/routing/route_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/utils/csv_exporter.dart';
 import '../../../../core/utils/currency_amount.dart';
 import '../../../../core/widgets/avatar_widget.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -239,9 +240,14 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                           icon: Icons.diamond_rounded,
                           onTap: () => _showComingSoon(context),
                         ),
+                        const FriendActionPill(
+                          label: 'Convert to USD',
+                          icon: Icons.currency_exchange_rounded,
+                        ),
                         FriendActionPill(
-                          label: 'Balances',
-                          onTap: () => _showComingSoon(context),
+                          label: 'Export',
+                          icon: Icons.download_rounded,
+                          onTap: () => _exportFriendExpenses(context, state, friend),
                         ),
                       ],
                     ),
@@ -521,6 +527,100 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
 
   void _showComingSoon(BuildContext context) {
     AppToast.show(context, 'Coming soon!', type: ToastType.info);
+  }
+
+  /// CSV of every expense shared with this friend, with one net column per
+  /// side so the running balance in the file matches the on-screen totals.
+  Future<void> _exportFriendExpenses(
+    BuildContext context,
+    FriendDetailState state,
+    UserPreview friend,
+  ) async {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! Authenticated) {
+      AppToast.show(context, 'Please log in again.', type: ToastType.error);
+      return;
+    }
+
+    final entries = state.entries
+        .where((entry) => !entry.expense.isDeleted)
+        .toList();
+    if (entries.isEmpty) {
+      AppToast.show(context, 'No expenses to export.', type: ToastType.info);
+      return;
+    }
+
+    final currentUserId = authState.user.id;
+    final csvRows = <String>[];
+    final headers = [
+      'Date',
+      'Description',
+      'Category',
+      'Group',
+      'Cost',
+      'Currency',
+      'You',
+      friend.name,
+    ];
+    csvRows.add(headers.map(_escapeCsvField).join(','));
+    csvRows.add('');
+
+    var youNetTotal = 0.0;
+    var friendNetTotal = 0.0;
+
+    for (final entry in entries) {
+      final expense = entry.expense;
+      final youNet = (expense.paidBy[currentUserId] ?? 0.0) -
+          (expense.splits[currentUserId] ?? 0.0);
+      final friendNet =
+          (expense.paidBy[friend.id] ?? 0.0) - (expense.splits[friend.id] ?? 0.0);
+      youNetTotal += youNet;
+      friendNetTotal += friendNet;
+
+      csvRows.add([
+        DateFormat('yyyy-MM-dd').format(expense.date),
+        expense.title,
+        expense.category,
+        state.groupNames[expense.groupId] ?? '',
+        expense.amount.toStringAsFixed(2),
+        expense.currencyCode,
+        youNet.toStringAsFixed(2),
+        friendNet.toStringAsFixed(2),
+      ].map(_escapeCsvField).join(','));
+    }
+
+    csvRows.add('');
+    csvRows.add([
+      DateFormat('yyyy-MM-dd').format(entries.first.expense.date),
+      'Total balance',
+      ' ',
+      ' ',
+      ' ',
+      entries.first.expense.currencyCode,
+      youNetTotal.toStringAsFixed(2),
+      friendNetTotal.toStringAsFixed(2),
+    ].map(_escapeCsvField).join(','));
+    csvRows.add('');
+    csvRows.add('');
+
+    final safeName = friend.name.replaceAll(RegExp(r'[^\w\s\-]'), '_');
+    try {
+      saveCsvFile(csvRows.join('\n'), '${safeName}_export.csv');
+      if (context.mounted) {
+        AppToast.show(context, 'Expenses exported successfully.', type: ToastType.success);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        AppToast.show(context, 'Failed to export CSV: $e', type: ToastType.error);
+      }
+    }
+  }
+
+  String _escapeCsvField(String field) {
+    if (field.contains(',') || field.contains('"') || field.contains('\n')) {
+      return '"${field.replaceAll('"', '""')}"';
+    }
+    return field;
   }
 
   /// Prefer the sole shared group, otherwise the group with the largest

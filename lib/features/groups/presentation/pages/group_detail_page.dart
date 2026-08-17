@@ -716,15 +716,21 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                           ),
                           _buildActionPill(
                             context,
-                            'Whiteboard',
-                            icon: Icons.edit_note_rounded,
-                            onTap: () => context.push('/group-detail/${widget.groupId}/whiteboard'),
-                          ),
-                          _buildActionPill(
-                            context,
                             'Balances',
                             icon: Icons.account_balance_wallet_rounded,
                             onTap: () => context.push('/group-detail/${widget.groupId}/balances'),
+                          ),
+                          _buildActionPill(
+                            context,
+                            'Totals',
+                            icon: Icons.summarize_outlined,
+                            onTap: () => context.push('/group-detail/${widget.groupId}/totals'),
+                          ),
+                          _buildActionPill(
+                            context,
+                            'Whiteboard',
+                            icon: Icons.edit_note_rounded,
+                            onTap: () => context.push('/group-detail/${widget.groupId}/whiteboard'),
                           ),
                           _buildActionPill(
                             context,
