@@ -76,4 +76,7 @@ class AppDurations {
   static const Duration animQuick = Duration(milliseconds: 150);
   static const Duration animNormal = Duration(milliseconds: 300);
   static const Duration animSlow = Duration(milliseconds: 500);
+
+  /// Sweep used when a chart draws itself in after its data lands.
+  static const Duration chartReveal = Duration(milliseconds: 900);
 }

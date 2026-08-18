@@ -16,7 +16,8 @@ Future<void> _pump(WidgetTester tester, Widget child) {
 }
 
 void main() {
-  testWidgets('donut renders the total in the middle of the ring', (tester) async {
+  testWidgets('donut shows the total immediately and settles after the share '
+      'arc sweeps in', (tester) async {
     await _pump(
       tester,
       const Center(
@@ -24,13 +25,18 @@ void main() {
           totalSpent: 580,
           yourShare: 193.34,
           centerLabel: 'Total',
-          centerAmount: '₹580.00',
+          currencySymbol: '₹',
         ),
       ),
     );
 
     expect(find.text('Total'), findsOneWidget);
     expect(find.text('₹580.00'), findsOneWidget);
+
+    await tester.pumpAndSettle();
+
+    expect(find.text('₹580.00'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('bars render one labelled column per month and report taps', (

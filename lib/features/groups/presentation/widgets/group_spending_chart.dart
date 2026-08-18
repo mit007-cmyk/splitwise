@@ -9,48 +9,95 @@ import '../../../../core/utils/context_extension.dart';
 
 /// All-time spending ring: the full circle is what the group spent, the darker
 /// arc is the slice of it that is yours.
-class GroupSpendingDonut extends StatelessWidget {
+///
+/// The circle is drawn straight away; only the share arc sweeps in from zero
+/// once the data lands.
+class GroupSpendingDonut extends StatefulWidget {
   final double totalSpent;
   final double yourShare;
   final String centerLabel;
-  final String centerAmount;
+  final String currencySymbol;
 
   const GroupSpendingDonut({
     super.key,
     required this.totalSpent,
     required this.yourShare,
     required this.centerLabel,
-    required this.centerAmount,
+    required this.currencySymbol,
   });
 
   @override
+  State<GroupSpendingDonut> createState() => _GroupSpendingDonutState();
+}
+
+class _GroupSpendingDonutState extends State<GroupSpendingDonut>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _progress;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: AppDurations.chartReveal,
+    );
+    _progress = CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic);
+    _controller.forward();
+  }
+
+  @override
+  void didUpdateWidget(covariant GroupSpendingDonut oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Switching currency or period is new data, so redraw it the same way.
+    if (oldWidget.totalSpent != widget.totalSpent ||
+        oldWidget.yourShare != widget.yourShare) {
+      _controller.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final fraction = totalSpent <= 0
+    final shareFraction = widget.totalSpent <= 0
         ? 0.0
-        : (yourShare / totalSpent).clamp(0.0, 1.0).toDouble();
+        : (widget.yourShare / widget.totalSpent).clamp(0.0, 1.0).toDouble();
 
     return SizedBox(
       width: 220.w,
       height: 220.w,
-      child: CustomPaint(
-        painter: _DonutPainter(
-          shareFraction: fraction,
-          hasSpending: totalSpent > 0,
-          trackColor: context.colorScheme.outlineVariant,
-        ),
+      child: AnimatedBuilder(
+        animation: _progress,
+        builder: (context, child) {
+          return CustomPaint(
+            painter: _DonutPainter(
+              shareProgress: _progress.value,
+              shareFraction: shareFraction,
+              hasSpending: widget.totalSpent > 0,
+              trackColor: context.colorScheme.outlineVariant,
+            ),
+            child: child,
+          );
+        },
         child: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                centerLabel,
+                widget.centerLabel,
                 style: context.textTheme.bodyMedium?.copyWith(
                   color: AppColors.chartTotalSpent,
                 ),
               ),
               SizedBox(height: AppDimensions.xs.h),
               Text(
-                centerAmount,
+                '${widget.currencySymbol}'
+                '${widget.totalSpent.toStringAsFixed(2)}',
                 style: context.textTheme.titleLarge?.copyWith(
                   color: AppColors.chartTotalSpent,
                   fontWeight: FontWeight.w500,
@@ -65,11 +112,13 @@ class GroupSpendingDonut extends StatelessWidget {
 }
 
 class _DonutPainter extends CustomPainter {
+  final double shareProgress;
   final double shareFraction;
   final bool hasSpending;
   final Color trackColor;
 
   _DonutPainter({
+    required this.shareProgress,
     required this.shareFraction,
     required this.hasSpending,
     required this.trackColor,
@@ -84,14 +133,17 @@ class _DonutPainter extends CustomPainter {
       radius: radius,
     );
 
-    final total = Paint()
-      ..isAntiAlias = true
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..color = hasSpending ? AppColors.chartTotalSpent : trackColor;
-    canvas.drawCircle(rect.center, radius, total);
+    canvas.drawCircle(
+      rect.center,
+      radius,
+      Paint()
+        ..isAntiAlias = true
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidth
+        ..color = hasSpending ? AppColors.chartTotalSpent : trackColor,
+    );
 
-    if (!hasSpending || shareFraction <= 0) return;
+    if (!hasSpending || shareFraction <= 0 || shareProgress <= 0) return;
 
     final share = Paint()
       ..isAntiAlias = true
@@ -99,12 +151,19 @@ class _DonutPainter extends CustomPainter {
       ..strokeWidth = strokeWidth
       ..strokeCap = StrokeCap.round
       ..color = AppColors.chartYourShare;
-    canvas.drawArc(rect, -math.pi / 2, shareFraction * 2 * math.pi, false, share);
+    canvas.drawArc(
+      rect,
+      -math.pi / 2,
+      shareProgress * shareFraction * 2 * math.pi,
+      false,
+      share,
+    );
   }
 
   @override
   bool shouldRepaint(covariant _DonutPainter oldDelegate) {
-    return oldDelegate.shareFraction != shareFraction ||
+    return oldDelegate.shareProgress != shareProgress ||
+        oldDelegate.shareFraction != shareFraction ||
         oldDelegate.hasSpending != hasSpending ||
         oldDelegate.trackColor != trackColor;
   }

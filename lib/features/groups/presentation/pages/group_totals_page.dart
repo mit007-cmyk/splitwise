@@ -167,7 +167,7 @@ class _GroupTotalsPageState extends State<GroupTotalsPage> {
                       totalSpent: summary.totalSpent,
                       yourShare: summary.yourShare,
                       centerLabel: 'Total',
-                      centerAmount: summary.formatted(summary.totalSpent),
+                      currencySymbol: summary.currencySymbol,
                     ),
                   )
                 else
