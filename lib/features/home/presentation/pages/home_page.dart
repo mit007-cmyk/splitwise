@@ -389,18 +389,18 @@ class _HomePageState extends State<HomePage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              _buildAnimatedFab(
-                isFabExtended: isFabExtended,
-                heroTag: 'scan_fab',
-                icon: Icons.photo_camera_outlined,
-                label: 'Scan',
-                backgroundColor: context.appColors.elevatedSurface,
-                foregroundColor: context.appColors.onImageColor,
-                onPressed: () {
-                  AppToast.show(context, 'Receipt scanning coming soon!', type: ToastType.info);
-                },
-              ),
-              SizedBox(height: 12.h),
+              // _buildAnimatedFab(
+              //   isFabExtended: isFabExtended,
+              //   heroTag: 'scan_fab',
+              //   icon: Icons.photo_camera_outlined,
+              //   label: 'Scan',
+              //   backgroundColor: context.appColors.elevatedSurface,
+              //   foregroundColor: context.appColors.onImageColor,
+              //   onPressed: () {
+              //     AppToast.show(context, 'Receipt scanning coming soon!', type: ToastType.info);
+              //   },
+              // ),
+              // SizedBox(height: 12.h),
               _buildAnimatedFab(
                 isFabExtended: isFabExtended,
                 heroTag: 'add_expense_fab',

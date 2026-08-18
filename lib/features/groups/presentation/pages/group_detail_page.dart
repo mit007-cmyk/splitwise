@@ -814,17 +814,17 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              FloatingActionButton(
-                heroTag: 'scan_group_fab_${widget.groupId}',
-                elevation: 4,
-                backgroundColor: colors.elevatedSurface,
-                hoverColor: colors.elevatedSurfaceHover,
-                onPressed: () {
-                  AppToast.show(context, 'Receipt scanning coming soon!', type: ToastType.info);
-                },
-                child: Icon(Icons.photo_camera_outlined, color: colors.onImageColor),
-              ),
-              SizedBox(height: 12.h),
+              // FloatingActionButton(
+              //   heroTag: 'scan_group_fab_${widget.groupId}',
+              //   elevation: 4,
+              //   backgroundColor: colors.elevatedSurface,
+              //   hoverColor: colors.elevatedSurfaceHover,
+              //   onPressed: () {
+              //     AppToast.show(context, 'Receipt scanning coming soon!', type: ToastType.info);
+              //   },
+              //   child: Icon(Icons.photo_camera_outlined, color: colors.onImageColor),
+              // ),
+              // SizedBox(height: 12.h),
               FloatingActionButton.extended(
                 heroTag: 'add_group_expense_fab_${widget.groupId}',
                 elevation: 4,
