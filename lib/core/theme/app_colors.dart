@@ -168,6 +168,15 @@ class AppColors {
   static const Color onImageDark = Color(0xFFFFFFFF);
 
   // ---------------------------------------------------------------------
+  // Spending charts (theme-independent accents)
+  // ---------------------------------------------------------------------
+  static const Color chartTotalSpent = Color(0xFF5BB4E5);
+  static const Color chartYourShare = Color(0xFF1B7CA8);
+
+  static const Color proBannerBackground = Color(0xFF6B21C8);
+  static const Color proBannerButton = Color(0xFF9B5DE5);
+
+  // ---------------------------------------------------------------------
   // Avatar / group placeholder backgrounds (theme-independent accents)
   // ---------------------------------------------------------------------
   static const List<Color> avatarPlaceholders = [
