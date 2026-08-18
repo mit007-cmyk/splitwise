@@ -47,7 +47,6 @@ class AddExpensePage extends StatefulWidget {
 }
 
 class _AddExpensePageState extends State<AddExpensePage> {
-  bool _didPrefill = false;
   late final AddExpenseBloc _bloc;
   late final TextEditingController _titleController;
   late final TextEditingController _amountController;
@@ -94,6 +93,18 @@ class _AddExpensePageState extends State<AddExpensePage> {
     super.dispose();
   }
 
+  /// Pushes a bloc-sourced value into a field without disturbing what the user
+  /// is doing: text they just typed is already in the controller, so nothing
+  /// happens, and a genuine change (prefill, preset) lands with the caret at
+  /// the end instead of selecting the whole field.
+  void _syncField(TextEditingController controller, String value) {
+    if (controller.text == value) return;
+    controller.value = TextEditingValue(
+      text: value,
+      selection: TextSelection.collapsed(offset: value.length),
+    );
+  }
+
   Future<void> _pickDate(BuildContext context, DateTime current) async {
     final picked = await showDatePicker(
       context: context,
@@ -112,23 +123,38 @@ class _AddExpensePageState extends State<AddExpensePage> {
 
     return BlocProvider.value(
       value: _bloc,
-      child: BlocListener<AddExpenseBloc, AddExpenseState>(
-        listenWhen: (previous, current) =>
-            previous.status != current.status || previous.errorMessage != current.errorMessage,
-        listener: (context, state) {
-          if (state.status == AddExpenseStatus.success) {
-            final message = switch (state.lastAction) {
-              AddExpenseAction.delete => 'Expense deleted!',
-              AddExpenseAction.save =>
-                state.isEditMode ? 'Expense updated!' : 'Expense added!',
-              AddExpenseAction.none => 'Saved successfully!',
-            };
-            AppToast.show(context, message, type: ToastType.success);
-            context.pop(true);
-          } else if (state.errorMessage != null) {
-            AppToast.show(context, state.errorMessage!, type: ToastType.error);
-          }
-        },
+      child: MultiBlocListener(
+        listeners: [
+          BlocListener<AddExpenseBloc, AddExpenseState>(
+            listenWhen: (previous, current) =>
+                previous.status != current.status || previous.errorMessage != current.errorMessage,
+            listener: (context, state) {
+              if (state.status == AddExpenseStatus.success) {
+                final message = switch (state.lastAction) {
+                  AddExpenseAction.delete => 'Expense deleted!',
+                  AddExpenseAction.save =>
+                    state.isEditMode ? 'Expense updated!' : 'Expense added!',
+                  AddExpenseAction.none => 'Saved successfully!',
+                };
+                AppToast.show(context, message, type: ToastType.success);
+                context.pop(true);
+              } else if (state.errorMessage != null) {
+                AppToast.show(context, state.errorMessage!, type: ToastType.error);
+              }
+            },
+          ),
+          BlocListener<AddExpenseBloc, AddExpenseState>(
+            listenWhen: (previous, current) =>
+                previous.title != current.title ||
+                previous.amountText != current.amountText ||
+                previous.notes != current.notes,
+            listener: (context, state) {
+              _syncField(_titleController, state.title);
+              _syncField(_amountController, state.amountText);
+              _syncField(_notesController, state.notes);
+            },
+          ),
+        ],
         child: Scaffold(
           backgroundColor: scheme.surface,
           appBar: AppBar(
@@ -188,16 +214,6 @@ class _AddExpensePageState extends State<AddExpensePage> {
             builder: (context, state) {
               if (state.status == AddExpenseStatus.loading) {
                 return const Center(child: CircularProgressIndicator());
-              }
-              if (!_didPrefill &&
-                  (state.isEditMode ||
-                      state.title.isNotEmpty ||
-                      state.amountText.isNotEmpty ||
-                      state.notes.isNotEmpty)) {
-                _didPrefill = true;
-                _titleController.text = state.title;
-                _amountController.text = state.amountText;
-                _notesController.text = state.notes;
               }
               return _buildForm(context, state);
             },
@@ -418,38 +434,45 @@ class _AddExpensePageState extends State<AddExpensePage> {
   }
 
   Widget _buildQuickSplitButton(BuildContext context, AddExpenseState state) {
+    final fullAmountSummary = _fullAmountSummary(state);
+    void openQuickSplit() => QuickSplitOptionsPage.show(context, _bloc);
+
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: AppDimensions.lg.w, vertical: AppDimensions.sm.h),
-      child: Align(
-        alignment: Alignment.centerLeft,
-        child: OutlinedButton(
-          onPressed: () => QuickSplitOptionsPage.show(context, _bloc),
-          child: Padding(
-            padding: EdgeInsets.symmetric(horizontal: AppDimensions.sm.w),
-            child: Text(_quickSplitSummary(state)),
-          ),
-        ),
-      ),
+      child: fullAmountSummary != null
+          ? Align(
+              alignment: Alignment.centerLeft,
+              child: _buildInlineChip(context, fullAmountSummary, openQuickSplit),
+            )
+          : _buildPaidAndSplitSentence(
+              context,
+              payerName: _resolvePayerName(state),
+              splitLabel: state.splitType.label.toLowerCase(),
+              onPayerTap: openQuickSplit,
+              onSplitTap: openQuickSplit,
+            ),
     );
   }
 
-  String _quickSplitSummary(AddExpenseState state) {
+  /// The 2-person shortcut where one side owes 100% doesn't fit the
+  /// "paid by … and split …" sentence, so it keeps its own wording.
+  String? _fullAmountSummary(AddExpenseState state) {
     final other = state.otherParticipant;
-    final payerIsYou = state.singlePayerId == state.currentUserId;
-    final payerName = payerIsYou ? 'you' : (other?.name.toLowerCase() ?? 'someone');
+    if (other == null || state.splitType != SplitType.percentage) return null;
 
-    if (other != null && state.splitType == SplitType.percentage) {
-      final owedFullId = payerIsYou ? other.id : state.currentUserId;
-      final pct = double.tryParse((state.splitValueTexts[owedFullId] ?? '').trim()) ?? -1;
-      if ((pct - 100).abs() < 0.1) {
-        return payerIsYou ? 'You are owed the full amount.' : '${other.name} is owed the full amount.';
-      }
-    }
-    return 'Paid by $payerName and split ${state.splitType.label.toLowerCase()}.';
+    final payerIsYou = state.singlePayerId == state.currentUserId;
+    final owedFullId = payerIsYou ? other.id : state.currentUserId;
+    final pct = double.tryParse((state.splitValueTexts[owedFullId] ?? '').trim()) ?? -1;
+    if ((pct - 100).abs() >= 0.1) return null;
+
+    return payerIsYou
+        ? 'You are owed the full amount.'
+        : '${other.name} is owed the full amount.';
   }
 
   String _resolvePayerName(AddExpenseState state) {
     if (state.isMultiplePayers) return 'multiple people';
+    if (state.singlePayerId == state.currentUserId) return 'you';
     for (final member in state.members) {
       if (member.id == state.singlePayerId) return member.name.toLowerCase();
     }
@@ -457,40 +480,65 @@ class _AddExpensePageState extends State<AddExpensePage> {
   }
 
   Widget _buildPaidAndSplitRow(BuildContext context, AddExpenseState state) {
-    final payerName = _resolvePayerName(state);
-
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: AppDimensions.lg.w, vertical: AppDimensions.sm.h),
-      child: Wrap(
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Text('Paid by ', style: context.textTheme.bodyMedium),
-          GestureDetector(
-            onTap: () => PaidBySheet.show(context, _bloc),
-            child: Text(
-              payerName,
-              style: context.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                decoration: TextDecoration.underline,
-              ),
-            ),
+      child: _buildPaidAndSplitSentence(
+        context,
+        payerName: _resolvePayerName(state),
+        splitLabel: state.splitType.label.toLowerCase(),
+        onPayerTap: () => PaidBySheet.show(context, _bloc),
+        onSplitTap: () => Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => BlocProvider.value(value: _bloc, child: const AdjustSplitPage()),
           ),
-          Text(' and split ', style: context.textTheme.bodyMedium),
-          GestureDetector(
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => BlocProvider.value(value: _bloc, child: const AdjustSplitPage()),
-              ),
-            ),
-            child: Text(
-              state.splitType.label.toLowerCase(),
-              style: context.textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                decoration: TextDecoration.underline,
-              ),
-            ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaidAndSplitSentence(
+    BuildContext context, {
+    required String payerName,
+    required String splitLabel,
+    required VoidCallback onPayerTap,
+    required VoidCallback onSplitTap,
+  }) {
+    return Wrap(
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: AppDimensions.sm.w,
+      runSpacing: AppDimensions.sm.h,
+      children: [
+        Text('Paid by', style: context.textTheme.bodyMedium),
+        _buildInlineChip(context, payerName, onPayerTap),
+        Text('and split', style: context.textTheme.bodyMedium),
+        _buildInlineChip(context, splitLabel, onSplitTap),
+      ],
+    );
+  }
+
+  Widget _buildInlineChip(BuildContext context, String label, VoidCallback onTap) {
+    final scheme = context.colorScheme;
+    final radius = BorderRadius.circular(AppDimensions.radiusMd.r);
+
+    return InkWell(
+      borderRadius: radius,
+      onTap: onTap,
+      child: Container(
+        padding: EdgeInsets.symmetric(
+          horizontal: AppDimensions.md.w,
+          vertical: AppDimensions.sm.h,
+        ),
+        decoration: BoxDecoration(
+          border: Border.all(color: scheme.outline),
+          borderRadius: radius,
+        ),
+        child: Text(
+          label,
+          style: context.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: scheme.onSurface,
           ),
-        ],
+        ),
       ),
     );
   }
