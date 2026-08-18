@@ -9,6 +9,7 @@ import '../../../../core/services/app_launcher_service.dart';
 import '../../../../core/services/support_email_service.dart';
 import '../../../../core/utils/context_extension.dart';
 import '../../../../core/widgets/app_toast.dart';
+import '../../../../core/widgets/avatar_widget.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_event.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -129,31 +130,24 @@ class AccountPage extends StatelessWidget {
                       children: [
                         Stack(
                           children: [
-                            CircleAvatar(
-                              radius: 36.r,
-                              backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.2),
-                              child: Text(
-                                name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'G',
-                                style: TextStyle(
-                                  fontSize: 28.sp,
-                                  fontWeight: FontWeight.bold,
-                                  color: theme.colorScheme.primary,
-                                ),
-                              ),
+                            AvatarWidget(
+                              name: name,
+                              imageUrl: state is Authenticated ? state.user.photoUrl : null,
+                              size: 72.r,
                             ),
-                            Positioned(
-                              bottom: 0,
-                              right: 0,
-                              child: Container(
-                                padding: EdgeInsets.all(4.r),
-                                decoration: BoxDecoration(
-                                  color: theme.colorScheme.surface,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: theme.colorScheme.outline, width: 1),
-                                ),
-                                child: Icon(Icons.camera_alt, size: 14.sp, color: theme.colorScheme.onSurfaceVariant),
-                              ),
-                            ),
+                            // Positioned(
+                            //   bottom: 0,
+                            //   right: 0,
+                            //   child: Container(
+                            //     padding: EdgeInsets.all(4.r),
+                            //     decoration: BoxDecoration(
+                            //       color: theme.colorScheme.surface,
+                            //       shape: BoxShape.circle,
+                            //       border: Border.all(color: theme.colorScheme.outline, width: 1),
+                            //     ),
+                            //     child: Icon(Icons.camera_alt, size: 14.sp, color: theme.colorScheme.onSurfaceVariant),
+                            //   ),
+                            // ),
                           ],
                         ),
                         SizedBox(width: 16.w),

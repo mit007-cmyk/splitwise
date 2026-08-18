@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/di/di.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/widgets/avatar_widget.dart';
 import '../../../activity/presentation/bloc/activity_bloc.dart';
 import '../../../activity/presentation/bloc/activity_event.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -74,12 +75,48 @@ class MainNavigationPage extends StatelessWidget {
             label: 'Activity',
           ),
           NavigationDestination(
-            icon: const Icon(Icons.account_circle_outlined),
-            selectedIcon: Icon(Icons.account_circle, color: theme.colorScheme.primary),
+            icon: _AccountTabIcon(selected: false),
+            selectedIcon: _AccountTabIcon(selected: true),
             label: 'Account',
           ),
         ],
       ),
+    );
+  }
+}
+
+class _AccountTabIcon extends StatelessWidget {
+  final bool selected;
+
+  const _AccountTabIcon({required this.selected});
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocBuilder<AuthBloc, AuthState>(
+      builder: (context, state) {
+        final name = state is Authenticated ? state.user.name : 'Account';
+        final photoUrl = state is Authenticated ? state.user.photoUrl : null;
+
+        return Container(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: selected
+                  ? context.colorScheme.primary
+                  : Colors.transparent,
+              width: 2,
+            ),
+          ),
+          child: AvatarWidget(
+            name: name,
+            imageUrl: photoUrl,
+            size: 24,
+            borderWidth: 0,
+          ),
+        );
+      },
     );
   }
 }

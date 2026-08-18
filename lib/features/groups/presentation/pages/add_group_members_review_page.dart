@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/context_extension.dart';
 import '../../../../core/widgets/app_toast.dart';
+import '../../../../core/widgets/avatar_widget.dart';
 import '../../../activity/presentation/bloc/activity_bloc.dart';
 import '../../../activity/presentation/bloc/activity_event.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
@@ -259,31 +259,11 @@ Widget inviteLeadingAvatar(BuildContext context, GroupMemberInvite invite, {doub
 }
 
 Widget _inviteAvatar(BuildContext context, GroupMemberInvite invite, {required double radius}) {
-  if (invite.photoUrl != null && invite.photoUrl!.isNotEmpty) {
-    return CircleAvatar(
-      radius: radius.r,
-      backgroundImage: NetworkImage(invite.photoUrl!),
-      backgroundColor: Colors.transparent,
-    );
-  }
-
   if (invite.isRegistered) {
-    final colors = AppColors.avatarPlaceholders;
-    final index = invite.displayName.length % colors.length;
-    final initial = invite.displayName.isNotEmpty
-        ? invite.displayName.substring(0, 1).toUpperCase()
-        : 'U';
-    return CircleAvatar(
-      radius: radius.r,
-      backgroundColor: colors[index],
-      child: Text(
-        initial,
-        style: TextStyle(
-          color: context.appColors.onImageColor,
-          fontWeight: FontWeight.bold,
-          fontSize: (radius * 0.75).sp,
-        ),
-      ),
+    return AvatarWidget(
+      name: invite.displayName,
+      imageUrl: invite.photoUrl,
+      size: radius.r * 2,
     );
   }
 

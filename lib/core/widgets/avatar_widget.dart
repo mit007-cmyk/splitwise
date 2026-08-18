@@ -1,55 +1,38 @@
 import 'package:flutter/material.dart';
 import '../utils/context_extension.dart';
 import 'cached_image_widget.dart';
-import '../theme/app_colors.dart';
+import 'geometric_identicon.dart';
 
 class AvatarWidget extends StatelessWidget {
   final String? imageUrl;
   final String name;
   final double size;
+  final double? borderWidth;
 
   const AvatarWidget({
     super.key,
     required this.name,
     this.imageUrl,
     this.size = 40.0,
+    this.borderWidth,
   });
-
-  /// Computes initials (up to 2 letters) from a given name
-  String get _initials {
-    final cleanName = name.trim();
-    if (cleanName.isEmpty) return '?';
-
-    final parts = cleanName.split(' ');
-    if (parts.length > 1) {
-      final first = parts[0].substring(0, 1).toUpperCase();
-      final second = parts[parts.length - 1].substring(0, 1).toUpperCase();
-      return '$first$second';
-    }
-
-    return cleanName.substring(0, cleanName.length > 1 ? 2 : 1).toUpperCase();
-  }
-
-  /// Generates a deterministic background color based on name hash
-  Color _getBackgroundColor(BuildContext context) {
-    if (name.isEmpty) return context.colorScheme.primaryContainer;
-
-    final hash = name.codeUnits.fold(0, (prev, element) => prev + element);
-    return AppColors.avatarPlaceholders[hash % AppColors.avatarPlaceholders.length];
-  }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = context.colorScheme;
     final hasImage = imageUrl != null && imageUrl!.isNotEmpty;
+    final stroke = borderWidth ?? 4.0;
 
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        border: Border.all(color: colorScheme.surface, width: 4),
+        border: stroke > 0
+            ? Border.all(color: colorScheme.surface, width: stroke)
+            : null,
       ),
+      clipBehavior: Clip.antiAlias,
       child: hasImage
           ? CachedImageWidget(
               imageUrl: imageUrl!,
@@ -57,17 +40,14 @@ class AvatarWidget extends StatelessWidget {
               height: size,
               borderRadius: size / 2,
             )
-          : CircleAvatar(
-              backgroundColor: _getBackgroundColor(context),
-              radius: size / 2,
-              child: Text(
-                _initials,
-                style: TextStyle(
-                  fontSize: size * 0.4,
-                  fontWeight: FontWeight.bold,
-                  color: context.appColors.onImageColor,
-                ),
-              ),
+          : LayoutBuilder(
+              builder: (context, constraints) {
+                final side = constraints.biggest.shortestSide;
+                return GeometricIdenticon(
+                  seed: name,
+                  size: side.isFinite && side > 0 ? side : size,
+                );
+              },
             ),
     );
   }

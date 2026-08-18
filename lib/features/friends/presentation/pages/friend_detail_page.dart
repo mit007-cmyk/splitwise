@@ -6,11 +6,11 @@ import 'package:intl/intl.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/di.dart';
 import '../../../../core/routing/route_constants.dart';
-import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/context_extension.dart';
 import '../../../../core/utils/csv_exporter.dart';
 import '../../../../core/utils/currency_amount.dart';
 import '../../../../core/widgets/avatar_widget.dart';
+import '../../../../core/widgets/geometric_identicon.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../expenses/domain/services/friend_ledger.dart';
@@ -34,13 +34,27 @@ class FriendDetailPage extends StatefulWidget {
 
 class _FriendDetailPageState extends State<FriendDetailPage> {
   late final FriendDetailCubit _cubit;
+  late final ScrollController _scrollController;
   bool _breakdownExpanded = true;
+  bool _isCollapsed = false;
 
   @override
   void initState() {
     super.initState();
     _cubit = getIt<FriendDetailCubit>();
+    _scrollController = ScrollController();
+    _scrollController.addListener(_scrollListener);
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+  }
+
+  void _scrollListener() {
+    if (!mounted || !_scrollController.hasClients) return;
+    final threshold =
+        180.h - kToolbarHeight - MediaQuery.of(context).padding.top;
+    final collapsed = _scrollController.offset >= threshold;
+    if (collapsed != _isCollapsed) {
+      setState(() => _isCollapsed = collapsed);
+    }
   }
 
   void _load() {
@@ -52,17 +66,10 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
 
   @override
   void dispose() {
+    _scrollController.removeListener(_scrollListener);
+    _scrollController.dispose();
     _cubit.close();
     super.dispose();
-  }
-
-  Color _heroColor(String name) {
-    return AppColors.avatarPlaceholders[name.length %
-        AppColors.avatarPlaceholders.length];
-  }
-
-  Color _heroColorDark(String name) {
-    return Color.lerp(_heroColor(name), AppColors.shadow, 0.35)!;
   }
 
   @override
@@ -99,180 +106,220 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
   ) {
     final scheme = context.colorScheme;
     final appColors = context.appColors;
-    final heroColor = _heroColor(friend.name);
-    final heroColorDark = _heroColorDark(friend.name);
+    final heroColor = identiconPrimaryColor(friend.name);
     final overallAmounts = state.overallAmounts;
 
-    return RefreshIndicator(
-      onRefresh: () async => _load(),
-      child: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(
-            child: Stack(
-              clipBehavior: Clip.none,
-              alignment: Alignment.topCenter,
-              children: [
-                Container(
-                  height: 170.h,
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [heroColor, heroColorDark],
+    final avatarSize = 70.w;
+    final expandedHeight = 180.h;
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        RefreshIndicator(
+          onRefresh: () async => _load(),
+          child: NestedScrollView(
+            controller: _scrollController,
+            headerSliverBuilder: (context, innerBoxIsScrolled) {
+              return [
+                SliverAppBar(
+                  pinned: true,
+                  expandedHeight: expandedHeight,
+                  backgroundColor: heroColor,
+                  elevation: 0,
+                  centerTitle: false,
+                  title: _isCollapsed
+                      ? Text(
+                          friend.name,
+                          style: context.textTheme.titleLarge?.copyWith(
+                            color: appColors.onImageColor,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        )
+                      : null,
+                  leading: Padding(
+                    padding: EdgeInsets.only(left: 8.w, top: 4.h, bottom: 4.h),
+                    child: IconButton(
+                      icon: Icon(Icons.arrow_back, color: appColors.onImageColor),
+                      style: IconButton.styleFrom(
+                        backgroundColor:
+                            appColors.overlayColor.withValues(alpha: 0.3),
+                        shape: const CircleBorder(),
+                      ),
+                      onPressed: () => context.pop(),
                     ),
                   ),
-                  child: SafeArea(
-                    bottom: false,
-                    child: Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 8.w),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          IconButton(
-                            icon: Icon(
-                              Icons.arrow_back,
-                              color: appColors.onImageColor,
-                            ),
-                            style: IconButton.styleFrom(
-                              backgroundColor: appColors.overlayColor
-                                  .withValues(alpha: 0.3),
-                              shape: const CircleBorder(),
-                            ),
-                            onPressed: () => context.pop(),
-                          ),
-                          IconButton(
-                            icon: Icon(
-                              Icons.settings_outlined,
-                              color: appColors.onImageColor,
-                            ),
-                            style: IconButton.styleFrom(
-                              backgroundColor: appColors.overlayColor
-                                  .withValues(alpha: 0.3),
-                              shape: const CircleBorder(),
-                            ),
-                            onPressed: () async {
-                              await context.pushNamed(
-                                RouteConstants.friendSettingsName,
-                                pathParameters: {'friendId': widget.friendId},
-                              );
-                              if (mounted) {
-                                _load();
-                              }
-                            },
-                          ),
-                        ],
+                  actions: [
+                    Padding(
+                      padding: EdgeInsets.only(right: 8.w, top: 4.h, bottom: 4.h),
+                      child: IconButton(
+                        icon: Icon(
+                          Icons.settings_outlined,
+                          color: appColors.onImageColor,
+                        ),
+                        style: IconButton.styleFrom(
+                          backgroundColor:
+                              appColors.overlayColor.withValues(alpha: 0.3),
+                          shape: const CircleBorder(),
+                        ),
+                        onPressed: () async {
+                          await context.pushNamed(
+                            RouteConstants.friendSettingsName,
+                            pathParameters: {'friendId': widget.friendId},
+                          );
+                          if (mounted) {
+                            _load();
+                          }
+                        },
                       ),
                     ),
+                  ],
+                  flexibleSpace: FlexibleSpaceBar(
+                    collapseMode: CollapseMode.pin,
+                    background: GeometricIdenticon(
+                      seed: friend.name,
+                      clipToCircle: false,
+                    ),
                   ),
                 ),
-                Positioned(
-                  top: 130.h,
-                  left: AppDimensions.xxl.w,
-                  child: AvatarWidget(
-                    name: friend.name,
-                    imageUrl: friend.photoUrl,
-                    size: 88.w,
+              ];
+            },
+            body: ListView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.only(bottom: 96.h),
+              children: [
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    AppDimensions.xxl.w,
+                    _isCollapsed ? AppDimensions.lg.h : 52.h,
+                    AppDimensions.lg.w,
+                    0,
+                  ),
+                  child: Column(
+                    children: [
+                      IntrinsicHeight(
+                        child: Row(
+                          children: [
+                            VerticalDivider(
+                              color: heroColor,
+                              thickness: 1.w,
+                              width: 3.w,
+                            ),
+                            SizedBox(width: AppDimensions.md.w),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.stretch,
+                                children: [
+                                  Text(
+                                    friend.name,
+                                    style: context.textTheme.headlineSmall
+                                        ?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                          color: scheme.onSurface,
+                                        ),
+                                  ),
+                                  if (friend.contactLine != null) ...[
+                                    SizedBox(height: AppDimensions.xs.h),
+                                    Text(
+                                      friend.contactLine!,
+                                      style: context.textTheme.bodySmall
+                                          ?.copyWith(
+                                        color: scheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                  SizedBox(height: AppDimensions.sm.h),
+                                  _buildBalanceBreakdown(
+                                    context,
+                                    state,
+                                    friend.name,
+                                    overallAmounts,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      SizedBox(height: AppDimensions.lg.h),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            FriendActionPill(
+                              label: 'Settle up',
+                              onTap: () =>
+                                  _openSettleUp(context, state, friend),
+                            ),
+                            FriendActionPill(
+                              label: 'Remind...',
+                              onTap: () =>
+                                  _openRemindSheet(context, state, friend),
+                            ),
+                            FriendActionPill(
+                              label: 'Charts',
+                              icon: Icons.diamond_rounded,
+                              onTap: () => _showComingSoon(context),
+                            ),
+                            const FriendActionPill(
+                              label: 'Convert to USD',
+                              icon: Icons.currency_exchange_rounded,
+                            ),
+                            FriendActionPill(
+                              label: 'Export',
+                              icon: Icons.download_rounded,
+                              onTap: () => _exportFriendExpenses(
+                                context,
+                                state,
+                                friend,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
                 ),
+                if (state.entries.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 32),
+                    child: FriendExpensesEmptyState(),
+                  )
+                else
+                  Padding(
+                    padding: EdgeInsets.only(top: AppDimensions.lg.h),
+                    child: Column(
+                      children: _buildActivityFeed(context, state),
+                    ),
+                  ),
               ],
             ),
           ),
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                AppDimensions.xxl.w,
-                52.h,
-                AppDimensions.lg.w,
-                0,
-              ),
-              child: Column(
-                children: [
-                  IntrinsicHeight(
-                    child: Row(
-                      children: [
-                        VerticalDivider(
-                          color: heroColor,
-                          thickness: 3.w,
-                          width: 3.w,
-                        ),
-                        SizedBox(width: AppDimensions.md.w),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Text(
-                                friend.name,
-                                style: context.textTheme.headlineSmall
-                                    ?.copyWith(
-                                      fontWeight: FontWeight.bold,
-                                      color: scheme.onSurface,
-                                    ),
-                              ),
-                              SizedBox(height: AppDimensions.sm.h),
-                              _buildBalanceBreakdown(
-                                context,
-                                state,
-                                friend.name,
-                                overallAmounts,
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(height: AppDimensions.lg.h),
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: [
-                        FriendActionPill(
-                          label: 'Settle up',
-                          onTap: () => _openSettleUp(context, state, friend),
-                        ),
-                        FriendActionPill(
-                          label: 'Remind...',
-                          onTap: () => _openRemindSheet(context, state, friend),
-                        ),
-                        FriendActionPill(
-                          label: 'Charts',
-                          icon: Icons.diamond_rounded,
-                          onTap: () => _showComingSoon(context),
-                        ),
-                        const FriendActionPill(
-                          label: 'Convert to USD',
-                          icon: Icons.currency_exchange_rounded,
-                        ),
-                        FriendActionPill(
-                          label: 'Export',
-                          icon: Icons.download_rounded,
-                          onTap: () => _exportFriendExpenses(context, state, friend),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+        ),
+        AnimatedBuilder(
+          animation: _scrollController,
+          builder: (context, child) {
+            if (_isCollapsed) return const SizedBox.shrink();
+
+            final collapsedHeight =
+                kToolbarHeight + MediaQuery.of(context).padding.top;
+            final offset =
+                _scrollController.hasClients ? _scrollController.offset : 0.0;
+            final headerBottom =
+                (expandedHeight - offset).clamp(collapsedHeight, expandedHeight);
+
+            return Positioned(
+              top: headerBottom - 40.h,
+              left: AppDimensions.xxl.w,
+              child: child!,
+            );
+          },
+          child: AvatarWidget(
+            name: friend.name,
+            imageUrl: friend.photoUrl,
+            size: avatarSize,
           ),
-          if (state.entries.isEmpty)
-            const SliverFillRemaining(
-              hasScrollBody: false,
-              child: FriendExpensesEmptyState(),
-            )
-          else
-            SliverPadding(
-              padding: EdgeInsets.only(top: AppDimensions.lg.h, bottom: 96.h),
-              sliver: SliverList(
-                delegate: SliverChildListDelegate(
-                  _buildActivityFeed(context, state),
-                ),
-              ),
-            ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

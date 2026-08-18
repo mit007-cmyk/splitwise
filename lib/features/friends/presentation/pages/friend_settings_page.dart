@@ -305,10 +305,10 @@ class _FriendSettingsPageState extends State<FriendSettingsPage> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        if ((friend.email ?? '').isNotEmpty) ...[
+                        if (friend.contactLine != null) ...[
                           SizedBox(height: 2.h),
                           Text(
-                            friend.email!,
+                            friend.contactLine!,
                             style: context.textTheme.bodySmall?.copyWith(
                               color: scheme.onSurfaceVariant,
                             ),

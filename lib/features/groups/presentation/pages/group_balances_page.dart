@@ -9,6 +9,7 @@ import '../../../../core/utils/currency_amount.dart';
 import '../../../../core/utils/debt_settlement.dart';
 import '../../../../core/utils/group_balance_calculator.dart';
 import '../../../../core/widgets/app_toast.dart';
+import '../../../../core/widgets/avatar_widget.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../expenses/domain/entities/expense.dart';
@@ -51,27 +52,6 @@ class _GroupBalancesPageState extends State<GroupBalancesPage> {
   void dispose() {
     _cubit.close();
     super.dispose();
-  }
-
-  Color _avatarColorForName(String name) {
-    final hash = name.codeUnits.fold(0, (prev, elem) => prev + elem);
-    final list = [
-      const Color(0xFFE57373),
-      const Color(0xFFF06292),
-      const Color(0xFFBA68C8),
-      const Color(0xFF9575CD),
-      const Color(0xFF7986CB),
-      const Color(0xFF64B5F6),
-      const Color(0xFF4FC3F7),
-      const Color(0xFF4DD0E1),
-      const Color(0xFF4DB6AC),
-      const Color(0xFF81C784),
-      const Color(0xFFAED581),
-      const Color(0xFFFFD54F),
-      const Color(0xFFFFB74D),
-      const Color(0xFFFF8A65),
-    ];
-    return list[hash % list.length];
   }
 
   List<SettlementTransfer> _calculateRepayments({
@@ -354,17 +334,7 @@ class _GroupBalancesPageState extends State<GroupBalancesPage> {
                             padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
                             child: Row(
                               children: [
-                                CircleAvatar(
-                                  radius: 22.r,
-                                  backgroundColor: _avatarColorForName(name),
-                                  child: Text(
-                                    name.isNotEmpty ? name[0].toUpperCase() : '',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
+                                AvatarWidget(name: name, size: 44.w),
                                 SizedBox(width: 16.w),
                                 Expanded(child: balanceText),
                                 Icon(
@@ -392,18 +362,7 @@ class _GroupBalancesPageState extends State<GroupBalancesPage> {
                                   child: Row(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      CircleAvatar(
-                                        radius: 16.r,
-                                        backgroundColor: _avatarColorForName(tFromName),
-                                        child: Text(
-                                          tFromName.isNotEmpty ? tFromName[0].toUpperCase() : '',
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 12.sp,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
+                                      AvatarWidget(name: tFromName, size: 32.w),
                                       SizedBox(width: 12.w),
                                       Expanded(
                                         child: Column(

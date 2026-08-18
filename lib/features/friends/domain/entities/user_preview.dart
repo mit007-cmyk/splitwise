@@ -21,4 +21,13 @@ class UserPreview extends Equatable {
 
   @override
   List<Object?> get props => [id, name, email, phone, photoUrl, friendCode, isPending];
+
+  /// Email when present, otherwise phone. Null when neither is set.
+  String? get contactLine {
+    final mail = email?.trim() ?? '';
+    if (mail.isNotEmpty) return mail;
+    final tel = phone?.trim() ?? '';
+    if (tel.isNotEmpty) return tel;
+    return null;
+  }
 }

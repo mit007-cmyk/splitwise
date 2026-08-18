@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -6,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/di/di.dart';
 import '../../../../core/services/contacts_service.dart';
 import '../../../../core/utils/context_extension.dart';
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/widgets/avatar_widget.dart';
 import '../../../auth/data/models/user_model.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -81,31 +80,10 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
   }
 
   Widget _buildUserAvatar(UserModel user, {double radius = 22}) {
-    final isUnderTest = Platform.environment.containsKey('FLUTTER_TEST');
-    if (!isUnderTest && user.photoUrl != null && user.photoUrl!.isNotEmpty) {
-      return CircleAvatar(
-        radius: radius.r,
-        backgroundImage: NetworkImage(user.photoUrl!),
-        backgroundColor: Colors.transparent,
-      );
-    }
-
-    final colors = AppColors.avatarPlaceholders;
-    final index = user.name.length % colors.length;
-    final color = colors[index];
-    final initial = user.name.isNotEmpty ? user.name.substring(0, 1).toUpperCase() : 'U';
-
-    return CircleAvatar(
-      radius: radius.r,
-      backgroundColor: color,
-      child: Text(
-        initial,
-        style: TextStyle(
-          color: context.appColors.onImageColor,
-          fontWeight: FontWeight.bold,
-          fontSize: (radius * 0.75).sp,
-        ),
-      ),
+    return AvatarWidget(
+      name: user.name,
+      imageUrl: user.photoUrl,
+      size: radius.r * 2,
     );
   }
 

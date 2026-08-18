@@ -10,6 +10,7 @@ import '../../../../core/utils/context_extension.dart';
 import '../../../../core/utils/currency_amount.dart';
 import '../../../../core/widgets/app_switch.dart';
 import '../../../../core/widgets/app_toast.dart';
+import '../../../../core/widgets/avatar_widget.dart';
 import '../../../auth/data/models/user_model.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
@@ -216,21 +217,8 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
     return AppColors.avatarPlaceholders[index];
   }
 
-  Widget _buildUserAvatar(BuildContext context, String name) {
-    final color = _getGroupColor(name);
-    final initial = name.isNotEmpty ? name.substring(0, 1).toUpperCase() : 'U';
-
-    return CircleAvatar(
-      radius: 22.r,
-      backgroundColor: color,
-      child: Text(
-        initial,
-        style: TextStyle(
-          color: context.appColors.onImageColor,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
+  Widget _buildUserAvatar(BuildContext context, String name, {String? photoUrl}) {
+    return AvatarWidget(name: name, imageUrl: photoUrl, size: 44.w);
   }
 
   void _showMemberActionsSheet(
@@ -270,7 +258,11 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
                   padding: EdgeInsets.symmetric(horizontal: 16.w),
                   child: Row(
                     children: [
-                      _buildUserAvatar(context, member.name),
+                      _buildUserAvatar(
+                        context,
+                        member.name,
+                        photoUrl: member.photoUrl,
+                      ),
                       SizedBox(width: 12.w),
                       Expanded(
                         child: Column(
@@ -656,7 +648,11 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
                     }
 
                     return ListTile(
-                      leading: _buildUserAvatar(context, user.name),
+                      leading: _buildUserAvatar(
+                        context,
+                        user.name,
+                        photoUrl: user.photoUrl,
+                      ),
                       title: Text(
                         displayName,
                         style: context.textTheme.titleMedium?.copyWith(

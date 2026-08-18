@@ -186,6 +186,20 @@ class AppColors {
     Color(0xFF9D174D),
     Color(0xFF374151),
   ];
+
+  /// Four-shade palettes for the geometric identicon used when a user has no
+  /// photo. Each person gets one palette, so the same name always looks the
+  /// same and different people get different colours (teal, orange, …).
+  static const List<List<Color>> identiconPalettes = [
+    [Color(0xFF0F766E), Color(0xFF14B8A6), Color(0xFF5EEAD4), Color(0xFFECFDF5)],
+    [Color(0xFFC2410C), Color(0xFFEA580C), Color(0xFFFDBA74), Color(0xFFFFF7ED)],
+    [Color(0xFF1D4ED8), Color(0xFF3B82F6), Color(0xFF93C5FD), Color(0xFFEFF6FF)],
+    [Color(0xFF6B21A8), Color(0xFFA855F7), Color(0xFFD8B4FE), Color(0xFFFAF5FF)],
+    [Color(0xFF9F1239), Color(0xFFE11D48), Color(0xFFFB7185), Color(0xFFFFF1F2)],
+    [Color(0xFF365314), Color(0xFF65A30D), Color(0xFFA3E635), Color(0xFFF7FEE7)],
+    [Color(0xFF0E7490), Color(0xFF06B6D4), Color(0xFF67E8F9), Color(0xFFECFEFF)],
+    [Color(0xFF9A3412), Color(0xFFF97316), Color(0xFFFDBA74), Color(0xFFFFF7ED)],
+  ];
 }
 
 /// Theme-aware semantic colors exposed via [ThemeData.extensions].
