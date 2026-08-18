@@ -234,13 +234,13 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
         ),
         actions: [
           // Receipt / attachment placeholder
-          IconButton(
-            icon: const Icon(Icons.receipt_outlined),
-            tooltip: 'Attach receipt',
-            onPressed: () {
-              AppToast.show(context, 'Receipt attachment coming soon', type: ToastType.info);
-            },
-          ),
+          // IconButton(
+          //   icon: const Icon(Icons.receipt_outlined),
+          //   tooltip: 'Attach receipt',
+          //   onPressed: () {
+          //     AppToast.show(context, 'Receipt attachment coming soon', type: ToastType.info);
+          //   },
+          // ),
           // Delete
           ValueListenableBuilder<bool>(
             valueListenable: _isDeleting,
