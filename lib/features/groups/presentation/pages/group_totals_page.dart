@@ -7,12 +7,12 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/di.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/context_extension.dart';
-import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../expenses/data/datasources/currency_catalog.dart';
 import '../../domain/services/group_spending_calculator.dart';
 import '../bloc/group_detail_cubit.dart';
+import '../widgets/group_month_picker_dialog.dart';
 import '../widgets/group_spending_chart.dart';
 import '../widgets/spending_terms_sheet.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_bloc.dart';
@@ -171,10 +171,13 @@ class _GroupTotalsPageState extends State<GroupTotalsPage> {
                     ),
                   )
                 else
-                  GroupSpendingBars(
-                    bars: _buildBars(state, currencyCode, window, selectedMonth),
-                    onSelect: (index) =>
-                        setState(() => _selectedMonth = window[index]),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 50),
+                    child: GroupSpendingBars(
+                      bars: _buildBars(state, currencyCode, window, selectedMonth),
+                      onSelect: (index) =>
+                          setState(() => _selectedMonth = window[index]),
+                    ),
                   ),
                 SizedBox(height: AppDimensions.xl.h),
                 _buildMetric(
@@ -194,7 +197,24 @@ class _GroupTotalsPageState extends State<GroupTotalsPage> {
                       : '${summary.yourSharePercent}% of total group spending',
                 ),
                 SizedBox(height: AppDimensions.xl.h),
-                _buildProBanner(context),
+                GroupSpendingTrendChart(
+                  points: GroupSpendingCalculator.spendingOverTime(
+                    expenses: state.expenses,
+                    currencyCode: currencyCode,
+                    month: _isAllTime ? null : selectedMonth,
+                  ),
+                  currencySymbol: summary.currencySymbol,
+                  daily: !_isAllTime,
+                ),
+                SizedBox(height: AppDimensions.xl.h),
+                GroupCategoryBreakdown(
+                  categories: GroupSpendingCalculator.spendingByCategory(
+                    expenses: state.expenses,
+                    currencyCode: currencyCode,
+                    month: _isAllTime ? null : selectedMonth,
+                  ),
+                  currencySymbol: summary.currencySymbol,
+                ),
               ],
             ),
           ),
@@ -351,63 +371,6 @@ class _GroupTotalsPageState extends State<GroupTotalsPage> {
           ),
         ],
       ],
-    );
-  }
-
-  Widget _buildProBanner(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.symmetric(
-        horizontal: AppDimensions.lg.w,
-        vertical: AppDimensions.xl.h,
-      ),
-      decoration: BoxDecoration(
-        color: AppColors.proBannerBackground,
-        borderRadius: BorderRadius.circular(AppDimensions.radiusLg.r),
-      ),
-      child: Column(
-        children: [
-          Text(
-            'Pro users get more',
-            style: context.textTheme.titleLarge?.copyWith(
-              color: context.appColors.onImageColor,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          SizedBox(height: AppDimensions.sm.h),
-          Text(
-            'More insights. More features. More!',
-            style: context.textTheme.bodyMedium?.copyWith(
-              color: context.appColors.onImageColor.withValues(alpha: 0.85),
-            ),
-          ),
-          SizedBox(height: AppDimensions.lg.h),
-          SizedBox(
-            width: double.infinity,
-            height: AppDimensions.buttonHeight.h,
-            child: FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.proBannerButton,
-                foregroundColor: context.appColors.onImageColor,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(
-                    AppDimensions.radiusCircular.r,
-                  ),
-                ),
-              ),
-              onPressed: () =>
-                  AppToast.show(context, 'Coming soon!', type: ToastType.info),
-              child: Text(
-                'Get Splitwise Pro',
-                style: context.textTheme.titleSmall?.copyWith(
-                  color: context.appColors.onImageColor,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -604,35 +567,12 @@ class _GroupTotalsPageState extends State<GroupTotalsPage> {
   }
 
   Future<void> _pickMonth(List<DateTime> months, DateTime selected) async {
-    final picked = await showModalBottomSheet<DateTime>(
+    final now = GroupSpendingCalculator.monthOf(DateTime.now());
+    final picked = await GroupMonthPickerDialog.show(
       context: context,
-      backgroundColor: context.colorScheme.surfaceContainerHigh,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(AppDimensions.radiusXl.r),
-        ),
-      ),
-      builder: (sheetContext) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            for (final month in months.reversed)
-              ListTile(
-                title: Text(
-                  DateFormat('MMMM yyyy').format(month),
-                  style: sheetContext.textTheme.bodyLarge,
-                ),
-                trailing: month == selected
-                    ? Icon(
-                        Icons.check,
-                        color: sheetContext.colorScheme.primary,
-                      )
-                    : null,
-                onTap: () => Navigator.of(sheetContext).pop(month),
-              ),
-          ],
-        ),
-      ),
+      selectedMonth: selected,
+      minMonth: months.isEmpty ? null : DateTime(months.first.year),
+      maxMonth: now,
     );
 
     if (picked != null && mounted) {

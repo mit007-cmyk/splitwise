@@ -27,6 +27,23 @@ class GroupSpendingSummary {
       '$currencySymbol${amount.toStringAsFixed(2)}';
 }
 
+/// One point on the "Spending over time" line — a month when viewing all
+/// time, or a day when a single month is selected.
+class SpendPoint {
+  final DateTime date;
+  final double amount;
+
+  const SpendPoint({required this.date, required this.amount});
+}
+
+/// One slice on the "Spending by category" chart.
+class CategorySpend {
+  final String category;
+  final double amount;
+
+  const CategorySpend({required this.category, required this.amount});
+}
+
 /// Spending totals behind the group "Totals" screen.
 ///
 /// Amounts are never converted between currencies, so every figure on that
@@ -88,6 +105,95 @@ class GroupSpendingCalculator {
       totalSpent: totalSpent,
       yourShare: yourShare,
     );
+  }
+
+  /// All time: one point per month (gaps filled with zero, last 12 months).
+  /// A specific [month]: one point per calendar day in that month.
+  static List<SpendPoint> spendingOverTime({
+    required List<Expense> expenses,
+    required String currencyCode,
+    DateTime? month,
+  }) {
+    if (month != null) return _dailySpending(expenses, currencyCode, month);
+    return _monthlySpending(expenses, currencyCode);
+  }
+
+  /// Axis days to label when the trend is a single month: 1, 7, 14, 21, and
+  /// the last day — matching the ticks Splitwise draws under the line.
+  static List<int> monthAxisDays(int lastDay) {
+    final ticks = <int>{1, 7, 14, 21, lastDay}
+      ..removeWhere((day) => day < 1 || day > lastDay);
+    return ticks.toList()..sort();
+  }
+
+  static List<SpendPoint> _monthlySpending(
+    List<Expense> expenses,
+    String currencyCode,
+  ) {
+    final totals = <DateTime, double>{};
+    for (final expense in _inCurrency(expenses, currencyCode)) {
+      final month = monthOf(expense.date);
+      totals[month] = (totals[month] ?? 0) + expense.amount;
+    }
+    if (totals.isEmpty) return const [];
+
+    final months = totals.keys.toList()..sort();
+    final last = months.last;
+    final first = months.first;
+    final windowStart = DateTime(last.year, last.month - 11);
+    var cursor = first.isAfter(windowStart) ? first : windowStart;
+
+    final result = <SpendPoint>[];
+    while (!cursor.isAfter(last)) {
+      result.add(SpendPoint(date: cursor, amount: totals[cursor] ?? 0));
+      cursor = DateTime(cursor.year, cursor.month + 1);
+    }
+    return result;
+  }
+
+  static List<SpendPoint> _dailySpending(
+    List<Expense> expenses,
+    String currencyCode,
+    DateTime month,
+  ) {
+    final start = monthOf(month);
+    final lastDay = DateTime(start.year, start.month + 1, 0).day;
+    final totals = <int, double>{};
+    for (final expense in _inCurrency(expenses, currencyCode)) {
+      if (monthOf(expense.date) != start) continue;
+      final day = expense.date.day;
+      totals[day] = (totals[day] ?? 0) + expense.amount;
+    }
+
+    return [
+      for (var day = 1; day <= lastDay; day++)
+        SpendPoint(
+          date: DateTime(start.year, start.month, day),
+          amount: totals[day] ?? 0,
+        ),
+    ];
+  }
+
+  /// Category totals for [currencyCode], largest first. Pass [month] to match
+  /// the Totals period filter; omit it for all-time.
+  static List<CategorySpend> spendingByCategory({
+    required List<Expense> expenses,
+    required String currencyCode,
+    DateTime? month,
+  }) {
+    final totals = <String, double>{};
+    for (final expense in _inCurrency(expenses, currencyCode)) {
+      if (month != null && monthOf(expense.date) != monthOf(month)) continue;
+      final name = expense.category.trim().isEmpty
+          ? 'General'
+          : expense.category.trim();
+      totals[name] = (totals[name] ?? 0) + expense.amount;
+    }
+    final rows = [
+      for (final entry in totals.entries)
+        CategorySpend(category: entry.key, amount: entry.value),
+    ]..sort((a, b) => b.amount.compareTo(a.amount));
+    return rows;
   }
 
   static DateTime monthOf(DateTime date) => DateTime(date.year, date.month);

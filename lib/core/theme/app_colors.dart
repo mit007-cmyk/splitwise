@@ -173,6 +173,19 @@ class AppColors {
   static const Color chartTotalSpent = Color(0xFF5BB4E5);
   static const Color chartYourShare = Color(0xFF1B7CA8);
 
+  /// Slice colours for the category pie; cycled when a group uses more
+  /// categories than there are entries.
+  static const List<Color> chartCategories = [
+    Color(0xFF5BB4E5),
+    Color(0xFF1B7CA8),
+    Color(0xFF7C6CF0),
+    Color(0xFF2A9D8F),
+    Color(0xFFF4A261),
+    Color(0xFFE76F51),
+    Color(0xFFE9C46A),
+    Color(0xFF9B5DE5),
+  ];
+
   static const Color proBannerBackground = Color(0xFF6B21C8);
   static const Color proBannerButton = Color(0xFF9B5DE5);
 

@@ -34,12 +34,20 @@ import '../../features/auth/domain/usecases/register_usecase.dart' as _i941;
 import '../../features/auth/domain/usecases/watch_auth_status_usecase.dart'
     as _i281;
 import '../../features/auth/presentation/bloc/auth_bloc.dart' as _i797;
+import '../../features/expenses/data/datasources/exchange_rate_remote_datasource.dart'
+    as _i1051;
 import '../../features/expenses/data/datasources/expense_remote_datasource.dart'
     as _i848;
+import '../../features/expenses/data/repositories/exchange_rate_repository_impl.dart'
+    as _i243;
 import '../../features/expenses/data/repositories/expense_repository_impl.dart'
     as _i786;
+import '../../features/expenses/domain/repositories/exchange_rate_repository.dart'
+    as _i470;
 import '../../features/expenses/domain/repositories/expense_repository.dart'
     as _i939;
+import '../../features/expenses/domain/usecases/convert_expenses_to_currency.dart'
+    as _i863;
 import '../../features/friends/data/datasources/friends_remote_datasource.dart'
     as _i252;
 import '../../features/friends/data/datasources/friends_remote_datasource_impl.dart'
@@ -98,6 +106,8 @@ extension GetItInjectableX on _i174.GetIt {
       environmentFilter,
     );
     gh.singleton<_i1019.AppLogger>(() => _i1019.AppLogger());
+    gh.lazySingleton<_i1051.ExchangeRateRemoteDataSource>(
+        () => _i1051.ExchangeRateRemoteDataSourceImpl());
     gh.singleton<_i650.PermissionHelper>(
         () => _i650.PermissionHelper(gh<_i1019.AppLogger>()));
     gh.singleton<_i222.AnalyticsService>(
@@ -142,6 +152,9 @@ extension GetItInjectableX on _i174.GetIt {
               gh<_i52.FirestoreService>(),
               gh<_i252.FriendsRemoteDataSource>(),
             ));
+    gh.lazySingleton<_i470.ExchangeRateRepository>(() =>
+        _i243.ExchangeRateRepositoryImpl(
+            gh<_i1051.ExchangeRateRemoteDataSource>()));
     gh.lazySingleton<_i278.HomeRemoteDataSource>(
         () => _i278.HomeRemoteDataSourceImpl(gh<_i52.FirestoreService>()));
     gh.lazySingleton<_i600.BiometricLockService>(
@@ -198,6 +211,12 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i281.WatchAuthStatusUseCase(gh<_i787.AuthRepository>()));
     gh.lazySingleton<_i939.ExpenseRepository>(
         () => _i786.ExpenseRepositoryImpl(gh<_i848.ExpenseRemoteDataSource>()));
+    gh.lazySingleton<_i863.ConvertExpensesToCurrency>(
+        () => _i863.ConvertExpensesToCurrency(
+              gh<_i470.ExchangeRateRepository>(),
+              gh<_i939.ExpenseRepository>(),
+              gh<_i52.FirestoreService>(),
+            ));
     gh.factory<_i797.AuthBloc>(() => _i797.AuthBloc(
           gh<_i188.LoginUseCase>(),
           gh<_i941.RegisterUseCase>(),

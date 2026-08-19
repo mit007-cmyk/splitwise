@@ -7,7 +7,6 @@ import '../../../../core/widgets/avatar_widget.dart';
 import '../../../activity/presentation/bloc/activity_bloc.dart';
 import '../../../activity/presentation/bloc/activity_event.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
-import '../../../auth/presentation/bloc/auth_event.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../friends/presentation/bloc/friends_list_cubit.dart';
 import '../../../home/presentation/bloc/home_bloc.dart';
@@ -42,8 +41,6 @@ class MainNavigationPage extends StatelessWidget {
         }
       case activityTabIndex:
         context.read<ActivityBloc>().add(const RefreshActivity());
-      case accountTabIndex:
-        context.read<AuthBloc>().add(const CheckAuthStatus());
     }
   }
 

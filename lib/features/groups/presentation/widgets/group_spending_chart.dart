@@ -2,10 +2,13 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:intl/intl.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../expenses/presentation/widgets/category_picker_sheet.dart';
+import '../../domain/services/group_spending_calculator.dart';
 
 /// All-time spending ring: the full circle is what the group spent, the darker
 /// arc is the slice of it that is yours.
@@ -278,48 +281,124 @@ class GroupSpendingBars extends StatelessWidget {
     final fraction = maxTotal <= 0
         ? 0.0
         : (bar.totalSpent / maxTotal).clamp(0.0, 1.0).toDouble();
-    // Months with nothing spent still get a stub so the axis reads as a
-    // timeline rather than a gap.
-    final height = math.max(3.h, maxHeight * fraction);
-    final shareHeight = bar.totalSpent <= 0
-        ? 0.0
-        : height * (bar.yourShare / bar.totalSpent).clamp(0.0, 1.0).toDouble();
-    final width = 26.w;
-    final radius = BorderRadius.circular(width / 2);
+    final hasSpending = bar.totalSpent > 0;
+    // Empty months sit on the axis as a squat pill, not a hairline.
+    final height = math.max(8.h, maxHeight * fraction);
+    final shareFraction = hasSpending
+        ? (bar.yourShare / bar.totalSpent).clamp(0.0, 1.0).toDouble()
+        : 0.0;
+    final width = 28.w;
 
     return Align(
       alignment: Alignment.bottomCenter,
       child: SizedBox(
         width: width,
         height: height,
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: bar.totalSpent > 0
-                      ? AppColors.chartTotalSpent
-                      : scheme.outlineVariant,
-                  borderRadius: radius,
-                ),
-              ),
-            ),
-            if (shareHeight > 0)
-              Align(
-                alignment: Alignment.bottomCenter,
-                child: Container(
-                  width: width,
-                  height: shareHeight,
-                  decoration: BoxDecoration(
-                    color: AppColors.chartYourShare,
-                    borderRadius: radius,
-                  ),
-                ),
-              ),
-          ],
+        child: CustomPaint(
+          painter: _StackedCapsulePainter(
+            shareFraction: shareFraction,
+            hasSpending: hasSpending,
+            gap: 5,
+            totalColor: AppColors.chartTotalSpent,
+            shareColor: AppColors.chartYourShare,
+            emptyColor: scheme.outlineVariant,
+          ),
         ),
       ),
     );
+  }
+}
+
+/// Lighter remainder of the group total sits on top with a round peak; its
+/// base is cut in a frown that follows the darker share pill, leaving a curved
+/// gap of chart background — Splitwise Totals, not two facing capsules.
+class _StackedCapsulePainter extends CustomPainter {
+  final double shareFraction;
+  final bool hasSpending;
+  final double gap;
+  final Color totalColor;
+  final Color shareColor;
+  final Color emptyColor;
+
+  _StackedCapsulePainter({
+    required this.shareFraction,
+    required this.hasSpending,
+    required this.gap,
+    required this.totalColor,
+    required this.shareColor,
+    required this.emptyColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final corner = math.min(8.0, w / 2);
+    final cap = Radius.circular(corner);
+    final totalPaint = Paint()
+      ..isAntiAlias = true
+      ..color = totalColor;
+    final sharePaint = Paint()
+      ..isAntiAlias = true
+      ..color = shareColor;
+    final emptyPaint = Paint()
+      ..isAntiAlias = true
+      ..color = emptyColor;
+
+    if (!hasSpending) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(Offset.zero & size, cap),
+        emptyPaint,
+      );
+      return;
+    }
+
+    final shareHeight = size.height * shareFraction;
+    final remainderHeight = size.height - shareHeight;
+    final split = shareHeight > 0.5 && remainderHeight > 0.5 && shareFraction < 1;
+
+    if (!split) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(Offset.zero & size, cap),
+        shareHeight > remainderHeight ? sharePaint : totalPaint,
+      );
+      return;
+    }
+
+    final shareTop = size.height - shareHeight;
+    final shareRect = Rect.fromLTWH(0, shareTop, w, shareHeight);
+
+    var remainder = Path()
+      ..addRRect(
+        RRect.fromRectAndCorners(
+          Rect.fromLTWH(0, 0, w, shareTop),
+          topLeft: cap,
+          topRight: cap,
+        ),
+      );
+    final cut = Path()
+      ..addRRect(
+        RRect.fromRectAndRadius(
+          shareRect.inflate(gap),
+          Radius.circular(corner + gap),
+        ),
+      );
+    remainder = Path.combine(PathOperation.difference, remainder, cut);
+    canvas.drawPath(remainder, totalPaint);
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(shareRect, cap),
+      sharePaint,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _StackedCapsulePainter oldDelegate) {
+    return oldDelegate.shareFraction != shareFraction ||
+        oldDelegate.hasSpending != hasSpending ||
+        oldDelegate.gap != gap ||
+        oldDelegate.totalColor != totalColor ||
+        oldDelegate.shareColor != shareColor ||
+        oldDelegate.emptyColor != emptyColor;
   }
 }
 
@@ -355,4 +434,362 @@ class _DashedGridPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DashedGridPainter oldDelegate) =>
       oldDelegate.color != color;
+}
+
+/// Line chart of group spending: months for all time, days when a month is
+/// selected.
+class GroupSpendingTrendChart extends StatelessWidget {
+  final List<SpendPoint> points;
+  final String currencySymbol;
+  final bool daily;
+
+  const GroupSpendingTrendChart({
+    super.key,
+    required this.points,
+    required this.currencySymbol,
+    this.daily = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (points.isEmpty) return const SizedBox.shrink();
+
+    final scheme = context.colorScheme;
+    final maxAmount = points.fold<double>(
+      0,
+      (highest, point) => math.max(highest, point.amount),
+    );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Spending over time',
+          style: context.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        SizedBox(height: AppDimensions.lg.h),
+        SizedBox(
+          height: 180.h,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Align(
+                alignment: Alignment.topCenter,
+                child: Text(
+                  currencySymbol,
+                  style: context.textTheme.labelMedium?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              SizedBox(width: AppDimensions.sm.w),
+              Expanded(
+                child: Column(
+                  children: [
+                    Expanded(
+                      child: CustomPaint(
+                        painter: _TrendLinePainter(
+                          amounts: [for (final point in points) point.amount],
+                          maxAmount: maxAmount,
+                          lineColor: AppColors.chartTotalSpent,
+                          axisColor: scheme.outlineVariant,
+                        ),
+                        child: const SizedBox.expand(),
+                      ),
+                    ),
+                    Container(height: 1, color: scheme.outlineVariant),
+                    SizedBox(height: AppDimensions.sm.h),
+                    daily
+                        ? _buildDailyLabels(context)
+                        : _buildMonthLabels(context),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMonthLabels(BuildContext context) {
+    return Row(
+      children: [
+        for (final point in points)
+          Expanded(
+            child: Text(
+              DateFormat('MMM').format(point.date),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: context.textTheme.labelSmall?.copyWith(
+                color: context.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildDailyLabels(BuildContext context) {
+    final lastDay = points.last.date.day;
+    final ticks = GroupSpendingCalculator.monthAxisDays(lastDay).toSet();
+    final style = context.textTheme.labelSmall?.copyWith(
+      color: context.colorScheme.onSurfaceVariant,
+      fontWeight: FontWeight.w500,
+    );
+
+    return SizedBox(
+      height: 16.h,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final width = constraints.maxWidth;
+          final n = points.length;
+          const labelWidth = 48.0;
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              for (var i = 0; i < n; i++)
+                if (ticks.contains(points[i].date.day))
+                  Positioned(
+                    left: _labelLeft(i, n, width, labelWidth),
+                    width: labelWidth,
+                    child: Text(
+                      DateFormat('MMM d').format(points[i].date),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      style: style,
+                    ),
+                  ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  static double _labelLeft(int index, int count, double width, double labelWidth) {
+    final x = count == 1 ? width / 2 : width * (index / (count - 1));
+    return (x - labelWidth / 2).clamp(0.0, width - labelWidth);
+  }
+}
+
+class _TrendLinePainter extends CustomPainter {
+  final List<double> amounts;
+  final double maxAmount;
+  final Color lineColor;
+  final Color axisColor;
+
+  _TrendLinePainter({
+    required this.amounts,
+    required this.maxAmount,
+    required this.lineColor,
+    required this.axisColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (amounts.isEmpty) return;
+
+    final axis = Paint()
+      ..color = axisColor
+      ..strokeWidth = 1;
+    canvas.drawLine(Offset.zero, Offset(0, size.height), axis);
+
+    final n = amounts.length;
+    final maxY = maxAmount <= 0 ? 1.0 : maxAmount;
+    Offset pointAt(int index) {
+      final x = n == 1 ? size.width / 2 : size.width * (index / (n - 1));
+      final y = size.height - (amounts[index] / maxY) * size.height * 0.92;
+      return Offset(x, y);
+    }
+
+    final line = Paint()
+      ..isAntiAlias = true
+      ..color = lineColor
+      ..strokeWidth = 2.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    if (n > 1) {
+      final path = Path()..moveTo(pointAt(0).dx, pointAt(0).dy);
+      for (var i = 1; i < n; i++) {
+        path.lineTo(pointAt(i).dx, pointAt(i).dy);
+      }
+      canvas.drawPath(path, line);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _TrendLinePainter oldDelegate) {
+    return oldDelegate.amounts != amounts ||
+        oldDelegate.maxAmount != maxAmount ||
+        oldDelegate.lineColor != lineColor ||
+        oldDelegate.axisColor != axisColor;
+  }
+}
+
+/// Category pie plus a named list of amounts.
+class GroupCategoryBreakdown extends StatelessWidget {
+  final List<CategorySpend> categories;
+  final String currencySymbol;
+
+  const GroupCategoryBreakdown({
+    super.key,
+    required this.categories,
+    required this.currencySymbol,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (categories.isEmpty) return const SizedBox.shrink();
+
+    final scheme = context.colorScheme;
+    final total = categories.fold<double>(0, (sum, row) => sum + row.amount);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Spending by category',
+          style: context.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        SizedBox(height: AppDimensions.lg.h),
+        Center(
+          child: SizedBox(
+            width: 180.w,
+            height: 180.w,
+            child: CustomPaint(
+              painter: _CategoryPiePainter(
+                fractions: [
+                  for (final row in categories)
+                    total <= 0 ? 0.0 : row.amount / total,
+                ],
+                colors: [
+                  for (var i = 0; i < categories.length; i++)
+                    AppColors.chartCategories[i % AppColors.chartCategories.length],
+                ],
+                emptyColor: scheme.outlineVariant,
+              ),
+            ),
+          ),
+        ),
+        SizedBox(height: AppDimensions.xl.h),
+        for (var i = 0; i < categories.length; i++) ...[
+          if (i > 0) SizedBox(height: AppDimensions.md.h),
+          _CategoryRow(
+            category: categories[i].category,
+            amount:
+                '$currencySymbol${categories[i].amount.toStringAsFixed(2)}',
+            color: AppColors.chartCategories[i % AppColors.chartCategories.length],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _CategoryRow extends StatelessWidget {
+  final String category;
+  final String amount;
+  final Color color;
+
+  const _CategoryRow({
+    required this.category,
+    required this.amount,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 10.w,
+          height: 10.w,
+          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+        ),
+        SizedBox(width: AppDimensions.sm.w),
+        Icon(
+          ExpenseCategory.iconFor(category),
+          size: 18.r,
+          color: context.colorScheme.onSurfaceVariant,
+        ),
+        SizedBox(width: AppDimensions.sm.w),
+        Expanded(
+          child: Text(
+            category,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: context.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Text(
+          amount,
+          style: context.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CategoryPiePainter extends CustomPainter {
+  final List<double> fractions;
+  final List<Color> colors;
+  final Color emptyColor;
+
+  _CategoryPiePainter({
+    required this.fractions,
+    required this.colors,
+    required this.emptyColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final radius = math.min(size.width, size.height) / 2;
+    final rect = Rect.fromCircle(
+      center: Offset(size.width / 2, size.height / 2),
+      radius: radius,
+    );
+
+    final total = fractions.fold<double>(0, (sum, value) => sum + value);
+    if (total <= 0) {
+      canvas.drawCircle(rect.center, radius, Paint()..color = emptyColor);
+      return;
+    }
+
+    var start = -math.pi / 2;
+    for (var i = 0; i < fractions.length; i++) {
+      final sweep = fractions[i] * 2 * math.pi;
+      if (sweep <= 0) continue;
+      canvas.drawArc(
+        rect,
+        start,
+        sweep,
+        true,
+        Paint()
+          ..isAntiAlias = true
+          ..style = PaintingStyle.fill
+          ..color = colors[i],
+      );
+      start += sweep;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _CategoryPiePainter oldDelegate) {
+    return oldDelegate.fractions != fractions ||
+        oldDelegate.colors != colors ||
+        oldDelegate.emptyColor != emptyColor;
+  }
 }
