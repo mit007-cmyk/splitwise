@@ -722,7 +722,9 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                             context,
                             'Charts',
                             icon: Icons.bar_chart_rounded,
-                            onTap: () => context.push('/group-detail/${widget.groupId}/charts'),
+                            onTap: () => context.push(
+                              '/group-detail/${widget.groupId}/charts',
+                            ),
                           ),
                           _buildActionPill(
                             context,

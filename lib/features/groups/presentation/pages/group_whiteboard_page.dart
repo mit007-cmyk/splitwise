@@ -184,7 +184,6 @@ class _GroupWhiteboardPageState extends State<GroupWhiteboardPage> {
                                 color: theme.colorScheme.outlineVariant.withOpacity(0.4),
                               ),
                             ),
-                            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
                             child: TextField(
                               controller: _controller,
                               maxLines: null,

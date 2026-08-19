@@ -472,22 +472,40 @@ class GroupSpendingTrendChart extends StatelessWidget {
         SizedBox(height: AppDimensions.lg.h),
         SizedBox(
           height: 180.h,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+          child: Column(
             children: [
-              Align(
-                alignment: Alignment.topCenter,
-                child: Text(
-                  currencySymbol,
-                  style: context.textTheme.labelMedium?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-              SizedBox(width: AppDimensions.sm.w),
               Expanded(
-                child: Column(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    SizedBox(
+                      width: 44.w,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Text(
+                            '$currencySymbol${_axisAmount(maxAmount)}',
+                            style: context.textTheme.labelSmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                          Text(
+                            '$currencySymbol${_axisAmount(maxAmount / 2)}',
+                            style: context.textTheme.labelSmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                          Text(
+                            '${currencySymbol}0',
+                            style: context.textTheme.labelSmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(width: AppDimensions.sm.w),
                     Expanded(
                       child: CustomPaint(
                         painter: _TrendLinePainter(
@@ -499,19 +517,36 @@ class GroupSpendingTrendChart extends StatelessWidget {
                         child: const SizedBox.expand(),
                       ),
                     ),
-                    Container(height: 1, color: scheme.outlineVariant),
-                    SizedBox(height: AppDimensions.sm.h),
-                    daily
-                        ? _buildDailyLabels(context)
-                        : _buildMonthLabels(context),
                   ],
                 ),
+              ),
+              Padding(
+                padding: EdgeInsets.only(left: 44.w + AppDimensions.sm.w),
+                child: Container(height: 1, color: scheme.outlineVariant),
+              ),
+              SizedBox(height: AppDimensions.sm.h),
+              Padding(
+                padding: EdgeInsets.only(left: 44.w + AppDimensions.sm.w),
+                child: daily
+                    ? _buildDailyLabels(context)
+                    : _buildMonthLabels(context),
               ),
             ],
           ),
         ),
       ],
     );
+  }
+
+  static String _axisAmount(double value) {
+    if (value <= 0) return '0';
+    if (value >= 1000) {
+      final thousands = value / 1000;
+      return thousands.truncateToDouble() == thousands
+          ? '${thousands.toStringAsFixed(0)}k'
+          : '${thousands.toStringAsFixed(1)}k';
+    }
+    return value.round().toString();
   }
 
   Widget _buildMonthLabels(BuildContext context) {
@@ -641,11 +676,13 @@ class _TrendLinePainter extends CustomPainter {
 class GroupCategoryBreakdown extends StatelessWidget {
   final List<CategorySpend> categories;
   final String currencySymbol;
+  final ValueChanged<String>? onCategoryTap;
 
   const GroupCategoryBreakdown({
     super.key,
     required this.categories,
     required this.currencySymbol,
+    this.onCategoryTap,
   });
 
   @override
@@ -693,6 +730,9 @@ class GroupCategoryBreakdown extends StatelessWidget {
             amount:
                 '$currencySymbol${categories[i].amount.toStringAsFixed(2)}',
             color: AppColors.chartCategories[i % AppColors.chartCategories.length],
+            onTap: onCategoryTap == null
+                ? null
+                : () => onCategoryTap!(categories[i].category),
           ),
         ],
       ],
@@ -704,16 +744,18 @@ class _CategoryRow extends StatelessWidget {
   final String category;
   final String amount;
   final Color color;
+  final VoidCallback? onTap;
 
   const _CategoryRow({
     required this.category,
     required this.amount,
     required this.color,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
+    final row = Row(
       children: [
         Container(
           width: 10.w,
@@ -744,6 +786,16 @@ class _CategoryRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+
+    if (onTap == null) return row;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(AppDimensions.radiusSm.r),
+      child: Padding(
+        padding: EdgeInsets.symmetric(vertical: AppDimensions.xs.h),
+        child: row,
+      ),
     );
   }
 }

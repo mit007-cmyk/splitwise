@@ -3,10 +3,12 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/di.dart';
+import '../../../../core/routing/route_constants.dart';
 import '../../../../core/errors/result.dart';
 import '../../../../core/services/firestore_service.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -707,10 +709,19 @@ class _SpendingTrendSectionState extends State<_SpendingTrendSection> {
                 ),
               ),
               onPressed: () {
-                AppToast.show(
-                  context,
-                  'Charts coming soon',
-                  type: ToastType.info,
+                final groupId = widget.expense.groupId.trim();
+                if (groupId.isEmpty) {
+                  AppToast.show(
+                    context,
+                    'Charts are available for group expenses.',
+                    type: ToastType.info,
+                  );
+                  return;
+                }
+                context.pushNamed(
+                  RouteConstants.groupSpendingReportsName,
+                  pathParameters: {'groupId': groupId},
+                  extra: widget.expense.currencyCode,
                 );
               },
             ),

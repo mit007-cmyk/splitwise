@@ -16,6 +16,7 @@ import 'package:splitwise/features/groups/presentation/pages/group_whiteboard_pa
 import 'package:splitwise/features/groups/presentation/pages/group_invite_link_page.dart';
 import 'package:splitwise/features/groups/presentation/pages/group_balances_page.dart';
 import 'package:splitwise/features/groups/presentation/pages/group_totals_page.dart';
+import 'package:splitwise/features/groups/presentation/pages/group_spending_reports_page.dart';
 import 'package:splitwise/features/friends/presentation/pages/add_friend_page.dart';
 import 'package:splitwise/features/friends/presentation/pages/add_friend_search_page.dart';
 import 'package:splitwise/features/groups/presentation/pages/group_settings_page.dart';
@@ -237,6 +238,18 @@ class AppRouter {
         builder: (context, state) {
           final groupId = state.pathParameters['groupId'] ?? '';
           return GroupTotalsPage(groupId: groupId);
+        },
+      ),
+      GoRoute(
+        path: RouteConstants.groupSpendingReportsPath,
+        name: RouteConstants.groupSpendingReportsName,
+        builder: (context, state) {
+          final groupId = state.pathParameters['groupId'] ?? '';
+          final extra = state.extra;
+          return GroupSpendingReportsPage(
+            groupId: groupId,
+            initialCurrencyCode: extra is String ? extra : null,
+          );
         },
       ),
       GoRoute(
