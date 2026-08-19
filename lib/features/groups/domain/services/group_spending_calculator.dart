@@ -140,8 +140,12 @@ class GroupSpendingCalculator {
     final months = totals.keys.toList()..sort();
     final last = months.last;
     final first = months.first;
-    final windowStart = DateTime(last.year, last.month - 11);
-    var cursor = first.isAfter(windowStart) ? first : windowStart;
+    // A single month of data would otherwise be one point and no line. Always
+    // show at least four months so All time still reads as a trend.
+    final paddedStart = DateTime(last.year, last.month - 3);
+    final capStart = DateTime(last.year, last.month - 11);
+    var cursor = first.isAfter(paddedStart) ? paddedStart : first;
+    if (cursor.isBefore(capStart)) cursor = capStart;
 
     final result = <SpendPoint>[];
     while (!cursor.isAfter(last)) {

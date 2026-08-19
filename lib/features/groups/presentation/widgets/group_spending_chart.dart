@@ -615,13 +615,17 @@ class _TrendLinePainter extends CustomPainter {
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
-    if (n > 1) {
-      final path = Path()..moveTo(pointAt(0).dx, pointAt(0).dy);
-      for (var i = 1; i < n; i++) {
-        path.lineTo(pointAt(i).dx, pointAt(i).dy);
-      }
-      canvas.drawPath(path, line);
+    if (n == 1) {
+      final y = pointAt(0).dy;
+      canvas.drawLine(Offset(0, y), Offset(size.width, y), line);
+      return;
     }
+
+    final path = Path()..moveTo(pointAt(0).dx, pointAt(0).dy);
+    for (var i = 1; i < n; i++) {
+      path.lineTo(pointAt(i).dx, pointAt(i).dy);
+    }
+    canvas.drawPath(path, line);
   }
 
   @override
@@ -677,6 +681,7 @@ class GroupCategoryBreakdown extends StatelessWidget {
                 ],
                 emptyColor: scheme.outlineVariant,
               ),
+              child: const SizedBox.expand(),
             ),
           ),
         ),

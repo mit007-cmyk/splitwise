@@ -140,7 +140,7 @@ class _GroupTotalsPageState extends State<GroupTotalsPage> {
               AppDimensions.xl.w,
               AppDimensions.sm.h,
               AppDimensions.xl.w,
-              AppDimensions.xl.h,
+              AppDimensions.xxl.h,
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
