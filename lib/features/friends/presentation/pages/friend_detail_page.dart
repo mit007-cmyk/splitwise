@@ -363,7 +363,9 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                         owePrefix: 'You owe',
                         settled: 'You are all settled up.',
                       ) +
-                        (amounts.length == 1 ? ' overall' : ''),
+                        (MultiCurrency.netByCurrency(amounts).length == 1
+                            ? ' overall'
+                            : ''),
                 style: context.textTheme.bodyMedium?.copyWith(
                   fontWeight: FontWeight.w600,
                   color: balanceColor,

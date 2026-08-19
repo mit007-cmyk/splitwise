@@ -15,7 +15,7 @@ class BalanceSummary extends Equatable {
   });
 
   factory BalanceSummary.fromAmounts(List<CurrencyAmount> amounts) {
-    final sorted = MultiCurrency.sort(amounts);
+    final sorted = MultiCurrency.netByCurrency(amounts);
     if (sorted.isEmpty) {
       return const BalanceSummary(
         amount: 0,
@@ -41,7 +41,7 @@ class BalanceSummary extends Equatable {
   }
 
   List<CurrencyAmount> get displayAmounts {
-    if (amounts.isNotEmpty) return MultiCurrency.sort(amounts);
+    if (amounts.isNotEmpty) return MultiCurrency.netByCurrency(amounts);
     if (amount.abs() <= 0.01 || type == BalanceType.settled) return const [];
     return [
       CurrencyAmount(

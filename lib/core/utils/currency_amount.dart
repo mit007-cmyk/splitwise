@@ -90,14 +90,14 @@ class MultiCurrency {
   }
 
   static String join(Iterable<CurrencyAmount> amounts) {
-    return sort(amounts).map((item) => item.formatted).join(' + ');
+    return netByCurrency(amounts).map((item) => item.formatted).join(' + ');
   }
 
   /// Primary line for friend rows: home currency when present, else first, with `*` if more exist.
   static ({String text, bool mixedDirections, bool hasMore}) friendSummary(
     Iterable<CurrencyAmount> amounts,
   ) {
-    final list = sort(amounts);
+    final list = netByCurrency(amounts);
     if (list.isEmpty) {
       return (text: '', mixedDirections: false, hasMore: false);
     }
@@ -121,7 +121,7 @@ class MultiCurrency {
     String settled = 'settled up',
     bool overall = false,
   }) {
-    final list = sort(amounts);
+    final list = netByCurrency(amounts);
     if (list.isEmpty) return settled;
 
     final owed = list.where((item) => item.isOwed).toList();
