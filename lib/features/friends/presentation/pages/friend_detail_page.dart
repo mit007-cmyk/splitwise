@@ -13,7 +13,10 @@ import '../../../../core/widgets/avatar_widget.dart';
 import '../../../../core/widgets/geometric_identicon.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../../expenses/domain/entities/expense.dart';
+import '../../../expenses/domain/services/direct_group.dart';
 import '../../../expenses/domain/services/friend_ledger.dart';
+import '../../../expenses/presentation/pages/expense_detail_page.dart';
 import '../../domain/entities/user_preview.dart';
 import '../bloc/friend_detail_cubit.dart';
 import '../../../../core/widgets/app_toast.dart';
@@ -279,7 +282,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                     ],
                   ),
                 ),
-                if (state.entries.isEmpty)
+                if (_visibleEntries(state).isEmpty)
                   const Padding(
                     padding: EdgeInsets.only(top: 32),
                     child: FriendExpensesEmptyState(),
@@ -418,25 +421,75 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
     );
   }
 
-  /// One row per shared group, most recent activity first, with a month
-  /// divider inserted whenever the activity crosses into an earlier month —
-  /// mirrors Splitwise's friend activity feed.
+  List<FriendExpenseEntry> _visibleEntries(FriendDetailState state) {
+    return state.entries
+        .where((entry) => !entry.expense.isDeleted)
+        .toList();
+  }
+
+  /// Direct expenses are one row each. Group expenses collapse to a single
+  /// row per group, sorted by that group's most recent expense so a new
+  /// group spend jumps to the top of the feed.
   List<Widget> _buildActivityFeed(
     BuildContext context,
     FriendDetailState state,
   ) {
-    final feed = [...state.groupBalances]
-      ..sort((a, b) => b.lastActivityDate.compareTo(a.lastActivityDate));
+    final authState = context.read<AuthBloc>().state;
+    final currentUserId =
+        authState is Authenticated ? authState.user.id : '';
+    final friendId = state.friend?.id ?? '';
+    final friendName = state.friend?.name ?? '';
+
+    final directs = <FriendExpenseEntry>[];
+    final byGroup = <String, List<FriendExpenseEntry>>{};
+    for (final entry in _visibleEntries(state)) {
+      if (_isDirectExpense(entry.expense, currentUserId, friendId)) {
+        directs.add(entry);
+      } else {
+        byGroup.putIfAbsent(entry.expense.groupId, () => []).add(entry);
+      }
+    }
+
+    final dated = <({DateTime date, FriendExpenseEntry? direct, String? groupId})>[
+      for (final entry in directs)
+        (date: entry.expense.date, direct: entry, groupId: null),
+      for (final group in byGroup.entries)
+        (
+          date: group.value
+              .map((entry) => entry.expense.date)
+              .reduce((a, b) => a.isAfter(b) ? a : b),
+          direct: null,
+          groupId: group.key,
+        ),
+    ]..sort((a, b) => b.date.compareTo(a.date));
 
     final widgets = <Widget>[];
     int? lastMonthKey;
-    for (final group in feed) {
-      final monthKey =
-          group.lastActivityDate.year * 12 + group.lastActivityDate.month;
+    for (final item in dated) {
+      final monthKey = item.date.year * 12 + item.date.month;
       if (lastMonthKey != null && monthKey != lastMonthKey) {
-        widgets.add(_buildMonthHeader(context, group.lastActivityDate));
+        widgets.add(_buildMonthHeader(context, item.date));
       }
-      widgets.add(_buildGroupActivityTile(context, group));
+      if (item.direct != null) {
+        widgets.add(
+          _buildDirectActivityTile(
+            context,
+            state,
+            item.direct!,
+            currentUserId: currentUserId,
+            friendName: friendName,
+          ),
+        );
+      } else {
+        widgets.add(
+          _buildGroupActivityTile(
+            context,
+            state,
+            groupId: item.groupId!,
+            entries: byGroup[item.groupId]!,
+          ),
+        );
+      }
       lastMonthKey = monthKey;
     }
     return widgets;
@@ -461,23 +514,133 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
     );
   }
 
-  Widget _buildGroupActivityTile(
-    BuildContext context,
-    FriendGroupBalance group,
+  bool _isDirectExpense(
+    Expense expense,
+    String currentUserId,
+    String friendId,
   ) {
+    final groupId = expense.groupId.trim();
+    if (groupId.isEmpty || groupId.startsWith('direct_')) return true;
+    if (currentUserId.isEmpty || friendId.isEmpty) return false;
+    return groupId == DirectGroup.idFor(currentUserId, friendId);
+  }
+
+  String _directPaidSubtitle(
+    Expense expense,
+    String currentUserId,
+    String friendName,
+  ) {
+    final paidByMe = expense.paidBy[currentUserId] ?? 0.0;
+    if (paidByMe > 0.01) {
+      return 'You paid ${expense.currencySymbol}${paidByMe.toStringAsFixed(2)}';
+    }
+
+    var topPayerId = '';
+    var topPayerAmount = 0.0;
+    expense.paidBy.forEach((id, amount) {
+      if (amount > topPayerAmount) {
+        topPayerId = id;
+        topPayerAmount = amount;
+      }
+    });
+    final amount =
+        '${expense.currencySymbol}${topPayerAmount.toStringAsFixed(2)}';
+    if (topPayerId == currentUserId) return 'You paid $amount';
+    return '${friendName.isEmpty ? 'Someone' : friendName} paid $amount';
+  }
+
+  IconData _iconForCategory(String category) {
+    switch (category.toLowerCase()) {
+      case 'food':
+      case 'food & dining':
+      case 'restaurant':
+      case 'meal':
+        return Icons.restaurant_rounded;
+      case 'groceries':
+        return Icons.local_grocery_store_rounded;
+      case 'home':
+        return Icons.home_rounded;
+      case 'utilities':
+        return Icons.bolt_rounded;
+      case 'transportation':
+      case 'transport':
+        return Icons.directions_car_filled_rounded;
+      case 'travel':
+      case 'trip':
+        return Icons.flight_rounded;
+      case 'entertainment':
+        return Icons.movie_rounded;
+      case 'health':
+        return Icons.local_hospital_rounded;
+      case 'shopping':
+        return Icons.shopping_bag_rounded;
+      case 'settlement':
+        return Icons.payments_rounded;
+      default:
+        return Icons.receipt_long_rounded;
+    }
+  }
+
+  Widget _activityIcon({
+    required ColorScheme scheme,
+    required bool isDirect,
+    required String groupName,
+    required String category,
+  }) {
+    final size = 40.w;
+    if (isDirect) {
+      return Container(
+        width: size,
+        height: size,
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(8.r),
+        ),
+        child: Icon(
+          _iconForCategory(category),
+          size: 20.r,
+          color: scheme.onSurfaceVariant,
+        ),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8.r),
+      child: SizedBox(
+        width: size,
+        height: size,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            GeometricIdenticon(seed: groupName, clipToCircle: false),
+            Center(
+              child: Icon(
+                _iconForCategory(category),
+                size: 18.r,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDirectActivityTile(
+    BuildContext context,
+    FriendDetailState state,
+    FriendExpenseEntry entry, {
+    required String currentUserId,
+    required String friendName,
+  }) {
     final scheme = context.colorScheme;
     final appColors = context.appColors;
-    final isOwed = group.amount > 0;
-    final isSettled = group.amount.abs() < 0.01;
+    final expense = entry.expense;
+    final isOwed = entry.amount > 0;
+    final isSettled = entry.amount.abs() < 0.01;
 
     return InkWell(
-      onTap: () async {
-        await context.pushNamed(
-          RouteConstants.groupDetailName,
-          pathParameters: {'groupId': group.groupId},
-        );
-        if (mounted) _load();
-      },
+      onTap: () => _openExpense(context, state, entry, currentUserId),
       child: Padding(
         padding: EdgeInsets.symmetric(
           horizontal: AppDimensions.lg.w,
@@ -490,7 +653,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
               SizedBox(
                 width: 32.w,
                 child: Text(
-                  DateFormat('d\nMMM').format(group.lastActivityDate),
+                  DateFormat('d\nMMM').format(expense.date),
                   textAlign: TextAlign.center,
                   style: context.textTheme.labelSmall?.copyWith(
                     fontWeight: FontWeight.bold,
@@ -506,17 +669,11 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                 color: scheme.outlineVariant.withValues(alpha: 0.5),
               ),
               SizedBox(width: AppDimensions.md.w),
-              Container(
-                padding: EdgeInsets.all(6.r),
-                decoration: BoxDecoration(
-                  color: scheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(8.r),
-                ),
-                child: Icon(
-                  Icons.receipt_long,
-                  size: 16.r,
-                  color: scheme.onPrimaryContainer,
-                ),
+              _activityIcon(
+                scheme: scheme,
+                isDirect: true,
+                groupName: expense.title,
+                category: expense.category,
               ),
               SizedBox(width: AppDimensions.sm.w),
               Expanded(
@@ -525,7 +682,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Text(
-                      group.groupName,
+                      expense.title,
                       overflow: TextOverflow.ellipsis,
                       style: context.textTheme.bodyLarge?.copyWith(
                         fontWeight: FontWeight.w500,
@@ -533,9 +690,12 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                     ),
                     SizedBox(height: 2.h),
                     Text(
-                      group.expenseCount > 1
-                          ? 'Shared group'
-                          : 'Shared expense',
+                      _directPaidSubtitle(
+                        expense,
+                        currentUserId,
+                        friendName,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                       style: context.textTheme.bodySmall?.copyWith(
                         color: scheme.onSurfaceVariant,
                       ),
@@ -558,7 +718,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                     ),
                     SizedBox(height: 2.h),
                     Text(
-                      '${group.currencySymbol}${group.amount.abs().toStringAsFixed(2)}',
+                      '${expense.currencySymbol}${entry.amount.abs().toStringAsFixed(2)}',
                       style: context.textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: isOwed
@@ -573,6 +733,165 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
         ),
       ),
     );
+  }
+
+  Widget _buildGroupActivityTile(
+    BuildContext context,
+    FriendDetailState state, {
+    required String groupId,
+    required List<FriendExpenseEntry> entries,
+  }) {
+    final scheme = context.colorScheme;
+    final appColors = context.appColors;
+    final latest = entries.reduce(
+      (a, b) => a.expense.date.isAfter(b.expense.date) ? a : b,
+    );
+    final groupName =
+        state.groupNames[groupId] ?? latest.expense.title;
+    final balances =
+        state.groupBalances.where((row) => row.groupId == groupId).toList();
+
+    late final double amount;
+    late final String currencySymbol;
+    if (balances.length == 1) {
+      amount = balances.first.amount;
+      currencySymbol = balances.first.currencySymbol;
+    } else if (balances.isNotEmpty) {
+      final match = balances.where(
+        (row) => row.currencyCode == latest.expense.currencyCode,
+      );
+      final row = match.isNotEmpty ? match.first : balances.first;
+      amount = row.amount;
+      currencySymbol = row.currencySymbol;
+    } else {
+      amount = entries.fold(0.0, (sum, entry) => sum + entry.amount);
+      currencySymbol = latest.expense.currencySymbol;
+    }
+
+    final isOwed = amount > 0;
+    final isSettled = amount.abs() < 0.01;
+
+    return InkWell(
+      onTap: () async {
+        await context.pushNamed(
+          RouteConstants.groupDetailName,
+          pathParameters: {'groupId': groupId},
+        );
+        if (mounted) _load();
+      },
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: AppDimensions.lg.w,
+          vertical: AppDimensions.sm.h,
+        ),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 32.w,
+                child: Text(
+                  DateFormat('d\nMMM').format(latest.expense.date),
+                  textAlign: TextAlign.center,
+                  style: context.textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    height: 1.2,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              SizedBox(width: AppDimensions.md.w),
+              VerticalDivider(
+                width: 1,
+                thickness: 1,
+                color: scheme.outlineVariant.withValues(alpha: 0.5),
+              ),
+              SizedBox(width: AppDimensions.md.w),
+              _activityIcon(
+                scheme: scheme,
+                isDirect: false,
+                groupName: groupName,
+                category: latest.expense.category,
+              ),
+              SizedBox(width: AppDimensions.sm.w),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      groupName,
+                      overflow: TextOverflow.ellipsis,
+                      style: context.textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    SizedBox(height: 2.h),
+                    Text(
+                      'Shared group',
+                      style: context.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: AppDimensions.sm.w),
+              if (!isSettled)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      isOwed ? 'you lent' : 'you owe',
+                      style: context.textTheme.bodySmall?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    SizedBox(height: 2.h),
+                    Text(
+                      '$currencySymbol${amount.abs().toStringAsFixed(2)}',
+                      style: context.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: isOwed
+                            ? appColors.positiveBalanceColor
+                            : appColors.negativeBalanceColor,
+                      ),
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _openExpense(
+    BuildContext context,
+    FriendDetailState state,
+    FriendExpenseEntry entry,
+    String currentUserId,
+  ) async {
+    if (currentUserId.isEmpty) return;
+    final friend = state.friend;
+    final deleted = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => ExpenseDetailPage(
+          expense: entry.expense,
+          memberNames: {
+            currentUserId: 'You',
+            if (friend != null) friend.id: friend.name,
+          },
+          currentUserId: currentUserId,
+          groupName: state.groupNames[entry.expense.groupId],
+        ),
+      ),
+    );
+    if (deleted == true && mounted) {
+      _load();
+    }
   }
 
   void _showComingSoon(BuildContext context) {
