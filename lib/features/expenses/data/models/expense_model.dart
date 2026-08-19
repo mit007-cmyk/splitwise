@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../domain/entities/expense.dart';
+import '../../domain/entities/expense_comment.dart';
 import '../../domain/entities/split_type.dart';
 
 class ExpenseModel extends Expense {
@@ -23,6 +24,7 @@ class ExpenseModel extends Expense {
     super.deletedBy,
     super.isDeleted,
     super.receiptUrl,
+    super.comments,
   });
 
   factory ExpenseModel.fromEntity(Expense expense) {
@@ -46,6 +48,7 @@ class ExpenseModel extends Expense {
       deletedBy: expense.deletedBy,
       isDeleted: expense.isDeleted,
       receiptUrl: expense.receiptUrl,
+      comments: expense.comments,
     );
   }
 
@@ -114,7 +117,38 @@ class ExpenseModel extends Expense {
       deletedBy: map['deletedBy'] as String?,
       isDeleted: (map['isDeleted'] as bool?) ?? (deletedAt != null),
       receiptUrl: map['receiptUrl'] as String?,
+      comments: _commentsFromMap(map['comments']),
     );
+  }
+
+  static List<ExpenseComment> _commentsFromMap(Object? raw) {
+    if (raw is! Map) return const [];
+    final comments = <ExpenseComment>[];
+    for (final entry in raw.entries) {
+      final value = entry.value;
+      if (value is! Map) continue;
+      final nested = Map<String, dynamic>.from(value);
+      comments.add(
+        ExpenseComment(
+          id: entry.key.toString(),
+          createdBy:
+              (nested['createdBy'] as String?) ??
+              (nested['created_by'] as String?) ??
+              '',
+          text: nested['text'] as String? ?? '',
+          createdAt: _dateFrom(nested['createdAt'] ?? nested['created_at']) ??
+              DateTime.now(),
+        ),
+      );
+    }
+    comments.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return comments;
+  }
+
+  static DateTime? _dateFrom(Object? raw) {
+    if (raw is Timestamp) return raw.toDate();
+    if (raw is DateTime) return raw;
+    return null;
   }
 
   /// Firestore payload for `Splitwise/expenses.{id}` map entries.
@@ -162,6 +196,7 @@ class ExpenseModel extends Expense {
       'updatedAt': FieldValue.serverTimestamp(),
       'updatedBy': updatedBy,
       'isDeleted': false,
+      // comments are written only via addComment so a merge update does not wipe them
     };
   }
 }

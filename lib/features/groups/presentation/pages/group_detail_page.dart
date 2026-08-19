@@ -16,6 +16,7 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../expenses/domain/entities/expense.dart';
 import '../../../expenses/presentation/pages/expense_detail_page.dart';
+import '../../../expenses/presentation/widgets/category_picker_sheet.dart';
 import '../../../expenses/presentation/utils/currency_conversion_action.dart';
 import '../../../home/domain/entities/balance_summary.dart';
 import '../../../home/domain/entities/group_summary.dart';
@@ -440,18 +441,9 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                 ),
               ),
               SizedBox(width: 8.w),
-              Container(
-                width: 34.w,
-                height: 34.w,
-                decoration: BoxDecoration(
-                  color: isSettlement ? appColors.positiveBalanceColor : _iconBackgroundForCategory(expense.category, scheme),
-                  borderRadius: BorderRadius.circular(8.r),
-                ),
-                child: Icon(
-                  isSettlement ? Icons.payments_rounded : _iconForCategory(expense.category),
-                  size: 18.r,
-                  color: isSettlement ? scheme.onPrimary : scheme.onPrimaryContainer,
-                ),
+              ExpenseCategoryGlyph(
+                category: expense.category,
+                size: 34.w,
               ),
             ],
           ),
@@ -487,46 +479,6 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
               ),
       ),
     );
-  }
-
-  IconData _iconForCategory(String category) {
-    switch (category.toLowerCase()) {
-      case 'food':
-      case 'restaurant':
-      case 'meal':
-        return Icons.restaurant_rounded;
-      case 'travel':
-      case 'trip':
-      case 'transport':
-        return Icons.directions_car_filled_rounded;
-      case 'shopping':
-      case 'groceries':
-        return Icons.shopping_bag_rounded;
-      case 'entertainment':
-        return Icons.movie_rounded;
-      default:
-        return Icons.receipt_long_rounded;
-    }
-  }
-
-  Color _iconBackgroundForCategory(String category, ColorScheme scheme) {
-    switch (category.toLowerCase()) {
-      case 'food':
-      case 'restaurant':
-      case 'meal':
-        return scheme.primaryContainer;
-      case 'travel':
-      case 'trip':
-      case 'transport':
-        return scheme.tertiaryContainer;
-      case 'shopping':
-      case 'groceries':
-        return scheme.secondaryContainer;
-      case 'entertainment':
-        return scheme.errorContainer;
-      default:
-        return scheme.surfaceContainerHighest;
-    }
   }
 
   List<Widget> _buildExpenseFeed(

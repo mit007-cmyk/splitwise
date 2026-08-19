@@ -189,6 +189,19 @@ class AppColors {
   static const Color proBannerBackground = Color(0xFF6B21C8);
   static const Color proBannerButton = Color(0xFF9B5DE5);
 
+  /// Saturated tiles for expense-category glyphs (theme-independent).
+  static const Color categoryGeneral = Color(0xFF64748B);
+  static const Color categoryFood = Color(0xFF0F9F6E);
+  static const Color categoryGroceries = Color(0xFF16A34A);
+  static const Color categoryHome = Color(0xFFB45309);
+  static const Color categoryUtilities = Color(0xFFD97706);
+  static const Color categoryTransportation = Color(0xFF2563EB);
+  static const Color categoryEntertainment = Color(0xFF7C3AED);
+  static const Color categoryHealth = Color(0xFFDC2626);
+  static const Color categoryShopping = Color(0xFFDB2777);
+  static const Color categoryTravel = Color(0xFF0891B2);
+  static const Color categorySettlement = Color(0xFF15B77E);
+
   // ---------------------------------------------------------------------
   // Avatar / group placeholder backgrounds (theme-independent accents)
   // ---------------------------------------------------------------------

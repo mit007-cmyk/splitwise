@@ -17,6 +17,7 @@ import '../../../expenses/domain/entities/expense.dart';
 import '../../../expenses/domain/services/direct_group.dart';
 import '../../../expenses/domain/services/friend_ledger.dart';
 import '../../../expenses/presentation/pages/expense_detail_page.dart';
+import '../../../expenses/presentation/widgets/category_picker_sheet.dart';
 import '../../../expenses/presentation/utils/currency_conversion_action.dart';
 import '../../domain/entities/user_preview.dart';
 import '../bloc/friend_detail_cubit.dart';
@@ -572,59 +573,14 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
     return '${friendName.isEmpty ? 'Someone' : friendName} paid $amount';
   }
 
-  IconData _iconForCategory(String category) {
-    switch (category.toLowerCase()) {
-      case 'food':
-      case 'food & dining':
-      case 'restaurant':
-      case 'meal':
-        return Icons.restaurant_rounded;
-      case 'groceries':
-        return Icons.local_grocery_store_rounded;
-      case 'home':
-        return Icons.home_rounded;
-      case 'utilities':
-        return Icons.bolt_rounded;
-      case 'transportation':
-      case 'transport':
-        return Icons.directions_car_filled_rounded;
-      case 'travel':
-      case 'trip':
-        return Icons.flight_rounded;
-      case 'entertainment':
-        return Icons.movie_rounded;
-      case 'health':
-        return Icons.local_hospital_rounded;
-      case 'shopping':
-        return Icons.shopping_bag_rounded;
-      case 'settlement':
-        return Icons.payments_rounded;
-      default:
-        return Icons.receipt_long_rounded;
-    }
-  }
-
   Widget _activityIcon({
-    required ColorScheme scheme,
     required bool isDirect,
     required String groupName,
     required String category,
   }) {
     final size = 40.w;
     if (isDirect) {
-      return Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          color: scheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(8.r),
-        ),
-        child: Icon(
-          _iconForCategory(category),
-          size: 20.r,
-          color: scheme.onSurfaceVariant,
-        ),
-      );
+      return ExpenseCategoryGlyph(category: category, size: size);
     }
 
     return ClipRRect(
@@ -638,7 +594,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
             GeometricIdenticon(seed: groupName, clipToCircle: false),
             Center(
               child: Icon(
-                _iconForCategory(category),
+                ExpenseCategory.iconFor(category),
                 size: 18.r,
                 color: Colors.white,
               ),
@@ -693,7 +649,6 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
               ),
               SizedBox(width: AppDimensions.md.w),
               _activityIcon(
-                scheme: scheme,
                 isDirect: true,
                 groupName: expense.title,
                 category: expense.category,
@@ -831,7 +786,6 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
               ),
               SizedBox(width: AppDimensions.md.w),
               _activityIcon(
-                scheme: scheme,
                 isDirect: false,
                 groupName: groupName,
                 category: latest.expense.category,

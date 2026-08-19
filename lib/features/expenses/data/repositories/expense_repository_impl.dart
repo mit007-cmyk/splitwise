@@ -78,4 +78,19 @@ class ExpenseRepositoryImpl extends BaseRepository implements ExpenseRepository 
       ),
     );
   }
+
+  @override
+  Future<Result<void>> addExpenseComment({
+    required String expenseId,
+    required String actorUserId,
+    required String text,
+  }) {
+    return safeCall(
+      () => _remoteDataSource.addComment(
+        expenseId: expenseId,
+        actorUserId: actorUserId,
+        text: text,
+      ),
+    );
+  }
 }

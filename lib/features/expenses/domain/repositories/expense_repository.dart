@@ -24,4 +24,10 @@ abstract class ExpenseRepository {
     required String expenseId,
     required String actorUserId,
   });
+
+  Future<Result<void>> addExpenseComment({
+    required String expenseId,
+    required String actorUserId,
+    required String text,
+  });
 }

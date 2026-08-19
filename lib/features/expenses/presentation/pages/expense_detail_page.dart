@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:intl/intl.dart';
 
@@ -14,8 +15,10 @@ import '../../../../core/utils/user_display_names.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/avatar_widget.dart';
 import '../../../expenses/domain/entities/expense.dart';
+import '../../../expenses/domain/entities/expense_comment.dart';
 import '../../../expenses/domain/repositories/expense_repository.dart';
 import '../../../friends/domain/repositories/friends_repository.dart';
+import '../widgets/category_picker_sheet.dart';
 import 'add_expense_page.dart';
 
 /// Full-screen expense detail page.
@@ -50,19 +53,27 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
   final ExpenseRepository _expenseRepository = getIt<ExpenseRepository>();
   final TextEditingController _commentController = TextEditingController();
   final ValueNotifier<bool> _isDeleting = ValueNotifier(false);
+  final ValueNotifier<bool> _isSendingComment = ValueNotifier(false);
   late Map<String, String> _memberNames;
+  late Expense _expense;
+  bool _isLoadingComments = true;
 
   @override
   void initState() {
     super.initState();
+    _expense = widget.expense;
     _memberNames = Map<String, String>.from(widget.memberNames);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _resolveMissingNames());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _resolveMissingNames();
+      _refetchExpense();
+    });
   }
 
   @override
   void dispose() {
     _commentController.dispose();
     _isDeleting.dispose();
+    _isSendingComment.dispose();
     super.dispose();
   }
 
@@ -73,10 +84,11 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
 
   Future<void> _resolveMissingNames() async {
     final ids = <String>{
-      ...widget.expense.participantIds,
-      ...widget.expense.paidBy.keys,
-      ...widget.expense.splits.keys,
-      widget.expense.createdBy,
+      ..._expense.participantIds,
+      ..._expense.paidBy.keys,
+      ..._expense.splits.keys,
+      _expense.createdBy,
+      ..._expense.comments.map((c) => c.createdBy),
     }..removeWhere((id) => id.trim().isEmpty);
 
     final missing = ids.where((id) {
@@ -143,7 +155,7 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
 
   /// Primary payer name + amount string, e.g. "You paid ₹210.00"
   String get _payerLine {
-    final e = widget.expense;
+    final e = _expense;
     if (e.paidBy.isEmpty) return '';
     final topPayerId =
         e.paidBy.entries.reduce((a, b) => a.value >= b.value ? a : b).key;
@@ -154,7 +166,7 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
 
   /// Per-user share lines, e.g. ["You owe ₹105.00", "Vishal B. owes ₹105.00"]
   List<String> get _splitLines {
-    final e = widget.expense;
+    final e = _expense;
     return e.splits.entries.map((entry) {
       final name = _displayName(entry.key);
       final owes = entry.value;
@@ -163,13 +175,61 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
     }).toList();
   }
 
-  Color _heroColor(String name) => AppColors
-      .avatarPlaceholders[name.length % AppColors.avatarPlaceholders.length];
+  Color get _headerColor {
+    final category = _expense.category.toLowerCase();
+    if (category.contains('travel') || category.contains('transport')) {
+      return AppColors.secondaryContainerLight;
+    }
+    if (category.contains('shop') || category.contains('entertainment')) {
+      return AppColors.errorContainerLight;
+    }
+    return AppColors.primaryContainerLight;
+  }
+
+  Future<void> _refetchExpense({bool showCommentsLoader = false}) async {
+    if (showCommentsLoader && mounted) {
+      setState(() => _isLoadingComments = true);
+    }
+    final result = await _expenseRepository.getExpenseById(_expense.id);
+    if (!mounted) return;
+    if (!result.isSuccess) {
+      setState(() => _isLoadingComments = false);
+      return;
+    }
+    final fetched = result.dataOrThrow;
+    setState(() {
+      _isLoadingComments = false;
+      if (fetched != null) _expense = fetched;
+    });
+    if (fetched != null) await _resolveMissingNames();
+  }
+
+  Future<void> _submitComment() async {
+    final text = _commentController.text.trim();
+    if (text.isEmpty || _isSendingComment.value) return;
+    _isSendingComment.value = true;
+    final result = await _expenseRepository.addExpenseComment(
+      expenseId: _expense.id,
+      actorUserId: widget.currentUserId,
+      text: text,
+    );
+    if (!mounted) return;
+    _isSendingComment.value = false;
+    if (result.isSuccess) {
+      _commentController.clear();
+      await _refetchExpense();
+    } else {
+      final message = result is FailureResult<void>
+          ? result.failure.message
+          : 'Could not save comment. Try again.';
+      AppToast.show(context, message, type: ToastType.error);
+    }
+  }
 
   // ── Delete ─────────────────────────────────────────────────────────────────
 
   Future<void> _confirmDelete() async {
-    if (widget.expense.createdBy != widget.currentUserId) {
+    if (_expense.createdBy != widget.currentUserId) {
       AppToast.show(context, 'Only the creator can delete this expense.', type: ToastType.warning);
       return;
     }
@@ -199,7 +259,7 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
     if (confirmed != true || !mounted) return;
     _isDeleting.value = true;
     final Result<void> result = await _expenseRepository.deleteExpense(
-      expenseId: widget.expense.id,
+      expenseId: _expense.id,
       actorUserId: widget.currentUserId,
     );
     if (!mounted) return;
@@ -217,31 +277,28 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
   @override
   Widget build(BuildContext context) {
     final scheme = context.colorScheme;
-    final e = widget.expense;
-    final heroColor = _heroColor(e.category);
-    final dateStr =
+    final e = _expense;
+    final headerColor = _headerColor;
+    final headerIconColor = AppColors.textPrimaryLight;
+    final addedStr =
         'Added by ${_displayName(e.createdBy)} on ${DateFormat('dd-MMM-yyyy').format(e.date)}';
+    final updatedStr = e.updatedBy == null
+        ? null
+        : 'Updated by ${_displayName(e.updatedBy!)} on ${DateFormat('dd-MMM-yyyy').format(e.date)}';
 
     return Scaffold(
       backgroundColor: scheme.surface,
-      // ── AppBar ──────────────────────────────────────────────────────────
       appBar: AppBar(
-        backgroundColor: scheme.surface,
+        backgroundColor: headerColor,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
+        iconTheme: IconThemeData(color: headerIconColor),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(false),
         ),
         actions: [
-          // Receipt / attachment placeholder
-          // IconButton(
-          //   icon: const Icon(Icons.receipt_outlined),
-          //   tooltip: 'Attach receipt',
-          //   onPressed: () {
-          //     AppToast.show(context, 'Receipt attachment coming soon', type: ToastType.info);
-          //   },
-          // ),
-          // Delete
           ValueListenableBuilder<bool>(
             valueListenable: _isDeleting,
             builder: (context, deleting, child) => IconButton(
@@ -251,29 +308,33 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
                       height: 20.r,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: scheme.error,
+                        color: headerIconColor,
                       ),
                     )
                   : const Icon(Icons.delete_outline),
               tooltip: 'Delete expense',
-              color: scheme.error,
-              onPressed: deleting || widget.expense.createdBy != widget.currentUserId
+              onPressed: deleting ||
+                      _expense.createdBy != widget.currentUserId
                   ? null
                   : _confirmDelete,
             ),
           ),
-          // Edit
           IconButton(
             icon: const Icon(Icons.edit_outlined),
             tooltip: 'Edit expense',
             onPressed: () async {
-              if (widget.expense.createdBy != widget.currentUserId) {
-                AppToast.show(context, 'Only the creator can edit this expense.', type: ToastType.warning);
+              if (_expense.createdBy != widget.currentUserId) {
+                AppToast.show(
+                  context,
+                  'Only the creator can edit this expense.',
+                  type: ToastType.warning,
+                );
                 return;
               }
               final changed = await Navigator.of(context).push<bool>(
                 MaterialPageRoute(
-                  builder: (_) => AddExpensePage(existingExpense: widget.expense),
+                  builder: (_) =>
+                      AddExpensePage(existingExpense: _expense),
                 ),
               );
               if (changed == true && context.mounted) {
@@ -283,27 +344,74 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
           ),
         ],
       ),
-
-      // ── Body ─────────────────────────────────────────────────────────────
       body: Column(
         children: [
           Expanded(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.only(bottom: 24.h),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // ── Hero section ─────────────────────────────────────────
-                  _HeroSection(
-                    expense: e,
-                    heroColor: heroColor,
-                    dateStr: dateStr,
+            child: Column(
+              children: [
+                Container(
+                  height: 36.h,
+                  width: double.infinity,
+                  color: headerColor,
+                ),
+                Expanded(
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      SingleChildScrollView(
+                        padding: EdgeInsets.only(
+                          top: 40.h,
+                          bottom: AppDimensions.xl.h,
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      AppDimensions.xl.w,
+                      0,
+                      AppDimensions.xl.w,
+                      AppDimensions.lg.h,
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          e.title,
+                          style: context.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: AppDimensions.xs.h),
+                        Text(
+                          '${e.currencySymbol}${e.amount.toStringAsFixed(2)}',
+                          style: context.textTheme.headlineSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: AppDimensions.sm.h),
+                        Text(
+                          addedStr,
+                          style: context.textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                        if (updatedStr != null) ...[
+                          SizedBox(height: 2.h),
+                          Text(
+                            updatedStr,
+                            style: context.textTheme.bodySmall?.copyWith(
+                              color: scheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
-
-                  SizedBox(height: AppDimensions.lg.h),
-
-                  // ── Payer / split breakdown ──────────────────────────────
-                  _SectionCard(
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppDimensions.xl.w,
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -313,7 +421,8 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
                           payerId: e.paidBy.isNotEmpty
                               ? e.paidBy.entries
                                   .reduce(
-                                      (a, b) => a.value >= b.value ? a : b)
+                                    (a, b) => a.value >= b.value ? a : b,
+                                  )
                                   .key
                               : '',
                           currentUserId: widget.currentUserId,
@@ -332,17 +441,21 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
                                   painter: TreeLinePainter(
                                     isPayer: false,
                                     isLast: isLast,
-                                    color: scheme.outlineVariant.withValues(alpha: 0.5),
+                                    color: scheme.outlineVariant
+                                        .withValues(alpha: 0.5),
                                   ),
                                 ),
                                 SizedBox(width: AppDimensions.sm.w),
                                 Expanded(
                                   child: Container(
-                                    padding: EdgeInsets.symmetric(vertical: 6.h),
+                                    padding: EdgeInsets.symmetric(
+                                      vertical: 6.h,
+                                    ),
                                     alignment: Alignment.centerLeft,
                                     child: Text(
                                       line,
-                                      style: context.textTheme.bodyMedium?.copyWith(
+                                      style: context.textTheme.bodyMedium
+                                          ?.copyWith(
                                         color: scheme.onSurfaceVariant,
                                       ),
                                     ),
@@ -355,23 +468,39 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
                       ],
                     ),
                   ),
-
-                  SizedBox(height: AppDimensions.lg.h),
-
-                  // ── Spending trend ───────────────────────────────────────
+                  SizedBox(height: AppDimensions.xl.h),
                   _SpendingTrendSection(
                     expense: e,
                     expenseRepository: _expenseRepository,
-                    currentUserId: widget.currentUserId,
                     groupName: widget.groupName,
+                    barColor: headerColor,
+                  ),
+                  SizedBox(height: AppDimensions.xl.h),
+                  _CommentsSection(
+                    comments: e.comments,
+                    isLoading: _isLoadingComments,
+                    currentUserId: widget.currentUserId,
+                    displayName: _displayName,
                   ),
                 ],
               ),
             ),
+                      Positioned(
+                        left: AppDimensions.xl.w,
+                        top: -32,
+                        child: _CategoryBadge(category: e.category),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
-
-          // ── Comment bar ─────────────────────────────────────────────────
-          _CommentBar(controller: _commentController),
+          _CommentBar(
+            controller: _commentController,
+            isSubmitting: _isSendingComment,
+            onSubmit: _submitComment,
+          ),
         ],
       ),
     );
@@ -382,109 +511,34 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
 // Sub-widgets
 // ─────────────────────────────────────────────────────────────────────────────
 
-class _HeroSection extends StatelessWidget {
-  final Expense expense;
-  final Color heroColor;
-  final String dateStr;
+class _CategoryBadge extends StatelessWidget {
+  final String category;
 
-  const _HeroSection({
-    required this.expense,
-    required this.heroColor,
-    required this.dateStr,
-  });
+  const _CategoryBadge({required this.category});
 
   @override
   Widget build(BuildContext context) {
-    final scheme = context.colorScheme;
-    return Padding(
-      padding: EdgeInsets.symmetric(
-        horizontal: AppDimensions.lg.w,
-        vertical: AppDimensions.md.h,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Category icon box dropdown selector
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 6.h),
-            decoration: BoxDecoration(
-              color: scheme.surfaceContainerHigh,
-              borderRadius: BorderRadius.circular(8.r),
-              border: Border.all(color: scheme.outlineVariant),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  _iconForCategory(expense.category),
-                  color: scheme.onSurface,
-                  size: 24.r,
-                ),
-                SizedBox(width: 2.w),
-                Icon(
-                  Icons.arrow_drop_down,
-                  color: scheme.onSurfaceVariant,
-                  size: 16.r,
-                ),
-              ],
-            ),
-          ),
-          SizedBox(width: AppDimensions.md.w),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  expense.title,
-                  style: context.textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                SizedBox(height: 2.h),
-                Text(
-                  '${expense.currencySymbol}${expense.amount.toStringAsFixed(2)}',
-                  style: context.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: scheme.primary,
-                  ),
-                ),
-                SizedBox(height: 4.h),
-                Text(
-                  dateStr,
-                  style: context.textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
+    return Container(
+      width: 64,
+      height: 64,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppColors.surfaceLight,
+        border: Border.all(color: AppColors.textPrimaryLight, width: 2),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadow.withValues(alpha: 0.18),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
           ),
         ],
       ),
+      child: Icon(
+        ExpenseCategory.iconFor(category),
+        size: 28,
+        color: AppColors.textPrimaryLight,
+      ),
     );
-  }
-
-  IconData _iconForCategory(String category) {
-    switch (category.toLowerCase()) {
-      case 'food':
-      case 'restaurant':
-      case 'meal':
-        return Icons.restaurant_rounded;
-      case 'travel':
-      case 'trip':
-      case 'transport':
-        return Icons.directions_car_filled_rounded;
-      case 'shopping':
-      case 'groceries':
-        return Icons.shopping_bag_rounded;
-      case 'entertainment':
-        return Icons.movie_rounded;
-      case 'utilities':
-        return Icons.bolt_rounded;
-      case 'settlement':
-        return Icons.handshake_rounded;
-      default:
-        return Icons.receipt_long_rounded;
-    }
   }
 }
 
@@ -546,42 +600,17 @@ class _PayerRow extends StatelessWidget {
   }
 }
 
-class _SectionCard extends StatelessWidget {
-  final Widget child;
-
-  const _SectionCard({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: AppDimensions.lg.w),
-      child: Container(
-        width: double.infinity,
-        padding: EdgeInsets.all(AppDimensions.md.w),
-        decoration: BoxDecoration(
-          color: context.colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(AppDimensions.radiusMd.r),
-        ),
-        child: child,
-      ),
-    );
-  }
-}
-
-// ── Spending Trend ─────────────────────────────────────────────────────────
-
 class _SpendingTrendSection extends StatefulWidget {
   final Expense expense;
   final ExpenseRepository expenseRepository;
-  final String currentUserId;
-
   final String? groupName;
+  final Color barColor;
 
   const _SpendingTrendSection({
     required this.expense,
     required this.expenseRepository,
-    required this.currentUserId,
     this.groupName,
+    required this.barColor,
   });
 
   @override
@@ -612,8 +641,16 @@ class _SpendingTrendSectionState extends State<_SpendingTrendSection> {
         now,
       ];
       final stats = months.map((m) {
+        final category = widget.expense.category.toLowerCase();
         final total = expenses
-            .where((e) => e.date.year == m.year && e.date.month == m.month)
+            .where(
+              (e) =>
+                  !e.isDeleted &&
+                  e.category.toLowerCase() != 'settlement' &&
+                  e.category.toLowerCase() == category &&
+                  e.date.year == m.year &&
+                  e.date.month == m.month,
+            )
             .fold<double>(0, (sum, e) => sum + e.amount);
         return _MonthStat(
           label: DateFormat('MMM').format(m),
@@ -631,55 +668,50 @@ class _SpendingTrendSectionState extends State<_SpendingTrendSection> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = context.colorScheme;
-    return _SectionCard(
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: AppDimensions.xl.w),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Icon(Icons.bar_chart_rounded, size: 18.r, color: scheme.primary),
-              SizedBox(width: 6.w),
-              Expanded(
-                child: Text(
-                  'Spending trends for ${widget.groupName ?? 'group'} :: ${widget.expense.category}',
-                  style: context.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: scheme.onSurface,
-                  ),
-                ),
-              ),
-            ],
+          Text(
+            'Spending trends for ${widget.groupName ?? 'group'} :: ${widget.expense.category}',
+            style: context.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
           SizedBox(height: AppDimensions.md.h),
           if (_loading)
             const Center(child: CircularProgressIndicator())
-          else if (_stats == null || _stats!.every((s) => s.amount == 0))
-            Text(
-              'No spending data available.',
-              style: context.textTheme.bodySmall?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
-            )
           else
-            _TrendChart(stats: _stats!),
-          SizedBox(height: AppDimensions.md.h),
-          // "View more charts" button styled purple
+            _TrendChart(
+              stats: _stats ?? const [],
+              barColor: widget.barColor,
+              currencyCode: widget.expense.currencyCode,
+            ),
+          SizedBox(height: AppDimensions.lg.h),
           SizedBox(
             width: double.infinity,
+            height: AppDimensions.buttonHeight.h,
             child: FilledButton.icon(
-              icon: Icon(Icons.diamond_rounded,
-                  size: 16.r, color: scheme.onPrimary),
+              icon: Icon(
+                Icons.diamond_rounded,
+                size: 16.r,
+                color: AppColors.onImageLight,
+              ),
               label: const Text('View more charts'),
               style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF8A3CF6),
-                foregroundColor: scheme.onPrimary,
+                backgroundColor: AppColors.proBannerButton,
+                foregroundColor: AppColors.onImageLight,
                 shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8.r),
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusMd.r),
                 ),
               ),
               onPressed: () {
-              AppToast.show(context, 'Charts coming soon', type: ToastType.info);
+                AppToast.show(
+                  context,
+                  'Charts coming soon',
+                  type: ToastType.info,
+                );
               },
             ),
           ),
@@ -698,120 +730,280 @@ class _MonthStat {
 
 class _TrendChart extends StatelessWidget {
   final List<_MonthStat> stats;
+  final Color barColor;
+  final String currencyCode;
 
-  const _TrendChart({required this.stats});
+  const _TrendChart({
+    required this.stats,
+    required this.barColor,
+    required this.currencyCode,
+  });
 
   @override
   Widget build(BuildContext context) {
     final scheme = context.colorScheme;
-    final maxVal = stats.map((s) => s.amount).reduce(math.max);
+    if (stats.isEmpty) return const SizedBox.shrink();
+    final maxVal = stats.map((s) => s.amount).fold<double>(0, math.max);
 
     return Column(
-      children: stats.map((stat) {
-        final fraction = maxVal > 0 ? stat.amount / maxVal : 0.0;
-        return Padding(
-          padding: EdgeInsets.symmetric(vertical: 4.h),
-          child: Row(
-            children: [
-              SizedBox(
-                width: 32.w,
-                child: Text(
-                  stat.label,
-                  style: context.textTheme.labelSmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
+      children: [
+        for (final stat in stats)
+          Padding(
+            padding: EdgeInsets.symmetric(vertical: AppDimensions.sm.h),
+            child: Row(
+              children: [
+                SizedBox(
+                  width: 36.w,
+                  child: Text(
+                    stat.label,
+                    style: context.textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
-              ),
-              SizedBox(width: 8.w),
-              Expanded(
-                child: LayoutBuilder(
-                  builder: (ctx, constraints) {
-                    return ClipRRect(
-                      borderRadius: BorderRadius.circular(4.r),
-                      child: Stack(
-                        children: [
-                          Container(
-                            height: 16.h,
-                            color: scheme.surfaceContainerHighest,
-                          ),
-                          FractionallySizedBox(
-                            widthFactor: fraction,
-                            child: Container(
-                              height: 16.h,
-                              decoration: BoxDecoration(
-                                color: scheme.primary.withValues(alpha: 0.75),
-                                borderRadius: BorderRadius.circular(4.r),
-                              ),
+                SizedBox(width: AppDimensions.sm.w),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final fraction = maxVal > 0 ? stat.amount / maxVal : 0.0;
+                      final width = math.max(
+                        8.0,
+                        constraints.maxWidth * fraction,
+                      );
+                      return Align(
+                        alignment: Alignment.centerLeft,
+                        child: Container(
+                          height: 14.h,
+                          width: width,
+                          decoration: BoxDecoration(
+                            color: stat.amount > 0
+                                ? barColor
+                                : scheme.outlineVariant,
+                            borderRadius: BorderRadius.circular(
+                              AppDimensions.radiusMd.r,
                             ),
                           ),
-                        ],
-                      ),
-                    );
-                  },
+                        ),
+                      );
+                    },
+                  ),
                 ),
-              ),
-              SizedBox(width: 8.w),
-              SizedBox(
-                width: 72.w,
-                child: Text(
-                  'INR${stat.amount.toStringAsFixed(2)}',
-                  textAlign: TextAlign.end,
+                SizedBox(width: AppDimensions.sm.w),
+                Text(
+                  '$currencyCode${stat.amount.toStringAsFixed(2)}',
                   style: context.textTheme.labelSmall?.copyWith(
                     color: scheme.onSurfaceVariant,
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-        );
-      }).toList(),
+      ],
     );
   }
 }
 
 // ── Comment Bar ────────────────────────────────────────────────────────────
 
-class _CommentBar extends StatelessWidget {
-  final TextEditingController controller;
+class _CommentsSection extends StatelessWidget {
+  final List<ExpenseComment> comments;
+  final bool isLoading;
+  final String currentUserId;
+  final String Function(String userId) displayName;
 
-  const _CommentBar({required this.controller});
+  const _CommentsSection({
+    required this.comments,
+    required this.isLoading,
+    required this.currentUserId,
+    required this.displayName,
+  });
+
+  String _meta(ExpenseComment comment) {
+    final name = displayName(comment.createdBy);
+    return '$name · ${_timeLabel(comment.createdAt)}';
+  }
+
+  String _timeLabel(DateTime at) {
+    final now = DateTime.now();
+    final diff = now.difference(at);
+    if (diff.inMinutes < 1) return 'Just now';
+    if (at.year == now.year && at.month == now.month && at.day == now.day) {
+      return DateFormat('h:mm a').format(at);
+    }
+    return DateFormat('dd-MMM-yyyy').format(at);
+  }
 
   @override
   Widget build(BuildContext context) {
     final scheme = context.colorScheme;
-    return Container(
-      padding: EdgeInsets.fromLTRB(
-        AppDimensions.md.w,
-        AppDimensions.sm.h,
-        AppDimensions.sm.w,
-        AppDimensions.md.h + MediaQuery.of(context).viewInsets.bottom,
-      ),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        border: Border(top: BorderSide(color: scheme.outlineVariant)),
-      ),
-      child: Row(
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: AppDimensions.xl.w),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: TextField(
-              controller: controller,
-              decoration: InputDecoration(
-                hintText: 'Add a comment',
-                border: InputBorder.none,
-                hintStyle: TextStyle(color: scheme.onSurfaceVariant),
-              ),
+          Text(
+            'Comments',
+            style: context.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
             ),
           ),
-          IconButton(
-            icon: Icon(Icons.send_rounded, color: scheme.primary),
-            onPressed: () {
-              if (controller.text.trim().isNotEmpty) {
-                AppToast.show(context, 'Comments coming soon', type: ToastType.info);
-                controller.clear();
-              }
-            },
-          ),
+          SizedBox(height: AppDimensions.md.h),
+          if (isLoading)
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: AppDimensions.lg.h),
+              child: Center(
+                child: SizedBox(
+                  width: 24.r,
+                  height: 24.r,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: scheme.primary,
+                  ),
+                ),
+              ),
+            )
+          else if (comments.isEmpty)
+            Text(
+              'No comments yet.',
+              style: context.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
+            )
+          else
+            for (final comment in comments) ...[
+              Align(
+                alignment: comment.createdBy == currentUserId
+                    ? Alignment.centerRight
+                    : Alignment.centerLeft,
+                child: Text(
+                  _meta(comment),
+                  style: context.textTheme.labelSmall?.copyWith(
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              ),
+              SizedBox(height: AppDimensions.xs.h),
+              Align(
+                alignment: comment.createdBy == currentUserId
+                    ? Alignment.centerRight
+                    : Alignment.centerLeft,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: 280.w),
+                  child: Container(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: AppDimensions.md.w,
+                      vertical: AppDimensions.sm.h,
+                    ),
+                    decoration: BoxDecoration(
+                      color: comment.createdBy == currentUserId
+                          ? AppColors.primaryContainerDark
+                          : scheme.surfaceContainerHigh,
+                      borderRadius: BorderRadius.circular(
+                        AppDimensions.radiusLg.r,
+                      ),
+                    ),
+                    child: Text(
+                      comment.text,
+                      style: context.textTheme.bodyMedium?.copyWith(
+                        color: comment.createdBy == currentUserId
+                            ? AppColors.onImageLight
+                            : scheme.onSurface,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(height: AppDimensions.md.h),
+            ],
         ],
+      ),
+    );
+  }
+}
+
+class _CommentBar extends StatelessWidget {
+  final TextEditingController controller;
+  final ValueNotifier<bool> isSubmitting;
+  final VoidCallback onSubmit;
+
+  const _CommentBar({
+    required this.controller,
+    required this.isSubmitting,
+    required this.onSubmit,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = context.colorScheme;
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          AppDimensions.lg.w,
+          AppDimensions.sm.h,
+          AppDimensions.lg.w,
+          AppDimensions.md.h,
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: controller,
+                textInputAction: TextInputAction.send,
+                onSubmitted: (_) => onSubmit(),
+                decoration: InputDecoration(
+                  hintText: 'Add a comment',
+                  filled: true,
+                  fillColor: scheme.surfaceContainerHigh,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: AppDimensions.lg.w,
+                    vertical: AppDimensions.sm.h,
+                  ),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(
+                      AppDimensions.radiusCircular.r,
+                    ),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(
+                      AppDimensions.radiusCircular.r,
+                    ),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(
+                      AppDimensions.radiusCircular.r,
+                    ),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+            ),
+            SizedBox(width: AppDimensions.sm.w),
+            ValueListenableBuilder<bool>(
+              valueListenable: isSubmitting,
+              builder: (context, submitting, _) {
+                return IconButton(
+                  icon: submitting
+                      ? SizedBox(
+                          width: 20.r,
+                          height: 20.r,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        )
+                      : Icon(
+                          Icons.send_rounded,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                  onPressed: submitting ? null : onSubmit,
+                );
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

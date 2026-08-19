@@ -2,10 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/context_extension.dart';
 import '../bloc/add_expense_bloc.dart';
 import '../bloc/add_expense_event.dart';
 import '../bloc/add_expense_state.dart';
+
+enum _ExpenseCategoryKind {
+  general,
+  food,
+  groceries,
+  home,
+  utilities,
+  transportation,
+  entertainment,
+  health,
+  shopping,
+  travel,
+  settlement,
+}
 
 class ExpenseCategory {
   final String name;
@@ -13,30 +28,171 @@ class ExpenseCategory {
 
   const ExpenseCategory(this.name, this.icon);
 
-  /// Icon used in the category picker for [name], or the General icon
-  /// when the name is unknown (including blank).
+  /// Filled icon for list tiles and badges.
   static IconData iconFor(String? name) {
-    final needle = name?.trim().toLowerCase() ?? '';
-    if (needle == 'settlement') return Icons.payments_outlined;
-    for (final category in kExpenseCategories) {
-      if (category.name.toLowerCase() == needle) return category.icon;
+    switch (_kindFor(name)) {
+      case _ExpenseCategoryKind.food:
+        return Icons.restaurant_rounded;
+      case _ExpenseCategoryKind.groceries:
+        return Icons.local_grocery_store_rounded;
+      case _ExpenseCategoryKind.home:
+        return Icons.home_rounded;
+      case _ExpenseCategoryKind.utilities:
+        return Icons.bolt_rounded;
+      case _ExpenseCategoryKind.transportation:
+        return Icons.directions_car_rounded;
+      case _ExpenseCategoryKind.entertainment:
+        return Icons.movie_rounded;
+      case _ExpenseCategoryKind.health:
+        return Icons.local_hospital_rounded;
+      case _ExpenseCategoryKind.shopping:
+        return Icons.shopping_bag_rounded;
+      case _ExpenseCategoryKind.travel:
+        return Icons.flight_takeoff_rounded;
+      case _ExpenseCategoryKind.settlement:
+        return Icons.payments_rounded;
+      case _ExpenseCategoryKind.general:
+        return Icons.receipt_long_rounded;
     }
-    return Icons.receipt_long_outlined;
+  }
+
+  /// Saturated tile colour behind [iconFor], with white glyphs.
+  static Color backgroundFor(String? name) {
+    switch (_kindFor(name)) {
+      case _ExpenseCategoryKind.food:
+        return AppColors.categoryFood;
+      case _ExpenseCategoryKind.groceries:
+        return AppColors.categoryGroceries;
+      case _ExpenseCategoryKind.home:
+        return AppColors.categoryHome;
+      case _ExpenseCategoryKind.utilities:
+        return AppColors.categoryUtilities;
+      case _ExpenseCategoryKind.transportation:
+        return AppColors.categoryTransportation;
+      case _ExpenseCategoryKind.entertainment:
+        return AppColors.categoryEntertainment;
+      case _ExpenseCategoryKind.health:
+        return AppColors.categoryHealth;
+      case _ExpenseCategoryKind.shopping:
+        return AppColors.categoryShopping;
+      case _ExpenseCategoryKind.travel:
+        return AppColors.categoryTravel;
+      case _ExpenseCategoryKind.settlement:
+        return AppColors.categorySettlement;
+      case _ExpenseCategoryKind.general:
+        return AppColors.categoryGeneral;
+    }
+  }
+
+  static _ExpenseCategoryKind _kindFor(String? name) {
+    final needle = name?.trim().toLowerCase() ?? '';
+    if (needle.isEmpty) return _ExpenseCategoryKind.general;
+    if (needle == 'settlement') return _ExpenseCategoryKind.settlement;
+    for (final category in kExpenseCategories) {
+      if (category.name.toLowerCase() == needle) {
+        return _kindFromPickerName(category.name);
+      }
+    }
+    if (_containsAny(needle, const ['food', 'dining', 'restaurant', 'meal'])) {
+      return _ExpenseCategoryKind.food;
+    }
+    if (_containsAny(needle, const ['grocery', 'groceries'])) {
+      return _ExpenseCategoryKind.groceries;
+    }
+    if (_containsAny(needle, const ['home', 'house', 'rent'])) {
+      return _ExpenseCategoryKind.home;
+    }
+    if (_containsAny(needle, const ['utilit', 'electric', 'internet'])) {
+      return _ExpenseCategoryKind.utilities;
+    }
+    if (_containsAny(needle, const ['transport', 'car', 'uber', 'taxi'])) {
+      return _ExpenseCategoryKind.transportation;
+    }
+    if (_containsAny(needle, const ['entertain', 'movie'])) {
+      return _ExpenseCategoryKind.entertainment;
+    }
+    if (_containsAny(needle, const ['health', 'medical', 'hospital'])) {
+      return _ExpenseCategoryKind.health;
+    }
+    if (_containsAny(needle, const ['shop'])) {
+      return _ExpenseCategoryKind.shopping;
+    }
+    if (_containsAny(needle, const ['travel', 'trip', 'flight'])) {
+      return _ExpenseCategoryKind.travel;
+    }
+    return _ExpenseCategoryKind.general;
+  }
+
+  static _ExpenseCategoryKind _kindFromPickerName(String name) {
+    switch (name) {
+      case 'Food & Dining':
+        return _ExpenseCategoryKind.food;
+      case 'Groceries':
+        return _ExpenseCategoryKind.groceries;
+      case 'Home':
+        return _ExpenseCategoryKind.home;
+      case 'Utilities':
+        return _ExpenseCategoryKind.utilities;
+      case 'Transportation':
+        return _ExpenseCategoryKind.transportation;
+      case 'Entertainment':
+        return _ExpenseCategoryKind.entertainment;
+      case 'Health':
+        return _ExpenseCategoryKind.health;
+      case 'Shopping':
+        return _ExpenseCategoryKind.shopping;
+      case 'Travel':
+        return _ExpenseCategoryKind.travel;
+      default:
+        return _ExpenseCategoryKind.general;
+    }
+  }
+
+  static bool _containsAny(String needle, List<String> tokens) {
+    return tokens.any((token) => needle.contains(token));
   }
 }
 
 const List<ExpenseCategory> kExpenseCategories = [
-  ExpenseCategory('General', Icons.receipt_long_outlined),
-  ExpenseCategory('Food & Dining', Icons.restaurant_outlined),
-  ExpenseCategory('Groceries', Icons.local_grocery_store_outlined),
-  ExpenseCategory('Home', Icons.home_outlined),
-  ExpenseCategory('Utilities', Icons.bolt_outlined),
-  ExpenseCategory('Transportation', Icons.directions_car_outlined),
-  ExpenseCategory('Entertainment', Icons.movie_outlined),
-  ExpenseCategory('Health', Icons.local_hospital_outlined),
-  ExpenseCategory('Shopping', Icons.shopping_bag_outlined),
-  ExpenseCategory('Travel', Icons.flight_takeoff_outlined),
+  ExpenseCategory('General', Icons.receipt_long_rounded),
+  ExpenseCategory('Food & Dining', Icons.restaurant_rounded),
+  ExpenseCategory('Groceries', Icons.local_grocery_store_rounded),
+  ExpenseCategory('Home', Icons.home_rounded),
+  ExpenseCategory('Utilities', Icons.bolt_rounded),
+  ExpenseCategory('Transportation', Icons.directions_car_rounded),
+  ExpenseCategory('Entertainment', Icons.movie_rounded),
+  ExpenseCategory('Health', Icons.local_hospital_rounded),
+  ExpenseCategory('Shopping', Icons.shopping_bag_rounded),
+  ExpenseCategory('Travel', Icons.flight_takeoff_rounded),
 ];
+
+class ExpenseCategoryGlyph extends StatelessWidget {
+  final String category;
+  final double size;
+
+  const ExpenseCategoryGlyph({
+    super.key,
+    required this.category,
+    required this.size,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: ExpenseCategory.backgroundFor(category),
+        borderRadius: BorderRadius.circular(8.r),
+      ),
+      child: Icon(
+        ExpenseCategory.iconFor(category),
+        size: size * 0.55,
+        color: AppColors.onImageLight,
+      ),
+    );
+  }
+}
 
 class CategoryPickerSheet extends StatelessWidget {
   const CategoryPickerSheet({super.key});
@@ -75,7 +231,10 @@ class CategoryPickerSheet extends StatelessWidget {
                 ),
                 ...kExpenseCategories.map(
                   (category) => ListTile(
-                    leading: Icon(category.icon, color: scheme.onSurface),
+                    leading: ExpenseCategoryGlyph(
+                      category: category.name,
+                      size: 32.w,
+                    ),
                     title: Text(category.name),
                     trailing: state.category == category.name
                         ? Icon(Icons.check, color: scheme.primary)

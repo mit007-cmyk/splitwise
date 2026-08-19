@@ -39,6 +39,13 @@ abstract class ExpenseRemoteDataSource {
     required String expenseId,
     required String actorUserId,
   });
+
+  /// Adds one comment under `Splitwise/expenses.{expenseId}.comments.{commentId}`.
+  Future<void> addComment({
+    required String expenseId,
+    required String actorUserId,
+    required String text,
+  });
 }
 
 @LazySingleton(as: ExpenseRemoteDataSource)
@@ -541,6 +548,82 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
           snapshotBefore: existing,
           snapshotAfter: restored,
           changedFields: const ['isDeleted', 'deletedAt', 'deletedBy'],
+        ),
+      );
+    });
+  }
+
+  @override
+  Future<void> addComment({
+    required String expenseId,
+    required String actorUserId,
+    required String text,
+  }) async {
+    final trimmed = text.trim();
+    if (trimmed.isEmpty) {
+      throw StateError('Comment cannot be empty.');
+    }
+
+    final firestore = _firestoreService.firestore;
+    final splitwiseRef = firestore
+        .collection(FirestorePaths.root)
+        .doc(FirestorePaths.expenses);
+    final groupsRef = firestore
+        .collection(FirestorePaths.root)
+        .doc(FirestorePaths.groups);
+    final eventsRef = firestore
+        .collection(FirestorePaths.root)
+        .doc(FirestorePaths.events);
+    final commentId = _uuid.v4();
+
+    await _firestoreService.runTransaction((transaction) async {
+      final splitwiseSnap = await transaction.get(splitwiseRef);
+      final splitwiseData = splitwiseSnap.data();
+      final existingRaw = splitwiseData?[expenseId];
+
+      if (existingRaw is! Map) {
+        throw StateError('Expense not found.');
+      }
+      final existing = Map<String, dynamic>.from(existingRaw);
+      if (_isDeleted(existing)) {
+        throw StateError('Cannot comment on a deleted expense.');
+      }
+
+      final comment = <String, dynamic>{
+        'createdBy': actorUserId,
+        'text': trimmed,
+        'createdAt': FieldValue.serverTimestamp(),
+      };
+      final groupId = (existing['groupId'] as String?)?.trim() ?? '';
+      final groupsSnap = await transaction.get(groupsRef);
+      final groupsData = groupsSnap.data();
+      final groupName = _groupNameFromDoc(groupsData, groupId);
+
+      transaction.set(
+        splitwiseRef,
+        {
+          expenseId: {
+            'comments': {commentId: comment},
+          },
+        },
+        SetOptions(merge: true),
+      );
+      _appendEvent(
+        transaction,
+        eventsRef,
+        _buildExpenseEventData(
+          type: 'comment_added',
+          expenseId: expenseId,
+          groupId: groupId,
+          actorUserId: actorUserId,
+          expenseData: existing,
+          groupName: groupName,
+          snapshotAfter: {
+            'commentId': commentId,
+            'text': trimmed,
+            'createdBy': actorUserId,
+          },
+          changedFields: const ['comments'],
         ),
       );
     });

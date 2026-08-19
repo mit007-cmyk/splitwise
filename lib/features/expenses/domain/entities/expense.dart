@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'expense_comment.dart';
 import 'split_type.dart';
 
 /// A single expense recorded against a group.
@@ -26,6 +27,7 @@ class Expense extends Equatable {
   final String? deletedBy;
   final bool isDeleted;
   final String? receiptUrl;
+  final List<ExpenseComment> comments;
 
   const Expense({
     required this.id,
@@ -47,6 +49,7 @@ class Expense extends Equatable {
     this.deletedBy,
     this.isDeleted = false,
     this.receiptUrl,
+    this.comments = const [],
   });
 
   Expense copyWith({
@@ -69,6 +72,7 @@ class Expense extends Equatable {
     String? deletedBy,
     bool? isDeleted,
     String? receiptUrl,
+    List<ExpenseComment>? comments,
   }) {
     return Expense(
       id: id ?? this.id,
@@ -90,6 +94,7 @@ class Expense extends Equatable {
       deletedBy: deletedBy ?? this.deletedBy,
       isDeleted: isDeleted ?? this.isDeleted,
       receiptUrl: receiptUrl ?? this.receiptUrl,
+      comments: comments ?? this.comments,
     );
   }
 
@@ -114,5 +119,6 @@ class Expense extends Equatable {
         deletedBy,
         isDeleted,
         receiptUrl,
+        comments,
       ];
 }
