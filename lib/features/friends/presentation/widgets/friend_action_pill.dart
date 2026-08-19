@@ -5,12 +5,14 @@ import '../../../../core/utils/context_extension.dart';
 class FriendActionPill extends StatelessWidget {
   final String label;
   final IconData? icon;
+  final Widget? leading;
   final VoidCallback? onTap;
 
   const FriendActionPill({
     super.key,
     required this.label,
     this.icon,
+    this.leading,
     this.onTap,
   });
 
@@ -34,7 +36,10 @@ class FriendActionPill extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (icon != null) ...[
+            if (leading != null) ...[
+              leading!,
+              SizedBox(width: 6.w),
+            ] else if (icon != null) ...[
               Icon(
                 icon,
                 size: 16.r,

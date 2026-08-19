@@ -17,6 +17,7 @@ import '../../../expenses/domain/entities/expense.dart';
 import '../../../expenses/domain/services/direct_group.dart';
 import '../../../expenses/domain/services/friend_ledger.dart';
 import '../../../expenses/presentation/pages/expense_detail_page.dart';
+import '../../../expenses/presentation/utils/currency_conversion_action.dart';
 import '../../domain/entities/user_preview.dart';
 import '../bloc/friend_detail_cubit.dart';
 import '../../../../core/widgets/app_toast.dart';
@@ -40,6 +41,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
   late final ScrollController _scrollController;
   bool _breakdownExpanded = true;
   bool _isCollapsed = false;
+  String? _defaultCurrencyCode;
 
   @override
   void initState() {
@@ -64,6 +66,16 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
     final authState = context.read<AuthBloc>().state;
     if (authState is Authenticated) {
       _cubit.load(currentUserId: authState.user.id, friendId: widget.friendId);
+      _loadDefaultCurrency(authState.user.id);
+    }
+  }
+
+  Future<void> _loadDefaultCurrency(String userId) async {
+    try {
+      final code = await CurrencyConversionAction.defaultCode(userId);
+      if (mounted) setState(() => _defaultCurrencyCode = code);
+    } catch (_) {
+      if (mounted) setState(() => _defaultCurrencyCode = 'USD');
     }
   }
 
@@ -263,10 +275,21 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                               icon: Icons.diamond_rounded,
                               onTap: () => _showComingSoon(context),
                             ),
-                            const FriendActionPill(
-                              label: 'Convert to USD',
-                              icon: Icons.currency_exchange_rounded,
-                            ),
+                            if (CurrencyConversionAction.shouldShow(
+                              state.entries.map((entry) => entry.expense).toList(),
+                              _defaultCurrencyCode,
+                            ))
+                              FriendActionPill(
+                                label: CurrencyConversionAction.buttonLabel(
+                                  _defaultCurrencyCode ?? 'USD',
+                                ),
+                                leading: CurrencyConversionAction.buttonIcon(
+                                  defaultCode: _defaultCurrencyCode ?? 'USD',
+                                  color: context.colorScheme.secondary,
+                                  size: 16.r,
+                                ),
+                                onTap: () => _convertCurrencies(context, state),
+                              ),
                             FriendActionPill(
                               label: 'Export',
                               icon: Icons.download_rounded,
@@ -892,6 +915,25 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
     if (deleted == true && mounted) {
       _load();
     }
+  }
+
+  Future<void> _convertCurrencies(
+    BuildContext context,
+    FriendDetailState state,
+  ) async {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! Authenticated) {
+      AppToast.show(context, 'Please log in again.', type: ToastType.error);
+      return;
+    }
+
+    final converted = await CurrencyConversionAction.confirmAndRun(
+      context: context,
+      actorUserId: authState.user.id,
+      expenses: state.entries.map((entry) => entry.expense).toList(),
+      scopeLabel: 'friendship',
+    );
+    if (converted && mounted) _load();
   }
 
   void _showComingSoon(BuildContext context) {

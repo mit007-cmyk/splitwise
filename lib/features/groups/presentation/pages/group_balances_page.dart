@@ -13,6 +13,7 @@ import '../../../../core/widgets/avatar_widget.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../expenses/domain/entities/expense.dart';
+import '../../../expenses/presentation/utils/currency_conversion_action.dart';
 import '../../../home/domain/entities/balance_summary.dart';
 import '../../../home/domain/entities/group_summary.dart';
 import '../../../home/presentation/bloc/home_bloc.dart';
@@ -32,6 +33,7 @@ class GroupBalancesPage extends StatefulWidget {
 class _GroupBalancesPageState extends State<GroupBalancesPage> {
   late final GroupDetailCubit _cubit;
   final Set<String> _expandedMemberIds = {};
+  String? _defaultCurrencyCode;
 
   String get _currentUserId {
     final authState = context.read<AuthBloc>().state;
@@ -46,6 +48,13 @@ class _GroupBalancesPageState extends State<GroupBalancesPage> {
     super.initState();
     _cubit = GroupDetailCubit(getIt(), getIt());
     _cubit.loadExpenses(widget.groupId);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadDefaultCurrency());
+  }
+
+  Future<void> _loadDefaultCurrency() async {
+    if (_currentUserId.isEmpty) return;
+    final code = await CurrencyConversionAction.defaultCode(_currentUserId);
+    if (mounted) setState(() => _defaultCurrencyCode = code);
   }
 
   @override
@@ -97,6 +106,8 @@ class _GroupBalancesPageState extends State<GroupBalancesPage> {
           groupId: widget.groupId,
           currentUserId: _currentUserId,
           balances: [balance],
+          expenses: _cubit.state.expenses,
+          defaultCurrencyCode: _defaultCurrencyCode,
         ),
       ),
     );

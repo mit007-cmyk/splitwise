@@ -49,6 +49,50 @@ class Expense extends Equatable {
     this.receiptUrl,
   });
 
+  Expense copyWith({
+    String? id,
+    String? groupId,
+    String? title,
+    String? category,
+    double? amount,
+    String? currencyCode,
+    String? currencySymbol,
+    DateTime? date,
+    String? notes,
+    Map<String, double>? paidBy,
+    Map<String, double>? splits,
+    SplitType? splitType,
+    List<String>? participantIds,
+    String? createdBy,
+    String? updatedBy,
+    DateTime? deletedAt,
+    String? deletedBy,
+    bool? isDeleted,
+    String? receiptUrl,
+  }) {
+    return Expense(
+      id: id ?? this.id,
+      groupId: groupId ?? this.groupId,
+      title: title ?? this.title,
+      category: category ?? this.category,
+      amount: amount ?? this.amount,
+      currencyCode: currencyCode ?? this.currencyCode,
+      currencySymbol: currencySymbol ?? this.currencySymbol,
+      date: date ?? this.date,
+      notes: notes ?? this.notes,
+      paidBy: paidBy ?? this.paidBy,
+      splits: splits ?? this.splits,
+      splitType: splitType ?? this.splitType,
+      participantIds: participantIds ?? this.participantIds,
+      createdBy: createdBy ?? this.createdBy,
+      updatedBy: updatedBy ?? this.updatedBy,
+      deletedAt: deletedAt ?? this.deletedAt,
+      deletedBy: deletedBy ?? this.deletedBy,
+      isDeleted: isDeleted ?? this.isDeleted,
+      receiptUrl: receiptUrl ?? this.receiptUrl,
+    );
+  }
+
   @override
   List<Object?> get props => [
         id,

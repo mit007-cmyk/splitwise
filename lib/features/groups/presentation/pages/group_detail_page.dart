@@ -16,6 +16,7 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../expenses/domain/entities/expense.dart';
 import '../../../expenses/presentation/pages/expense_detail_page.dart';
+import '../../../expenses/presentation/utils/currency_conversion_action.dart';
 import '../../../home/domain/entities/balance_summary.dart';
 import '../../../home/domain/entities/group_summary.dart';
 import '../bloc/group_detail_cubit.dart';
@@ -36,6 +37,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
   late final GroupDetailCubit _cubit;
   late final ScrollController _scrollController;
   bool _isCollapsed = false;
+  String? _defaultCurrencyCode;
   String get _currentUserId {
     final authState = context.read<AuthBloc>().state;
     if (authState is Authenticated) {
@@ -50,7 +52,10 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
     _cubit = GroupDetailCubit(getIt(), getIt());
     _scrollController = ScrollController();
     _scrollController.addListener(_scrollListener);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _refreshData());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _refreshData();
+      _loadDefaultCurrency();
+    });
   }
 
   void _scrollListener() {
@@ -76,6 +81,16 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
     await _cubit.loadExpenses(widget.groupId);
     if (!mounted) return;
     await context.read<HomeBloc>().refreshAndWait();
+  }
+
+  Future<void> _loadDefaultCurrency() async {
+    if (_currentUserId.isEmpty) return;
+    try {
+      final code = await CurrencyConversionAction.defaultCode(_currentUserId);
+      if (mounted) setState(() => _defaultCurrencyCode = code);
+    } catch (_) {
+      if (mounted) setState(() => _defaultCurrencyCode = 'USD');
+    }
   }
 
   List<MemberBalance> _effectiveBalances(
@@ -122,10 +137,31 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
           groupId: widget.groupId,
           currentUserId: _currentUserId,
           balances: balances,
+          expenses: _cubit.state.expenses,
+          defaultCurrencyCode: _defaultCurrencyCode,
         ),
       ),
     );
     if (recorded == true && mounted) {
+      await _refreshData();
+    }
+  }
+
+  Future<void> _convertCurrencies(
+    BuildContext context,
+    List<Expense> expenses,
+  ) async {
+    if (_currentUserId.isEmpty) {
+      AppToast.show(context, 'Please log in again.', type: ToastType.error);
+      return;
+    }
+    final converted = await CurrencyConversionAction.confirmAndRun(
+      context: context,
+      actorUserId: _currentUserId,
+      expenses: expenses,
+      scopeLabel: 'group',
+    );
+    if (converted && mounted) {
       await _refreshData();
     }
   }
@@ -198,6 +234,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
     BuildContext context,
     String label, {
     IconData? icon,
+    Widget? leading,
     VoidCallback? onTap,
   }) {
     final scheme = context.colorScheme;
@@ -214,7 +251,10 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (icon != null) ...[
+            if (leading != null) ...[
+              leading,
+              SizedBox(width: 6.w),
+            ] else if (icon != null) ...[
               Icon(icon, size: 16.r, color: scheme.secondary),
               SizedBox(width: 6.w),
             ],
@@ -707,7 +747,25 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
                             'Settle up',
                             onTap: () => _openSettleUp(context, balances),
                           ),
-                          _buildActionPill(context, 'Convert to USD', icon: Icons.diamond_rounded),
+                          if (CurrencyConversionAction.shouldShow(
+                            detailState.expenses,
+                            _defaultCurrencyCode,
+                          ))
+                            _buildActionPill(
+                              context,
+                              CurrencyConversionAction.buttonLabel(
+                                _defaultCurrencyCode ?? 'USD',
+                              ),
+                              leading: CurrencyConversionAction.buttonIcon(
+                                defaultCode: _defaultCurrencyCode ?? 'USD',
+                                color: context.colorScheme.secondary,
+                                size: 16.r,
+                              ),
+                              onTap: () => _convertCurrencies(
+                                context,
+                                detailState.expenses,
+                              ),
+                            ),
                           _buildActionPill(
                             context,
                             'Charts',
