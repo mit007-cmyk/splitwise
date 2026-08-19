@@ -9,6 +9,7 @@ import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../expenses/domain/repositories/expense_repository.dart';
 import '../../../expenses/presentation/pages/expense_detail_page.dart';
+import '../../../expenses/presentation/widgets/category_picker_sheet.dart';
 import '../../domain/entities/activity_event.dart';
 import '../bloc/activity_bloc.dart';
 import '../bloc/activity_event.dart';
@@ -353,10 +354,20 @@ class _ActivityPageState extends State<ActivityPage> {
       case ActivityEventType.expenseUpdated:
       case ActivityEventType.expenseDeleted:
       case ActivityEventType.expenseRestored:
-        return Icons.restaurant_outlined;
+        return ExpenseCategory.iconFor(_categoryForEvent(event));
       default:
         return Icons.receipt_long_rounded;
     }
+  }
+
+  String? _categoryForEvent(ActivityEvent event) {
+    final fromMetadata = event.metadata['category'] as String?;
+    if (fromMetadata != null && fromMetadata.trim().isNotEmpty) {
+      return fromMetadata;
+    }
+    final after = event.snapshotAfter?['category'] as String?;
+    if (after != null && after.trim().isNotEmpty) return after;
+    return event.snapshotBefore?['category'] as String?;
   }
 
   Color _iconBgForEvent(BuildContext context, ActivityEvent event) {

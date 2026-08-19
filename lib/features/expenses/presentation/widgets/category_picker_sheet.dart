@@ -12,6 +12,17 @@ class ExpenseCategory {
   final IconData icon;
 
   const ExpenseCategory(this.name, this.icon);
+
+  /// Icon used in the category picker for [name], or the General icon
+  /// when the name is unknown (including blank).
+  static IconData iconFor(String? name) {
+    final needle = name?.trim().toLowerCase() ?? '';
+    if (needle == 'settlement') return Icons.payments_outlined;
+    for (final category in kExpenseCategories) {
+      if (category.name.toLowerCase() == needle) return category.icon;
+    }
+    return Icons.receipt_long_outlined;
+  }
 }
 
 const List<ExpenseCategory> kExpenseCategories = [
