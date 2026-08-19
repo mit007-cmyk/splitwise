@@ -10,6 +10,8 @@ import '../../../../core/utils/context_extension.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../../expenses/data/datasources/currency_catalog.dart';
+import '../../../expenses/domain/entities/expense.dart';
+import '../../../home/domain/entities/group_summary.dart';
 import '../../domain/services/group_spending_calculator.dart';
 import '../bloc/group_detail_cubit.dart';
 import '../widgets/group_month_picker_dialog.dart';
@@ -35,6 +37,7 @@ class _GroupTotalsPageState extends State<GroupTotalsPage> {
   String? _currencyCode;
   DateTime? _selectedMonth;
   bool _isAllTime = true;
+  String? _scopedUserId;
 
   String get _currentUserId {
     final authState = context.read<AuthBloc>().state;
@@ -73,7 +76,9 @@ class _GroupTotalsPageState extends State<GroupTotalsPage> {
             (g) => g.groupId == widget.groupId,
           );
           if (groupIndex == -1) {
-            return const Scaffold(body: Center(child: Text('Group not found.')));
+            return const Scaffold(
+              body: Center(child: Text('Group not found.')),
+            );
           }
 
           final group = homeState.summary.groups[groupIndex];
@@ -101,7 +106,7 @@ class _GroupTotalsPageState extends State<GroupTotalsPage> {
                   return Center(child: Text(state.expenseError!));
                 }
 
-                return _buildContent(context, state, group.groupName);
+                return _buildContent(context, state, group);
               },
             ),
           );
@@ -110,18 +115,79 @@ class _GroupTotalsPageState extends State<GroupTotalsPage> {
     );
   }
 
+  bool get _isPersonScope => _scopedUserId != null && _scopedUserId!.isNotEmpty;
+
+  String _memberLabel(String userId, Map<String, String> names, GroupSummary group) {
+    if (userId == _currentUserId) return 'You';
+    for (final balance in group.memberBalances) {
+      if (balance.userId == userId && balance.userName.trim().isNotEmpty) {
+        return balance.userName.trim();
+      }
+    }
+    final name = names[userId]?.trim();
+    if (name != null && name.isNotEmpty) return name;
+    return 'Unknown';
+  }
+
+  List<(String id, String label)> _memberOptions(
+    GroupSummary group,
+    Map<String, String> names, [
+    List<Expense>? expenses,
+  ]) {
+    final ids = <String>{
+      ...group.memberIds,
+      _currentUserId,
+      if (expenses != null)
+        for (final expense in expenses) ...[
+          ...expense.participantIds,
+          ...expense.paidBy.keys,
+          ...expense.splits.keys,
+        ],
+    }..removeWhere((id) => id.trim().isEmpty);
+    final others = ids.where((id) => id != _currentUserId).toList()
+      ..sort((a, b) => _memberLabel(a, names, group).toLowerCase().compareTo(
+            _memberLabel(b, names, group).toLowerCase(),
+          ));
+    return [
+      if (ids.contains(_currentUserId)) (_currentUserId, 'You'),
+      for (final id in others) (id, _memberLabel(id, names, group)),
+    ];
+  }
+
+  String _scopeChipLabel(GroupSummary group, Map<String, String> names) {
+    if (!_isPersonScope) return 'Group expenses';
+    return _memberLabel(_scopedUserId!, names, group);
+  }
+
+  String _scopeSubtitle(GroupSummary group, Map<String, String> names) {
+    if (!_isPersonScope) return 'group spending';
+    if (_scopedUserId == _currentUserId) return 'your spending';
+    return '${_memberLabel(_scopedUserId!, names, group)}\'s spending';
+  }
+
   Widget _buildContent(
     BuildContext context,
     GroupDetailState state,
-    String groupName,
+    GroupSummary group,
   ) {
-    final currencyCodes = GroupSpendingCalculator.currencyCodes(state.expenses);
-    if (currencyCodes.isEmpty) return _buildEmptyState(context);
+    final forUserId = _isPersonScope ? _scopedUserId : null;
+    final members = _memberOptions(group, state.memberNames, state.expenses);
+    final currencyCodes = GroupSpendingCalculator.currencyCodes(
+      state.expenses,
+      forUserId: forUserId,
+    );
+    if (currencyCodes.isEmpty) {
+      return _buildEmptyState(context, group, state.memberNames, members);
+    }
 
     final currencyCode = currencyCodes.contains(_currencyCode)
         ? _currencyCode!
         : currencyCodes.first;
-    final months = GroupSpendingCalculator.months(state.expenses, currencyCode);
+    final months = GroupSpendingCalculator.months(
+      state.expenses,
+      currencyCode,
+      forUserId: forUserId,
+    );
     final selectedMonth = _resolveMonth(months);
     final window = _monthWindow(selectedMonth);
 
@@ -130,6 +196,7 @@ class _GroupTotalsPageState extends State<GroupTotalsPage> {
       currencyCode: currencyCode,
       userId: _currentUserId,
       month: _isAllTime ? null : selectedMonth,
+      forUserId: forUserId,
     );
 
     return Column(
@@ -145,63 +212,87 @@ class _GroupTotalsPageState extends State<GroupTotalsPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  groupName,
-                  style: context.textTheme.headlineSmall,
-                ),
+                Text(group.groupName, style: context.textTheme.headlineSmall),
                 SizedBox(height: AppDimensions.xs.h),
                 Text(
                   _isAllTime
-                      ? 'All time spending'
-                      : '${DateFormat('MMMM yyyy').format(selectedMonth)} group spending',
+                      ? (_isPersonScope
+                          ? 'All time · ${_scopeSubtitle(group, state.memberNames)}'
+                          : 'All time spending')
+                      : '${DateFormat('MMMM yyyy').format(selectedMonth)} · '
+                          '${_scopeSubtitle(group, state.memberNames)}',
                   style: context.textTheme.titleSmall?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 SizedBox(height: AppDimensions.lg.h),
-                _buildCurrencyChip(context, currencyCode, currencyCodes),
-                SizedBox(height: AppDimensions.xl.h),
-                if (_isAllTime)
-                  Center(
-                    child: GroupSpendingDonut(
-                      totalSpent: summary.totalSpent,
-                      yourShare: summary.yourShare,
-                      centerLabel: 'Total',
-                      currencySymbol: summary.currencySymbol,
-                    ),
-                  )
-                else
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 50),
-                    child: GroupSpendingBars(
-                      bars: _buildBars(state, currencyCode, window, selectedMonth),
-                      onSelect: (index) =>
-                          setState(() => _selectedMonth = window[index]),
-                    ),
+                Wrap(
+                  spacing: AppDimensions.sm.w,
+                  runSpacing: AppDimensions.sm.h,
+                  children: [
+                    _buildScopeChip(context, members, group, state.memberNames),
+                    _buildCurrencyChip(context, currencyCode, currencyCodes),
+                  ],
+                ),
+                if (!_isPersonScope)
+                  Column(
+                    children: [
+                      SizedBox(height: AppDimensions.xl.h),
+                      if (_isAllTime)
+                        Center(
+                          child: GroupSpendingDonut(
+                            totalSpent: summary.totalSpent,
+                            yourShare: summary.yourShare,
+                            centerLabel: 'Total',
+                            currencySymbol: summary.currencySymbol,
+                          ),
+                        )
+                      else
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 50),
+                          child: GroupSpendingBars(
+                            bars: _buildBars(
+                              state,
+                              currencyCode,
+                              window,
+                              selectedMonth,
+                            ),
+                            onSelect: (index) =>
+                                setState(() => _selectedMonth = window[index]),
+                          ),
+                        ),
+                    ],
                   ),
                 SizedBox(height: AppDimensions.xl.h),
                 _buildMetric(
                   context,
-                  label: 'Total spent',
+                  label: !_isPersonScope
+                      ? 'Total spent'
+                      : (_scopedUserId == _currentUserId
+                          ? 'You spent'
+                          : '${_memberLabel(_scopedUserId!, state.memberNames, group)} spent'),
                   amount: summary.formatted(summary.totalSpent),
                   color: AppColors.chartTotalSpent,
                 ),
-                SizedBox(height: AppDimensions.xl.h),
-                _buildMetric(
-                  context,
-                  label: 'Your share',
-                  amount: summary.formatted(summary.yourShare),
-                  color: AppColors.chartYourShare,
-                  footnote: summary.isEmpty
-                      ? null
-                      : '${summary.yourSharePercent}% of total group spending',
-                ),
+                if (!_isPersonScope) ...[
+                  SizedBox(height: AppDimensions.xl.h),
+                  _buildMetric(
+                    context,
+                    label: 'Your share',
+                    amount: summary.formatted(summary.yourShare),
+                    color: AppColors.chartYourShare,
+                    footnote: summary.isEmpty
+                        ? null
+                        : '${summary.yourSharePercent}% of total group spending',
+                  ),
+                ],
                 SizedBox(height: AppDimensions.xl.h),
                 GroupSpendingTrendChart(
                   points: GroupSpendingCalculator.spendingOverTime(
                     expenses: state.expenses,
                     currencyCode: currencyCode,
                     month: _isAllTime ? null : selectedMonth,
+                    forUserId: forUserId,
                   ),
                   currencySymbol: summary.currencySymbol,
                   daily: !_isAllTime,
@@ -212,6 +303,7 @@ class _GroupTotalsPageState extends State<GroupTotalsPage> {
                     expenses: state.expenses,
                     currencyCode: currencyCode,
                     month: _isAllTime ? null : selectedMonth,
+                    forUserId: forUserId,
                   ),
                   currencySymbol: summary.currencySymbol,
                 ),
@@ -238,6 +330,7 @@ class _GroupTotalsPageState extends State<GroupTotalsPage> {
             currencyCode: currencyCode,
             userId: _currentUserId,
             month: month,
+            forUserId: _isPersonScope ? _scopedUserId : null,
           );
           return GroupSpendingBar(
             label: DateFormat('MMM').format(month).toUpperCase(),
@@ -252,10 +345,10 @@ class _GroupTotalsPageState extends State<GroupTotalsPage> {
   /// The selected month plus the two before it, matching the window Splitwise
   /// keeps on screen while you step through a group's history.
   List<DateTime> _monthWindow(DateTime month) => [
-        DateTime(month.year, month.month - 2),
-        DateTime(month.year, month.month - 1),
-        month,
-      ];
+    DateTime(month.year, month.month - 2),
+    DateTime(month.year, month.month - 1),
+    month,
+  ];
 
   DateTime _resolveMonth(List<DateTime> months) {
     if (_selectedMonth != null) return _selectedMonth!;
@@ -263,41 +356,110 @@ class _GroupTotalsPageState extends State<GroupTotalsPage> {
     return GroupSpendingCalculator.monthOf(DateTime.now());
   }
 
+  Widget _buildScopeChip(
+    BuildContext context,
+    List<(String id, String label)> members,
+    GroupSummary group,
+    Map<String, String> names,
+  ) {
+    return _buildPopupChip<String>(
+      context,
+      label: _scopeChipLabel(group, names),
+      selected: _scopedUserId ?? '',
+      items: [
+        ('', 'Group expenses'),
+        for (final member in members) member,
+      ],
+      onSelected: (id) => setState(() {
+        _scopedUserId = id.isEmpty ? null : id;
+      }),
+    );
+  }
+
   Widget _buildCurrencyChip(
     BuildContext context,
     String currencyCode,
     List<String> currencyCodes,
   ) {
-    final scheme = context.colorScheme;
+    return _buildPopupChip<String>(
+      context,
+      label: currencyCode,
+      selected: currencyCode,
+      enabled: currencyCodes.length > 1,
+      items: [
+        for (final code in currencyCodes)
+          (code, '$code · ${CurrencyCatalog.byCode(code).name}'),
+      ],
+      onSelected: (code) {
+        setState(() {
+          _currencyCode = code;
+          _selectedMonth = null;
+        });
+      },
+    );
+  }
 
-    return InkWell(
-      borderRadius: BorderRadius.circular(AppDimensions.radiusMd.r),
-      onTap: currencyCodes.length < 2
-          ? null
-          : () => _pickCurrency(currencyCodes, currencyCode),
-      child: Container(
-        padding: EdgeInsets.symmetric(
-          horizontal: AppDimensions.md.w,
-          vertical: AppDimensions.sm.h,
-        ),
-        decoration: BoxDecoration(
-          border: Border.all(color: scheme.outline),
-          borderRadius: BorderRadius.circular(AppDimensions.radiusMd.r),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              currencyCode,
-              style: context.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            SizedBox(width: AppDimensions.xs.w),
-            Icon(Icons.arrow_drop_down, size: 20.r, color: scheme.onSurface),
-          ],
-        ),
+  Widget _buildPopupChip<T>(
+    BuildContext context, {
+    required String label,
+    required T selected,
+    required List<(T value, String itemLabel)> items,
+    required ValueChanged<T> onSelected,
+    bool enabled = true,
+  }) {
+    final scheme = context.colorScheme;
+    final chip = Container(
+      padding: EdgeInsets.symmetric(
+        horizontal: AppDimensions.md.w,
+        vertical: AppDimensions.sm.h,
       ),
+      decoration: BoxDecoration(
+        border: Border.all(color: scheme.outline),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusMd.r),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: context.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          SizedBox(width: AppDimensions.xs.w),
+          Icon(Icons.arrow_drop_down, size: 20.r, color: scheme.onSurface),
+        ],
+      ),
+    );
+
+    if (!enabled) return chip;
+
+    return PopupMenuButton<T>(
+      tooltip: label,
+      offset: Offset(0, 8.h),
+      position: PopupMenuPosition.under,
+      color: scheme.surfaceContainerHigh,
+      elevation: 8,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppDimensions.radiusMd.r),
+      ),
+      onSelected: onSelected,
+      itemBuilder: (menuContext) => [
+        for (final item in items)
+          PopupMenuItem<T>(
+            value: item.$1,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(item.$2, style: menuContext.textTheme.bodyLarge),
+                ),
+                if (item.$1 == selected)
+                  Icon(Icons.check, color: menuContext.colorScheme.primary),
+              ],
+            ),
+          ),
+      ],
+      child: chip,
     );
   }
 
@@ -451,9 +613,7 @@ class _GroupTotalsPageState extends State<GroupTotalsPage> {
                             children: [
                               Flexible(
                                 child: Text(
-                                  DateFormat(
-                                    'MMMM yyyy',
-                                  ).format(selectedMonth),
+                                  DateFormat('MMMM yyyy').format(selectedMonth),
                                   overflow: TextOverflow.ellipsis,
                                   style: context.textTheme.bodyMedium?.copyWith(
                                     color: _isAllTime
@@ -526,46 +686,6 @@ class _GroupTotalsPageState extends State<GroupTotalsPage> {
     });
   }
 
-  Future<void> _pickCurrency(List<String> codes, String selected) async {
-    final picked = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: context.colorScheme.surfaceContainerHigh,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(AppDimensions.radiusXl.r),
-        ),
-      ),
-      builder: (sheetContext) => SafeArea(
-        child: ListView(
-          shrinkWrap: true,
-          children: [
-            for (final code in codes)
-              ListTile(
-                title: Text(
-                  '$code · ${CurrencyCatalog.byCode(code).name}',
-                  style: sheetContext.textTheme.bodyLarge,
-                ),
-                trailing: code == selected
-                    ? Icon(
-                        Icons.check,
-                        color: sheetContext.colorScheme.primary,
-                      )
-                    : null,
-                onTap: () => Navigator.of(sheetContext).pop(code),
-              ),
-          ],
-        ),
-      ),
-    );
-
-    if (picked != null && mounted) {
-      setState(() {
-        _currencyCode = picked;
-        _selectedMonth = null;
-      });
-    }
-  }
-
   Future<void> _pickMonth(List<DateTime> months, DateTime selected) async {
     final now = GroupSpendingCalculator.monthOf(DateTime.now());
     final picked = await GroupMonthPickerDialog.show(
@@ -583,38 +703,68 @@ class _GroupTotalsPageState extends State<GroupTotalsPage> {
     }
   }
 
-  Widget _buildEmptyState(BuildContext context) {
+  Widget _buildEmptyState(
+    BuildContext context,
+    GroupSummary group,
+    Map<String, String> names,
+    List<(String id, String label)> members,
+  ) {
     final scheme = context.colorScheme;
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: AppDimensions.xl.w),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.donut_large_rounded,
-              size: 72.r,
-              color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
-            ),
-            SizedBox(height: AppDimensions.lg.h),
-            Text(
-              'No totals to show yet.',
-              style: context.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: scheme.onSurface,
-              ),
-            ),
-            SizedBox(height: AppDimensions.sm.h),
-            Text(
-              'Add an expense to this group to see the spending summary.',
-              style: context.textTheme.bodyMedium?.copyWith(
-                color: scheme.onSurfaceVariant,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
+    final personLabel = _isPersonScope
+        ? _memberLabel(_scopedUserId!, names, group)
+        : null;
+    return Column(
+      children: [
+        Padding(
+          padding: EdgeInsets.fromLTRB(
+            AppDimensions.xl.w,
+            AppDimensions.sm.h,
+            AppDimensions.xl.w,
+            0,
+          ),
+          child: _buildScopeChip(context, members, group, names),
         ),
-      ),
+        Expanded(
+          child: Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(horizontal: AppDimensions.xl.w),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.donut_large_rounded,
+                    size: 72.r,
+                    color: scheme.onSurfaceVariant.withValues(alpha: 0.5),
+                  ),
+                  SizedBox(height: AppDimensions.lg.h),
+                  Text(
+                    personLabel == null
+                        ? 'No totals to show yet.'
+                        : personLabel == 'You'
+                            ? 'No spending of yours to show yet.'
+                            : 'No spending for $personLabel to show yet.',
+                    style: context.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: scheme.onSurface,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  SizedBox(height: AppDimensions.sm.h),
+                  Text(
+                    personLabel == null
+                        ? 'Add an expense to this group to see the spending summary.'
+                        : 'When they are on a split in this group, their share will show up here.',
+                    style: context.textTheme.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

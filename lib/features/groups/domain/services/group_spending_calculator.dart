@@ -56,12 +56,25 @@ class GroupSpendingCalculator {
   static bool counts(Expense expense) =>
       !expense.isDeleted && expense.category.toLowerCase() != 'settlement';
 
+  /// The amount that counts for a chart or total. Group view uses the full
+  /// expense; [forUserId] uses that person's split ("You" / my expenses).
+  static double attributedAmount(Expense expense, {String? forUserId}) {
+    if (forUserId == null || forUserId.isEmpty) return expense.amount;
+    return expense.splits[forUserId] ?? 0.0;
+  }
+
   /// Currency codes with spending in this group, biggest spender first.
-  static List<String> currencyCodes(List<Expense> expenses) {
+  /// Pass [forUserId] to only include currencies where that person has a share.
+  static List<String> currencyCodes(
+    List<Expense> expenses, {
+    String? forUserId,
+  }) {
     final totals = <String, double>{};
     for (final expense in expenses.where(counts)) {
+      final amount = attributedAmount(expense, forUserId: forUserId);
+      if (amount.abs() < 0.01) continue;
       final code = CurrencyCatalog.normalizeCode(expense.currencyCode);
-      totals[code] = (totals[code] ?? 0) + expense.amount;
+      totals[code] = (totals[code] ?? 0) + amount;
     }
     final codes = totals.keys.toList()
       ..sort((a, b) => totals[b]!.compareTo(totals[a]!));
@@ -70,9 +83,17 @@ class GroupSpendingCalculator {
 
   /// Months that contain spending in [currencyCode], oldest first, each
   /// normalised to the first day of the month.
-  static List<DateTime> months(List<Expense> expenses, String currencyCode) {
+  static List<DateTime> months(
+    List<Expense> expenses,
+    String currencyCode, {
+    String? forUserId,
+  }) {
     final seen = <DateTime>{};
-    for (final expense in _inCurrency(expenses, currencyCode)) {
+    for (final expense in _inCurrency(
+      expenses,
+      currencyCode,
+      forUserId: forUserId,
+    )) {
       seen.add(monthOf(expense.date));
     }
     final result = seen.toList()..sort();
@@ -84,18 +105,23 @@ class GroupSpendingCalculator {
     required String currencyCode,
     required String userId,
     DateTime? month,
+    String? forUserId,
   }) {
     final code = CurrencyCatalog.normalizeCode(currencyCode);
     var totalSpent = 0.0;
     var yourShare = 0.0;
     String? symbol;
 
-    for (final expense in _inCurrency(expenses, code)) {
+    for (final expense in _inCurrency(
+      expenses,
+      code,
+      forUserId: forUserId,
+    )) {
       if (month != null && monthOf(expense.date) != monthOf(month)) continue;
       symbol ??= expense.currencySymbol.trim().isEmpty
           ? null
           : expense.currencySymbol.trim();
-      totalSpent += expense.amount;
+      totalSpent += attributedAmount(expense, forUserId: forUserId);
       yourShare += expense.splits[userId] ?? 0.0;
     }
 
@@ -113,9 +139,17 @@ class GroupSpendingCalculator {
     required List<Expense> expenses,
     required String currencyCode,
     DateTime? month,
+    String? forUserId,
   }) {
-    if (month != null) return _dailySpending(expenses, currencyCode, month);
-    return _monthlySpending(expenses, currencyCode);
+    if (month != null) {
+      return _dailySpending(
+        expenses,
+        currencyCode,
+        month,
+        forUserId: forUserId,
+      );
+    }
+    return _monthlySpending(expenses, currencyCode, forUserId: forUserId);
   }
 
   /// Axis days to label when the trend is a single month: 1, 7, 14, 21, and
@@ -128,12 +162,18 @@ class GroupSpendingCalculator {
 
   static List<SpendPoint> _monthlySpending(
     List<Expense> expenses,
-    String currencyCode,
-  ) {
+    String currencyCode, {
+    String? forUserId,
+  }) {
     final totals = <DateTime, double>{};
-    for (final expense in _inCurrency(expenses, currencyCode)) {
+    for (final expense in _inCurrency(
+      expenses,
+      currencyCode,
+      forUserId: forUserId,
+    )) {
       final month = monthOf(expense.date);
-      totals[month] = (totals[month] ?? 0) + expense.amount;
+      totals[month] =
+          (totals[month] ?? 0) + attributedAmount(expense, forUserId: forUserId);
     }
     if (totals.isEmpty) return const [];
 
@@ -158,15 +198,21 @@ class GroupSpendingCalculator {
   static List<SpendPoint> _dailySpending(
     List<Expense> expenses,
     String currencyCode,
-    DateTime month,
-  ) {
+    DateTime month, {
+    String? forUserId,
+  }) {
     final start = monthOf(month);
     final lastDay = DateTime(start.year, start.month + 1, 0).day;
     final totals = <int, double>{};
-    for (final expense in _inCurrency(expenses, currencyCode)) {
+    for (final expense in _inCurrency(
+      expenses,
+      currencyCode,
+      forUserId: forUserId,
+    )) {
       if (monthOf(expense.date) != start) continue;
       final day = expense.date.day;
-      totals[day] = (totals[day] ?? 0) + expense.amount;
+      totals[day] =
+          (totals[day] ?? 0) + attributedAmount(expense, forUserId: forUserId);
     }
 
     return [
@@ -179,19 +225,26 @@ class GroupSpendingCalculator {
   }
 
   /// Category totals for [currencyCode], largest first. Pass [month] to match
-  /// the Totals period filter; omit it for all-time.
+  /// the Totals period filter; omit it for all-time. Pass [forUserId] to chart
+  /// that person's share instead of the group's full amounts.
   static List<CategorySpend> spendingByCategory({
     required List<Expense> expenses,
     required String currencyCode,
     DateTime? month,
+    String? forUserId,
   }) {
     final totals = <String, double>{};
-    for (final expense in _inCurrency(expenses, currencyCode)) {
+    for (final expense in _inCurrency(
+      expenses,
+      currencyCode,
+      forUserId: forUserId,
+    )) {
       if (month != null && monthOf(expense.date) != monthOf(month)) continue;
       final name = expense.category.trim().isEmpty
           ? 'General'
           : expense.category.trim();
-      totals[name] = (totals[name] ?? 0) + expense.amount;
+      totals[name] =
+          (totals[name] ?? 0) + attributedAmount(expense, forUserId: forUserId);
     }
     final rows = [
       for (final entry in totals.entries)
@@ -204,13 +257,17 @@ class GroupSpendingCalculator {
 
   static Iterable<Expense> _inCurrency(
     List<Expense> expenses,
-    String currencyCode,
-  ) {
+    String currencyCode, {
+    String? forUserId,
+  }) {
     final code = CurrencyCatalog.normalizeCode(currencyCode);
-    return expenses.where(
-      (expense) =>
-          counts(expense) &&
-          CurrencyCatalog.normalizeCode(expense.currencyCode) == code,
-    );
+    return expenses.where((expense) {
+      if (!counts(expense)) return false;
+      if (CurrencyCatalog.normalizeCode(expense.currencyCode) != code) {
+        return false;
+      }
+      if (forUserId == null || forUserId.isEmpty) return true;
+      return attributedAmount(expense, forUserId: forUserId).abs() >= 0.01;
+    });
   }
 }

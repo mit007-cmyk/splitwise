@@ -172,5 +172,52 @@ void main() {
       expect(summary.yourSharePercent, 0);
       expect(summary.currencySymbol, '₹');
     });
+
+    test('mine-only charts use the user share instead of the group amount', () {
+      final expenses = [
+        _expense(
+          id: 'e1',
+          amount: 300,
+          date: august,
+          category: 'Food & Dining',
+          splits: const {'me': 100, 'friend': 200},
+        ),
+        _expense(
+          id: 'e2',
+          amount: 90,
+          date: july,
+          category: 'Travel',
+          splits: const {'me': 0, 'friend': 90},
+        ),
+      ];
+
+      final mine = GroupSpendingCalculator.summarize(
+        expenses: expenses,
+        currencyCode: 'INR',
+        userId: 'me',
+        forUserId: 'me',
+      );
+      expect(mine.totalSpent, 100);
+      expect(mine.yourShare, 100);
+
+      final overTime = GroupSpendingCalculator.spendingOverTime(
+        expenses: expenses,
+        currencyCode: 'INR',
+        forUserId: 'me',
+      );
+      final augustPoint = overTime.firstWhere(
+        (point) => point.date == DateTime(2026, 8),
+      );
+      expect(augustPoint.amount, 100);
+
+      final categories = GroupSpendingCalculator.spendingByCategory(
+        expenses: expenses,
+        currencyCode: 'INR',
+        forUserId: 'me',
+      );
+      expect(categories, hasLength(1));
+      expect(categories.single.category, 'Food & Dining');
+      expect(categories.single.amount, 100);
+    });
   });
 }
