@@ -52,6 +52,10 @@ abstract class FriendsRepository {
     required String friendUserId,
   });
 
+  /// Registered accounts only (skips pending shadow users). Used to match
+  /// on-device contacts without uploading the address book.
+  Future<Result<List<UserPreview>>> getRegisteredUsers();
+
   /// Finds a Splitwise user by email or phone.
   /// Returns null when no user matches.
   Future<Result<UserPreview?>> findUserByEmailOrPhone({
@@ -61,6 +65,14 @@ abstract class FriendsRepository {
 
   Future<Result<String>> createPendingContact({
     required String ownerUserId,
+    required String displayName,
+    String? email,
+    String? phone,
+  });
+
+  Future<Result<void>> updatePendingContact({
+    required String ownerUserId,
+    required String contactId,
     required String displayName,
     String? email,
     String? phone,

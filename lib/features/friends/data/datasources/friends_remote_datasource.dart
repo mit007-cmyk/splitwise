@@ -61,6 +61,10 @@ abstract class FriendsRemoteDataSource {
 
   /// Finds a user by matching email or phone from the `users` table.
   /// Returns null if no match is found.
+  /// Registered accounts only (skips pending shadow users). Used to match
+  /// on-device contacts without uploading the address book.
+  Future<List<UserPreview>> getRegisteredUsers();
+
   Future<UserPreview?> findUserByEmailOrPhone({
     String? email,
     String? phone,
@@ -68,6 +72,14 @@ abstract class FriendsRemoteDataSource {
 
   Future<String> createPendingContact({
     required String ownerUserId,
+    required String displayName,
+    String? email,
+    String? phone,
+  });
+
+  Future<void> updatePendingContact({
+    required String ownerUserId,
+    required String contactId,
     required String displayName,
     String? email,
     String? phone,

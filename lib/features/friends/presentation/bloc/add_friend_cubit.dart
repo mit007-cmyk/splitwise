@@ -9,6 +9,7 @@ class AddFriendState extends Equatable {
   final String email;
   final bool isLoading;
   final bool isSuccess;
+  final bool pendingInviteCreated;
   final String? errorMessage;
   final UserPreview? resolvedUser;
 
@@ -18,6 +19,7 @@ class AddFriendState extends Equatable {
     required this.email,
     required this.isLoading,
     required this.isSuccess,
+    this.pendingInviteCreated = false,
     this.errorMessage,
     this.resolvedUser,
   });
@@ -60,6 +62,7 @@ class AddFriendState extends Equatable {
     String? email,
     bool? isLoading,
     bool? isSuccess,
+    bool? pendingInviteCreated,
     String? errorMessage,
     UserPreview? resolvedUser,
   }) {
@@ -69,14 +72,23 @@ class AddFriendState extends Equatable {
       email: email ?? this.email,
       isLoading: isLoading ?? this.isLoading,
       isSuccess: isSuccess ?? this.isSuccess,
+      pendingInviteCreated: pendingInviteCreated ?? this.pendingInviteCreated,
       errorMessage: errorMessage ?? this.errorMessage,
       resolvedUser: resolvedUser ?? this.resolvedUser,
     );
   }
 
   @override
-  List<Object?> get props =>
-      [name, phone, email, isLoading, isSuccess, errorMessage, resolvedUser];
+  List<Object?> get props => [
+        name,
+        phone,
+        email,
+        isLoading,
+        isSuccess,
+        pendingInviteCreated,
+        errorMessage,
+        resolvedUser,
+      ];
 }
 
 class AddFriendCubit extends Cubit<AddFriendState> {
@@ -154,6 +166,7 @@ class AddFriendCubit extends Cubit<AddFriendState> {
         state.copyWith(
           isLoading: false,
           isSuccess: true,
+          pendingInviteCreated: true,
         ),
       );
       return;

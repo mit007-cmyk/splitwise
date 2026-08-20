@@ -6,9 +6,14 @@ import '../../../../core/constants/app_constants.dart';
 import '../../../../core/di/di.dart';
 import '../../../../core/routing/route_constants.dart';
 import '../../../../core/utils/context_extension.dart';
+import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/avatar_widget.dart';
+import '../../../auth/presentation/bloc/auth_bloc.dart';
+import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../domain/entities/phone_contact.dart';
+import '../../domain/entities/user_preview.dart';
 import '../bloc/add_friend_search_cubit.dart';
+import '../bloc/friends_list_cubit.dart';
 
 class AddFriendSearchPage extends StatefulWidget {
   const AddFriendSearchPage({super.key});
@@ -24,7 +29,9 @@ class _AddFriendSearchPageState extends State<AddFriendSearchPage> {
   @override
   void initState() {
     super.initState();
-    _cubit = getIt<AddFriendSearchCubit>()..loadContacts();
+    final userId = _currentUserId();
+    _cubit = getIt<AddFriendSearchCubit>()
+      ..loadContacts(currentUserId: userId ?? '');
   }
 
   @override
@@ -32,6 +39,12 @@ class _AddFriendSearchPageState extends State<AddFriendSearchPage> {
     _searchController.dispose();
     _cubit.close();
     super.dispose();
+  }
+
+  String? _currentUserId() {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is Authenticated) return authState.user.id;
+    return null;
   }
 
   void _openAddSomeoneNew() {
@@ -124,7 +137,24 @@ class _AddFriendSearchPageState extends State<AddFriendSearchPage> {
                 ),
               ),
               Expanded(
-                child: BlocBuilder<AddFriendSearchCubit, AddFriendSearchState>(
+                child: BlocConsumer<AddFriendSearchCubit, AddFriendSearchState>(
+                  listener: (context, state) {
+                    if (state.addedFriendName != null) {
+                      AppToast.show(
+                        context,
+                        '${state.addedFriendName} added as a friend.',
+                        type: ToastType.success,
+                      );
+                      final uid = _currentUserId();
+                      if (uid != null) getIt<FriendsListCubit>().load(uid);
+                    } else if (state.errorMessage != null) {
+                      AppToast.show(
+                        context,
+                        state.errorMessage!,
+                        type: ToastType.error,
+                      );
+                    }
+                  },
                   builder: (context, state) {
                     if (state.isLoading) {
                       return const Center(child: CircularProgressIndicator());
@@ -179,39 +209,25 @@ class _AddFriendSearchPageState extends State<AddFriendSearchPage> {
                           ),
                         ),
                         ...state.filteredContacts.map(
-                          (contact) => ListTile(
-                            leading: contact.phone != null
-                                ? CircleAvatar(
-                                    radius: 22.r,
-                                    backgroundColor: scheme
-                                        .surfaceContainerHighest,
-                                    child: Icon(
-                                      Icons.phone,
-                                      color: scheme.onSurfaceVariant,
-                                      size: 20.r,
-                                    ),
-                                  )
-                                : AvatarWidget(
-                                    name: contact.displayName,
-                                    size: 44.w,
-                                  ),
-                            title: Text(
-                              contact.displayName,
-                              style: context.textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                            subtitle: contact.subtitle.isNotEmpty
-                                ? Text(
-                                    contact.subtitle,
-                                    style: context.textTheme.bodySmall
-                                        ?.copyWith(
-                                      color: scheme.onSurfaceVariant
-                                          .withValues(alpha: 0.7),
-                                    ),
-                                  )
-                                : null,
-                            onTap: () => _openContact(contact),
+                          (contact) => _ContactTile(
+                            contact: contact,
+                            registered: state.registeredMatches[contact.id],
+                            isFriend: () {
+                              final user = state.registeredMatches[contact.id];
+                              return user != null &&
+                                  state.friendIds.contains(user.id);
+                            }(),
+                            isInvited: state.invitedContactIds.contains(contact.id),
+                            isAdding: state.addingContactIds.contains(contact.id),
+                            onAdd: () {
+                              final uid = _currentUserId();
+                              if (uid == null) return;
+                              _cubit.addRegisteredContact(
+                                currentUserId: uid,
+                                contact: contact,
+                              );
+                            },
+                            onInvite: () => _openContact(contact),
                           ),
                         ),
                       ],
@@ -223,6 +239,97 @@ class _AddFriendSearchPageState extends State<AddFriendSearchPage> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _ContactTile extends StatelessWidget {
+  final PhoneContact contact;
+  final UserPreview? registered;
+  final bool isFriend;
+  final bool isInvited;
+  final bool isAdding;
+  final VoidCallback onAdd;
+  final VoidCallback onInvite;
+
+  const _ContactTile({
+    required this.contact,
+    required this.registered,
+    required this.isFriend,
+    required this.isInvited,
+    required this.isAdding,
+    required this.onAdd,
+    required this.onInvite,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = context.colorScheme;
+    final onSplitwise = registered != null;
+    final subtitle = onSplitwise
+        ? (isFriend ? 'Already friends' : 'On Splitwise')
+        : (isInvited ? 'Invite sent' : (contact.subtitle.isNotEmpty
+            ? contact.subtitle
+            : 'Not on Splitwise'));
+
+    return ListTile(
+      leading: onSplitwise
+          ? AvatarWidget(
+              name: registered!.name,
+              imageUrl: registered!.photoUrl,
+              size: 44.w,
+            )
+          : CircleAvatar(
+              radius: 22.r,
+              backgroundColor: scheme.surfaceContainerHighest,
+              child: Icon(
+                contact.phone != null ? Icons.phone : Icons.email_outlined,
+                color: scheme.onSurfaceVariant,
+                size: 20.r,
+              ),
+            ),
+      title: Text(
+        contact.displayName,
+        style: context.textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.w500,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: context.textTheme.bodySmall?.copyWith(
+          color: onSplitwise && !isFriend
+              ? scheme.primary
+              : scheme.onSurfaceVariant.withValues(alpha: 0.7),
+        ),
+      ),
+      trailing: _trailing(context),
+      onTap: onSplitwise
+          ? (isFriend || isAdding ? null : onAdd)
+          : (isInvited ? null : onInvite),
+    );
+  }
+
+  Widget? _trailing(BuildContext context) {
+    final scheme = context.colorScheme;
+    if (isAdding) {
+      return SizedBox(
+        width: 22.w,
+        height: 22.w,
+        child: const CircularProgressIndicator(strokeWidth: 2),
+      );
+    }
+    if (isFriend || isInvited) {
+      return Icon(Icons.check, color: scheme.primary);
+    }
+    if (registered != null) {
+      return TextButton(
+        onPressed: onAdd,
+        child: const Text('Add'),
+      );
+    }
+    return TextButton(
+      onPressed: onInvite,
+      child: const Text('Invite'),
     );
   }
 }

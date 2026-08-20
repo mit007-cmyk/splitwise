@@ -331,7 +331,11 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
                                 ),
                                 ...state.filteredContacts.map((contact) {
                                   final contactKey = 'contact:${contact.id}';
-                                  final isSelected = cubit.isSelectedKey(contactKey);
+                                  final matched = state.registeredMatches[contact.id];
+                                  final isSelected = matched != null
+                                      ? cubit.isSelectedKey(matched.id)
+                                      : cubit.isSelectedKey(contactKey);
+                                  final onSplitwise = matched != null;
                                   return ListTile(
                                     leading: CircleAvatar(
                                       radius: 22.r,
@@ -350,21 +354,31 @@ class _AddGroupMembersPageState extends State<AddGroupMembersPage> {
                                         fontWeight: FontWeight.w500,
                                       ),
                                     ),
-                                    subtitle: contact.subtitle.isNotEmpty
-                                        ? Text(
-                                            contact.subtitle,
-                                            style: context.textTheme.bodySmall?.copyWith(
-                                              color: theme.colorScheme.onSurfaceVariant
-                                                  .withOpacity(0.7),
-                                            ),
-                                          )
-                                        : null,
+                                    subtitle: Text(
+                                      onSplitwise
+                                          ? 'On Splitwise'
+                                          : (contact.subtitle.isNotEmpty
+                                              ? contact.subtitle
+                                              : 'Invite to the app'),
+                                      style: context.textTheme.bodySmall?.copyWith(
+                                        color: onSplitwise
+                                            ? theme.colorScheme.primary
+                                            : theme.colorScheme.onSurfaceVariant
+                                                .withOpacity(0.7),
+                                      ),
+                                    ),
                                     trailing: isSelected
                                         ? Icon(
                                             Icons.check,
                                             color: theme.colorScheme.primary,
                                           )
-                                        : null,
+                                        : Text(
+                                            onSplitwise ? 'Add' : 'Invite',
+                                            style: TextStyle(
+                                              color: theme.colorScheme.primary,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
                                     contentPadding: EdgeInsets.symmetric(
                                       horizontal: 16.w,
                                       vertical: 4.h,

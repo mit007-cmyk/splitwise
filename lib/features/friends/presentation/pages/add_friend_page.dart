@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
-import 'package:splitwise/core/di/di.dart';
+import '../../../../core/di/di.dart';
 import '../../../../core/utils/context_extension.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
 import '../../domain/repositories/friends_repository.dart';
 import '../bloc/add_friend_cubit.dart';
+import '../bloc/friends_list_cubit.dart';
+import '../utils/friend_invite_sender.dart';
+import '../widgets/member_added_invite_dialog.dart';
 
 class AddFriendPage extends StatefulWidget {
   final String? initialName;
@@ -53,6 +56,22 @@ class _AddFriendPageState extends State<AddFriendPage> {
     return null;
   }
 
+  Future<void> _sendInvite(BuildContext context, AddFriendState state) async {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! Authenticated) return;
+    final codeResult = await getIt<FriendsRepository>().getMyFriendCode(
+      userId: authState.user.id,
+      userName: authState.user.name,
+      photoUrl: authState.user.photoUrl,
+    );
+    if (!codeResult.isSuccess) return;
+    await FriendInviteSender.send(
+      inviteUrl: codeResult.dataOrThrow.inviteUrl,
+      phone: state.phone,
+      email: state.email,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = context.theme;
@@ -65,10 +84,24 @@ class _AddFriendPageState extends State<AddFriendPage> {
         initialEmail: widget.initialEmail,
       ),
       child: BlocConsumer<AddFriendCubit, AddFriendState>(
-        listener: (context, state) {
+        listener: (context, state) async {
           if (state.isSuccess) {
-            AppToast.show(context, 'Friend added successfully!', type: ToastType.success);
-            context.pop();
+            if (state.pendingInviteCreated) {
+              final send = await MemberAddedInviteDialog.show(
+                context,
+                title: 'Your new friend has been added',
+              );
+              if (context.mounted && send) {
+                await _sendInvite(context, state);
+              }
+            } else {
+              AppToast.show(context, 'Friend added successfully!', type: ToastType.success);
+            }
+            if (context.mounted) {
+              final uid = _currentUserId();
+              if (uid != null) getIt<FriendsListCubit>().load(uid);
+              context.pop();
+            }
           } else if (state.errorMessage != null) {
             AppToast.show(context, state.errorMessage!, type: ToastType.error);
           }

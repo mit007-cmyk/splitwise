@@ -133,6 +133,11 @@ class FriendsRepositoryImpl extends BaseRepository implements FriendsRepository 
   }
 
   @override
+  Future<Result<List<UserPreview>>> getRegisteredUsers() {
+    return safeCall(() => _remoteDataSource.getRegisteredUsers());
+  }
+
+  @override
   Future<Result<UserPreview?>> findUserByEmailOrPhone({
     String? email,
     String? phone,
@@ -152,6 +157,25 @@ class FriendsRepositoryImpl extends BaseRepository implements FriendsRepository 
     return safeCall(
       () => _remoteDataSource.createPendingContact(
         ownerUserId: ownerUserId,
+        displayName: displayName,
+        email: email,
+        phone: phone,
+      ),
+    );
+  }
+
+  @override
+  Future<Result<void>> updatePendingContact({
+    required String ownerUserId,
+    required String contactId,
+    required String displayName,
+    String? email,
+    String? phone,
+  }) {
+    return safeCall(
+      () => _remoteDataSource.updatePendingContact(
+        ownerUserId: ownerUserId,
+        contactId: contactId,
         displayName: displayName,
         email: email,
         phone: phone,

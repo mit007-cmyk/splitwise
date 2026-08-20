@@ -21,7 +21,9 @@ import 'package:splitwise/features/activity/presentation/bloc/activity_event.dar
 import 'package:splitwise/features/home/presentation/bloc/home_bloc.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_event.dart';
 import 'package:splitwise/features/home/presentation/bloc/home_state.dart';
+import '../../../friends/domain/repositories/friends_repository.dart';
 import '../../../friends/presentation/bloc/friends_list_cubit.dart';
+import '../../../friends/presentation/utils/friend_invite_sender.dart';
 import '../../domain/repositories/group_user_settings_repository.dart';
 
 class GroupSettingsPage extends StatefulWidget {
@@ -221,19 +223,25 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
     return AvatarWidget(name: name, imageUrl: photoUrl, size: 44.w);
   }
 
-  void _showMemberActionsSheet(
+  Future<void> _showMemberActionsSheet(
     BuildContext context, {
     required String groupId,
     required UserModel member,
     required bool isSettled,
     required String balanceLabel,
     required Color balanceColor,
-  }) {
+  }) async {
     final theme = context.theme;
     final homeBloc = context.read<HomeBloc>();
+    final previewResult = await getIt<FriendsRepository>().getUserById(member.id);
+    final isPending = previewResult.isSuccess &&
+        (previewResult.dataOrThrow?.isPending ?? false);
+    final phone = previewResult.isSuccess ? previewResult.dataOrThrow?.phone : null;
+    final email = previewResult.isSuccess ? previewResult.dataOrThrow?.email : null;
+    if (!mounted) return;
 
     showModalBottomSheet(
-      context: context,
+      context: this.context,
       backgroundColor: theme.colorScheme.surfaceContainerHigh,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
@@ -313,6 +321,23 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
                     );
                   },
                 ),
+                if (isPending)
+                  ListTile(
+                    leading: Icon(Icons.mail_outline, color: theme.colorScheme.onSurface),
+                    title: Text(
+                      'Resend invite',
+                      style: context.textTheme.bodyLarge?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    onTap: () {
+                      Navigator.of(sheetContext).pop();
+                      _resendMemberInvite(
+                        phone: phone ?? member.email,
+                        email: email,
+                      );
+                    },
+                  ),
                 ListTile(
                   leading: Icon(
                     Icons.logout_rounded,
@@ -354,6 +379,26 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
           ),
         );
       },
+    );
+  }
+
+  Future<void> _resendMemberInvite({String? phone, String? email}) async {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! Authenticated) return;
+    final codeResult = await getIt<FriendsRepository>().getMyFriendCode(
+      userId: authState.user.id,
+      userName: authState.user.name,
+      photoUrl: authState.user.photoUrl,
+    );
+    if (!mounted) return;
+    if (codeResult.isFailure) {
+      AppToast.show(context, 'Could not prepare the invite.', type: ToastType.error);
+      return;
+    }
+    await FriendInviteSender.send(
+      inviteUrl: codeResult.dataOrThrow.inviteUrl,
+      phone: phone,
+      email: email,
     );
   }
 

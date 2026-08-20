@@ -13,13 +13,18 @@ import '../../../activity/presentation/bloc/activity_bloc.dart';
 import '../../../activity/presentation/bloc/activity_event.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../../groups/domain/entities/group_member_invite.dart';
+import '../../../groups/presentation/pages/group_member_invite_form_page.dart';
 import '../../../home/domain/entities/group_summary.dart';
 import '../../../home/domain/repositories/home_repository.dart';
 import '../../../home/presentation/bloc/home_bloc.dart';
 import '../../../home/presentation/bloc/home_event.dart';
 import '../../domain/entities/user_preview.dart';
 import '../../domain/repositories/friends_repository.dart';
+import '../../domain/services/contact_user_matcher.dart';
+import '../../domain/services/friend_reminder_message.dart';
 import '../bloc/friends_list_cubit.dart';
+import '../utils/friend_invite_sender.dart';
 
 class FriendSettingsPage extends StatefulWidget {
   final String friendId;
@@ -243,6 +248,61 @@ class _FriendSettingsPageState extends State<FriendSettingsPage> {
     context.pop();
   }
 
+  Future<void> _editPendingContact(UserPreview friend) async {
+    final updated = await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => GroupMemberInviteFormPage(
+          title: 'Edit contact info',
+          initial: GroupMemberInvite(
+            key: friend.id,
+            displayName: friend.name,
+            email: friend.email,
+            phone: friend.phone,
+            photoUrl: friend.photoUrl,
+            userId: friend.id,
+          ),
+        ),
+      ),
+    );
+    if (updated is! GroupMemberInvite || !mounted) return;
+    final currentUserId = _currentUserId;
+    if (currentUserId == null) return;
+
+    final result = await getIt<FriendsRepository>().updatePendingContact(
+      ownerUserId: currentUserId,
+      contactId: friend.id,
+      displayName: updated.displayName,
+      email: updated.email,
+      phone: updated.phone,
+    );
+    if (!mounted) return;
+    if (result.isFailure) {
+      AppToast.show(context, 'Could not update contact info.', type: ToastType.error);
+      return;
+    }
+    await _load();
+  }
+
+  Future<void> _resendInvite(UserPreview friend) async {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is! Authenticated) return;
+    final codeResult = await getIt<FriendsRepository>().getMyFriendCode(
+      userId: authState.user.id,
+      userName: authState.user.name,
+      photoUrl: authState.user.photoUrl,
+    );
+    if (!mounted) return;
+    if (codeResult.isFailure) {
+      AppToast.show(context, 'Could not prepare the invite.', type: ToastType.error);
+      return;
+    }
+    await FriendInviteSender.send(
+      inviteUrl: codeResult.dataOrThrow.inviteUrl,
+      phone: friend.phone,
+      email: friend.email,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = context.colorScheme;
@@ -321,6 +381,12 @@ class _FriendSettingsPageState extends State<FriendSettingsPage> {
               ),
             ),
             SizedBox(height: AppDimensions.xl.h),
+            if (friend.isPending) _PendingInviteBanner(
+              friend: friend,
+              onEdit: () => _editPendingContact(friend),
+              onResend: () => _resendInvite(friend),
+            ),
+            if (friend.isPending) SizedBox(height: AppDimensions.xl.h),
             _SectionHeader(title: 'Shared groups'),
             Padding(
               padding: EdgeInsets.symmetric(horizontal: AppDimensions.lg.w),
@@ -374,6 +440,87 @@ class _FriendSettingsPageState extends State<FriendSettingsPage> {
               title: 'Report user',
               subtitle: 'Flag an abusive, suspicious, or spam account.',
               onTap: _reportUser,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PendingInviteBanner extends StatelessWidget {
+  final UserPreview friend;
+  final VoidCallback onEdit;
+  final VoidCallback onResend;
+
+  const _PendingInviteBanner({
+    required this.friend,
+    required this.onEdit,
+    required this.onResend,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final firstName = FriendReminderMessage.firstNameOf(friend.name);
+    final phone = ContactUserMatcher.formatPhoneForDisplay(
+      friend.phone ?? friend.email,
+    );
+    final scheme = context.colorScheme;
+
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: AppDimensions.lg.w),
+      child: Container(
+        width: double.infinity,
+        padding: EdgeInsets.all(AppDimensions.lg.w),
+        decoration: BoxDecoration(
+          color: context.appColors.warningColor,
+          borderRadius: BorderRadius.circular(AppDimensions.radiusMd.r),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "$firstName's invite has not been accepted. "
+              "Is the phone number '$phone' correct?",
+              style: context.textTheme.bodyMedium?.copyWith(
+                color: scheme.onError,
+                fontWeight: FontWeight.w500,
+                height: 1.35,
+              ),
+            ),
+            SizedBox(height: AppDimensions.md.h),
+            InkWell(
+              onTap: onEdit,
+              child: Row(
+                children: [
+                  Icon(Icons.edit_outlined, size: 18.r, color: scheme.onError),
+                  SizedBox(width: AppDimensions.sm.w),
+                  Text(
+                    'No, edit contact info',
+                    style: context.textTheme.bodyMedium?.copyWith(
+                      color: scheme.onError,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(height: AppDimensions.sm.h),
+            InkWell(
+              onTap: onResend,
+              child: Row(
+                children: [
+                  Icon(Icons.send_outlined, size: 18.r, color: scheme.onError),
+                  SizedBox(width: AppDimensions.sm.w),
+                  Text(
+                    'Yes, resend invite',
+                    style: context.textTheme.bodyMedium?.copyWith(
+                      color: scheme.onError,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),

@@ -16,6 +16,7 @@ import '../../domain/entities/friend_invite_preview.dart';
 import '../../domain/entities/friend_invite_resolution.dart';
 import '../../domain/entities/friend_request.dart';
 import '../../domain/entities/user_preview.dart';
+import '../../domain/services/contact_user_matcher.dart';
 import '../models/friend_request_model.dart';
 import '../models/friendship_model.dart';
 import '../models/friend_code_entry_model.dart';
@@ -669,65 +670,37 @@ class FriendsRemoteDataSourceImpl implements FriendsRemoteDataSource {
   }
 
   @override
-  Future<UserPreview?> findUserByEmailOrPhone({
-    String? email,
-    String? phone,
-  }) async {
-    final normalizedEmail = email?.trim().toLowerCase();
-    final normalizedPhoneDigits =
-        phone?.replaceAll(RegExp(r'\D'), '').trim();
-
-    if ((normalizedEmail == null || normalizedEmail.isEmpty) &&
-        (normalizedPhoneDigits == null || normalizedPhoneDigits.isEmpty)) {
-      return null;
-    }
-
+  Future<List<UserPreview>> getRegisteredUsers() async {
     final doc = await _firestoreService.getDocument(
       FirestorePaths.root,
       FirestorePaths.users,
     );
     final data = doc.data();
-    if (data == null) return null;
+    if (data == null) return [];
 
+    final users = <UserPreview>[];
     for (final entry in data.entries) {
-      final raw = entry.value;
-      if (raw is! Map) continue;
-      final userMap = Map<String, dynamic>.from(raw);
-
-      final userEmail = (userMap['email'] as String?)?.trim().toLowerCase();
-      if (normalizedEmail != null &&
-          normalizedEmail.isNotEmpty &&
-          userEmail != null &&
-          userEmail.isNotEmpty &&
-          userEmail == normalizedEmail) {
-        return UserPreview(
-          id: entry.key,
-          name: (userMap['name'] as String?) ?? 'Splitwise user',
-          email: userEmail,
-          photoUrl: userMap['photoUrl'] as String?,
-          friendCode: (userMap['friendCode'] as String?) ?? '',
-        );
-      }
-
-      final userPhoneDigits = (userMap['phone'] as String?)
-          ?.replaceAll(RegExp(r'\D'), '')
-          .trim();
-      if (normalizedPhoneDigits != null &&
-          normalizedPhoneDigits.isNotEmpty &&
-          userPhoneDigits != null &&
-          userPhoneDigits.isNotEmpty &&
-          userPhoneDigits == normalizedPhoneDigits) {
-        return UserPreview(
-          id: entry.key,
-          name: (userMap['name'] as String?) ?? 'Splitwise user',
-          email: userMap['email'] as String?,
-          photoUrl: userMap['photoUrl'] as String?,
-          friendCode: (userMap['friendCode'] as String?) ?? '',
-        );
-      }
+      final preview = _previewFromUserMap(
+        entry.key,
+        entry.value,
+        includePending: false,
+      );
+      if (preview != null) users.add(preview);
     }
+    return users;
+  }
 
-    return null;
+  @override
+  Future<UserPreview?> findUserByEmailOrPhone({
+    String? email,
+    String? phone,
+  }) async {
+    final users = await getRegisteredUsers();
+    return ContactUserMatcher.registeredUserForEmailPhone(
+      email: email,
+      phone: phone,
+      registeredUsers: users,
+    );
   }
 
   @override
@@ -853,6 +826,72 @@ class FriendsRemoteDataSourceImpl implements FriendsRemoteDataSource {
     );
 
     return id;
+  }
+
+  @override
+  Future<void> updatePendingContact({
+    required String ownerUserId,
+    required String contactId,
+    required String displayName,
+    String? email,
+    String? phone,
+  }) async {
+    final trimmedName = displayName.trim();
+    final normalizedEmail = email?.trim().toLowerCase();
+    final normalizedPhoneDigits = phone?.replaceAll(RegExp(r'\D'), '').trim();
+
+    if (trimmedName.isEmpty) {
+      throw const ServerException(message: 'Name is required');
+    }
+    if ((normalizedEmail == null || normalizedEmail.isEmpty) &&
+        (normalizedPhoneDigits == null || normalizedPhoneDigits.isEmpty)) {
+      throw const ServerException(message: 'Phone or email is required');
+    }
+
+    final pendingDoc = await _firestoreService.getDocument(
+      FirestorePaths.root,
+      FirestorePaths.pendingContacts,
+    );
+    final raw = pendingDoc.data()?[contactId];
+    if (raw is! Map) {
+      throw const ServerException(message: 'Invite not found');
+    }
+    final map = Map<String, dynamic>.from(raw);
+    if ((map['ownerUserId'] as String?) != ownerUserId) {
+      throw const ServerException(message: 'Invite not found');
+    }
+    if ((map['status'] as String?) != 'pending') {
+      throw const ServerException(message: 'Invite is no longer pending');
+    }
+
+    await _firestoreService.setDocument(
+      FirestorePaths.root,
+      FirestorePaths.pendingContacts,
+      {
+        contactId: {
+          ...map,
+          'displayName': trimmedName,
+          'email': normalizedEmail,
+          'phone': normalizedPhoneDigits,
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+      },
+      merge: true,
+    );
+
+    await _firestoreService.setDocument(
+      FirestorePaths.root,
+      FirestorePaths.users,
+      {
+        contactId: {
+          'name': trimmedName,
+          'email': normalizedEmail,
+          'phone': normalizedPhoneDigits,
+          'updatedAt': FieldValue.serverTimestamp(),
+        },
+      },
+      merge: true,
+    );
   }
 
   @override
@@ -1139,6 +1178,25 @@ class FriendsRemoteDataSourceImpl implements FriendsRemoteDataSource {
     }
     users.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     return users;
+  }
+
+  UserPreview? _previewFromUserMap(
+    String id,
+    Object? raw, {
+    required bool includePending,
+  }) {
+    if (raw is! Map) return null;
+    final userMap = Map<String, dynamic>.from(raw);
+    if (!includePending && userMap['isPendingUser'] == true) return null;
+    return UserPreview(
+      id: id,
+      name: (userMap['name'] as String?) ?? 'Splitwise user',
+      email: userMap['email'] as String?,
+      phone: userMap['phone'] as String?,
+      photoUrl: userMap['photoUrl'] as String?,
+      friendCode: (userMap['friendCode'] as String?) ?? '',
+      isPending: userMap['isPendingUser'] == true,
+    );
   }
 
   Future<bool> _isBlockedEither(String userIdA, String userIdB) async {

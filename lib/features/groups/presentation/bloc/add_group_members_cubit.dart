@@ -7,6 +7,7 @@ import 'package:splitwise/features/auth/data/models/user_model.dart';
 import 'package:splitwise/features/friends/domain/entities/phone_contact.dart';
 import 'package:splitwise/features/friends/domain/entities/user_preview.dart';
 import 'package:splitwise/features/friends/domain/repositories/friends_repository.dart';
+import 'package:splitwise/features/friends/domain/services/contact_user_matcher.dart';
 import 'package:splitwise/features/friends/domain/services/friend_list_deduper.dart';
 import 'package:splitwise/features/groups/domain/entities/group_member_invite.dart';
 
@@ -15,6 +16,7 @@ class AddGroupMembersState extends Equatable {
   final List<UserModel> filteredUsers;
   final List<PhoneContact> allContacts;
   final List<PhoneContact> filteredContacts;
+  final Map<String, UserPreview> registeredMatches;
   final List<GroupMemberInvite> selected;
   final List<String> existingMemberIds;
   final String query;
@@ -28,6 +30,7 @@ class AddGroupMembersState extends Equatable {
     this.filteredUsers = const [],
     this.allContacts = const [],
     this.filteredContacts = const [],
+    this.registeredMatches = const {},
     this.selected = const [],
     this.existingMemberIds = const [],
     this.query = '',
@@ -42,6 +45,7 @@ class AddGroupMembersState extends Equatable {
     List<UserModel>? filteredUsers,
     List<PhoneContact>? allContacts,
     List<PhoneContact>? filteredContacts,
+    Map<String, UserPreview>? registeredMatches,
     List<GroupMemberInvite>? selected,
     List<String>? existingMemberIds,
     String? query,
@@ -56,6 +60,7 @@ class AddGroupMembersState extends Equatable {
       filteredUsers: filteredUsers ?? this.filteredUsers,
       allContacts: allContacts ?? this.allContacts,
       filteredContacts: filteredContacts ?? this.filteredContacts,
+      registeredMatches: registeredMatches ?? this.registeredMatches,
       selected: selected ?? this.selected,
       existingMemberIds: existingMemberIds ?? this.existingMemberIds,
       query: query ?? this.query,
@@ -72,6 +77,7 @@ class AddGroupMembersState extends Equatable {
         filteredUsers,
         allContacts,
         filteredContacts,
+        registeredMatches,
         selected,
         existingMemberIds,
         query,
@@ -139,10 +145,22 @@ class AddGroupMembersCubit extends Cubit<AddGroupMembersState> {
 
     final contacts = await _contactsService.loadContacts();
     final unique = contacts.where((contact) => !_isAlreadyFriend(contact)).toList();
+    final registeredResult = await _friendsRepository.getRegisteredUsers();
+    final registered =
+        registeredResult.isSuccess ? registeredResult.dataOrThrow : const <UserPreview>[];
+    final matches = <String, UserPreview>{};
+    for (final contact in unique) {
+      final user = ContactUserMatcher.registeredUserFor(
+        contact: contact,
+        registeredUsers: registered,
+      );
+      if (user != null) matches[contact.id] = user;
+    }
 
     emit(state.copyWith(
       allContacts: unique,
       filteredContacts: _filterContacts(unique, state.query),
+      registeredMatches: matches,
       isLoadingContacts: false,
     ));
   }
@@ -161,6 +179,18 @@ class AddGroupMembersCubit extends Cubit<AddGroupMembersState> {
   }
 
   void toggleContact(PhoneContact contact) {
+    final matched = state.registeredMatches[contact.id];
+    if (matched != null) {
+      toggleSelection(
+        UserModel(
+          id: matched.id,
+          email: matched.email ?? matched.phone ?? '',
+          name: matched.name,
+          photoUrl: matched.photoUrl,
+        ),
+      );
+      return;
+    }
     _toggleInvite(GroupMemberInvite.fromContact(contact));
   }
 
@@ -338,9 +368,5 @@ class AddGroupMembersCubit extends Cubit<AddGroupMembersState> {
     }).toList();
   }
 
-  static String? _phoneKey(String? raw) {
-    final digits = (raw ?? '').replaceAll(RegExp(r'\D'), '');
-    if (digits.length < 8) return null;
-    return digits.length > 10 ? digits.substring(digits.length - 10) : digits;
-  }
+  static String? _phoneKey(String? raw) => ContactUserMatcher.phoneKey(raw);
 }

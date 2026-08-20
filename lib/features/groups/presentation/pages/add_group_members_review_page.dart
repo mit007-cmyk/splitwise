@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/di/di.dart';
 import '../../../../core/utils/context_extension.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/avatar_widget.dart';
@@ -9,6 +10,9 @@ import '../../../activity/presentation/bloc/activity_bloc.dart';
 import '../../../activity/presentation/bloc/activity_event.dart';
 import '../../../auth/presentation/bloc/auth_bloc.dart';
 import '../../../auth/presentation/bloc/auth_state.dart';
+import '../../../friends/domain/repositories/friends_repository.dart';
+import '../../../friends/presentation/utils/friend_invite_sender.dart';
+import '../../../friends/presentation/widgets/member_added_invite_dialog.dart';
 import '../../../home/presentation/bloc/home_bloc.dart';
 import '../../../home/presentation/bloc/home_event.dart';
 import '../../domain/entities/group_member_invite.dart';
@@ -48,14 +52,38 @@ class AddGroupMembersReviewPage extends StatelessWidget {
           actorUserId: actorUserId,
         ));
     context.read<ActivityBloc>().add(const RefreshActivity());
-    AppToast.show(
-      context,
-      memberIds.length == 1
-          ? 'Member added to the group!'
-          : '${memberIds.length} members added to the group!',
-      type: ToastType.success,
-    );
-    context.pop(true);
+
+    final unregistered = cubit.state.selected.where((invite) => !invite.isRegistered).toList();
+    if (unregistered.isNotEmpty && context.mounted) {
+      final send = await MemberAddedInviteDialog.show(context);
+      if (context.mounted && send) {
+        final authState = context.read<AuthBloc>().state;
+        if (authState is Authenticated) {
+          final codeResult = await getIt<FriendsRepository>().getMyFriendCode(
+            userId: authState.user.id,
+            userName: authState.user.name,
+            photoUrl: authState.user.photoUrl,
+          );
+          if (codeResult.isSuccess) {
+            final invite = unregistered.first;
+            await FriendInviteSender.send(
+              inviteUrl: codeResult.dataOrThrow.inviteUrl,
+              phone: invite.phone,
+              email: invite.email,
+            );
+          }
+        }
+      }
+    } else if (context.mounted) {
+      AppToast.show(
+        context,
+        memberIds.length == 1
+            ? 'Member added to the group!'
+            : '${memberIds.length} members added to the group!',
+        type: ToastType.success,
+      );
+    }
+    if (context.mounted) context.pop(true);
   }
 
   Future<void> _editInvite(BuildContext context, GroupMemberInvite invite) async {
