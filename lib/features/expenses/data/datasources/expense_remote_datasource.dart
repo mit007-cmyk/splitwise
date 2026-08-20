@@ -46,6 +46,12 @@ abstract class ExpenseRemoteDataSource {
     required String actorUserId,
     required String text,
   });
+
+  Future<void> deleteComment({
+    required String expenseId,
+    required String actorUserId,
+    required String commentId,
+  });
 }
 
 @LazySingleton(as: ExpenseRemoteDataSource)
@@ -77,11 +83,46 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
     return ids.map((id) => id.trim()).where((id) => id.isNotEmpty).toList();
   }
 
+  bool _isSettlementMap(Map<String, dynamic> expenseData) {
+    final category = (expenseData['category'] as String?)?.toLowerCase() ?? '';
+    final categoryId =
+        (expenseData['categoryId'] as String?)?.toLowerCase() ?? '';
+    return category == 'settlement' || categoryId == 'settlement';
+  }
+
+  String? _otherParticipantId(
+    Map<String, dynamic> expenseData,
+    String actorUserId,
+  ) {
+    for (final id in _visibilityUserIds(expenseData)) {
+      if (id != actorUserId.trim()) return id;
+    }
+    return null;
+  }
+
+  String _mutationEventType({
+    required String action,
+    required Map<String, dynamic> expenseData,
+  }) {
+    if (_isSettlementMap(expenseData)) {
+      switch (action) {
+        case 'created':
+          return 'settlement_added';
+        case 'updated':
+          return 'settlement_updated';
+        case 'deleted':
+          return 'settlement_deleted';
+      }
+    }
+    return 'expense_$action';
+  }
+
   Map<String, dynamic> _expenseMetadata(
     Map<String, dynamic> expenseData, {
     required String expenseId,
     required String actorUserId,
     required String? groupName,
+    Map<String, dynamic>? snapshotBefore,
   }) {
     final paidBy = expenseData['paidBy'] is Map
         ? Map<String, dynamic>.from(expenseData['paidBy'] as Map)
@@ -95,6 +136,7 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
     final netDirection = net > 0.01
         ? 'owed'
         : (net < -0.01 ? 'owe' : 'settled');
+    final otherUserId = _otherParticipantId(expenseData, actorUserId);
     return {
       'title': expenseData['title'],
       'amount': (expenseData['amount'] as num?)?.toDouble() ?? 0.0,
@@ -107,6 +149,12 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
       'netAmount': net.abs(),
       'netDirection': netDirection,
       'expenseId': expenseId,
+      if (otherUserId != null) 'otherUserId': otherUserId,
+      if (snapshotBefore != null) ...{
+        'previousAmount': (snapshotBefore['amount'] as num?)?.toDouble(),
+        'previousCategory': snapshotBefore['category'],
+        'previousTitle': snapshotBefore['title'],
+      },
     };
   }
 
@@ -161,6 +209,7 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
         expenseId: expenseId,
         actorUserId: actorUserId,
         groupName: groupName,
+        snapshotBefore: snapshotBefore,
       ),
       if (snapshotBefore != null) 'snapshotBefore': snapshotBefore,
       'snapshotAfter': snapshotAfter,
@@ -214,7 +263,7 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
         transaction,
         eventsRef,
         _buildExpenseEventData(
-          type: 'expense_created',
+          type: _mutationEventType(action: 'created', expenseData: data),
           expenseId: expenseId,
           groupId: groupId,
           actorUserId: actorUserId,
@@ -393,7 +442,7 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
         transaction,
         eventsRef,
         _buildExpenseEventData(
-          type: 'expense_updated',
+          type: _mutationEventType(action: 'updated', expenseData: merged),
           expenseId: expenseId,
           groupId: nextGroupId,
           actorUserId: actorUserId,
@@ -466,7 +515,7 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
         transaction,
         eventsRef,
         _buildExpenseEventData(
-          type: 'expense_deleted',
+          type: _mutationEventType(action: 'deleted', expenseData: existing),
           expenseId: expenseId,
           groupId: groupId,
           actorUserId: actorUserId,
@@ -622,6 +671,84 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
             'commentId': commentId,
             'text': trimmed,
             'createdBy': actorUserId,
+          },
+          changedFields: const ['comments'],
+        ),
+      );
+    });
+  }
+
+  @override
+  Future<void> deleteComment({
+    required String expenseId,
+    required String actorUserId,
+    required String commentId,
+  }) async {
+    final firestore = _firestoreService.firestore;
+    final splitwiseRef = firestore
+        .collection(FirestorePaths.root)
+        .doc(FirestorePaths.expenses);
+    final groupsRef = firestore
+        .collection(FirestorePaths.root)
+        .doc(FirestorePaths.groups);
+    final eventsRef = firestore
+        .collection(FirestorePaths.root)
+        .doc(FirestorePaths.events);
+
+    await _firestoreService.runTransaction((transaction) async {
+      final splitwiseSnap = await transaction.get(splitwiseRef);
+      final splitwiseData = splitwiseSnap.data();
+      final existingRaw = splitwiseData?[expenseId];
+
+      if (existingRaw is! Map) {
+        throw StateError('Expense not found.');
+      }
+      final existing = Map<String, dynamic>.from(existingRaw);
+      if (_isDeleted(existing)) {
+        throw StateError('Cannot delete a comment on a deleted expense.');
+      }
+
+      final commentsRaw = existing['comments'];
+      if (commentsRaw is! Map || commentsRaw[commentId] is! Map) {
+        throw StateError('Comment not found.');
+      }
+      final comment = Map<String, dynamic>.from(commentsRaw[commentId] as Map);
+      final createdBy = (comment['createdBy'] as String?)?.trim() ?? '';
+      if (createdBy.isNotEmpty && createdBy != actorUserId.trim()) {
+        throw StateError('You can only delete your own comments.');
+      }
+
+      final groupId = (existing['groupId'] as String?)?.trim() ?? '';
+      final groupsSnap = await transaction.get(groupsRef);
+      final groupsData = groupsSnap.data();
+      final groupName = _groupNameFromDoc(groupsData, groupId);
+
+      transaction.set(
+        splitwiseRef,
+        {
+          expenseId: {
+            'comments': {commentId: FieldValue.delete()},
+          },
+        },
+        SetOptions(merge: true),
+      );
+      _appendEvent(
+        transaction,
+        eventsRef,
+        _buildExpenseEventData(
+          type: 'comment_deleted',
+          expenseId: expenseId,
+          groupId: groupId,
+          actorUserId: actorUserId,
+          expenseData: existing,
+          groupName: groupName,
+          snapshotBefore: {
+            'commentId': commentId,
+            'text': comment['text'],
+            'createdBy': createdBy,
+          },
+          snapshotAfter: {
+            'commentId': commentId,
           },
           changedFields: const ['comments'],
         ),

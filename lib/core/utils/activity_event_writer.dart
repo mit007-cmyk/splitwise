@@ -136,7 +136,11 @@ class ActivityEventWriter {
     required String memberUserId,
     required String memberName,
     required List<String> visibilityUserIds,
+    bool invited = false,
   }) {
+    final joinKind = memberUserId == actorUserId
+        ? 'joined'
+        : (invited ? 'invited' : 'added');
     return {
       'type': 'member_joined_group',
       'entityType': 'group',
@@ -148,9 +152,148 @@ class ActivityEventWriter {
         'groupName': groupName,
         'memberUserId': memberUserId,
         'memberName': memberName,
+        'joinKind': joinKind,
       },
       'changedFields': const <String>[],
       'visibilityUserIds': visibilityUserIds,
+    };
+  }
+
+  /// [removed] is true when someone else was taken out of the group.
+  static Map<String, dynamic> memberLeftGroup({
+    required String groupId,
+    required String groupName,
+    required String actorUserId,
+    required String memberUserId,
+    required String memberName,
+    required List<String> visibilityUserIds,
+    required bool removed,
+  }) {
+    return {
+      'type': 'member_left_group',
+      'entityType': 'group',
+      'entityId': groupId,
+      'groupId': groupId,
+      'performedBy': actorUserId,
+      'performedAt': FieldValue.serverTimestamp(),
+      'metadata': {
+        'groupName': groupName,
+        'memberUserId': memberUserId,
+        'memberName': memberName,
+        'joinKind': removed ? 'removed' : 'left',
+      },
+      'changedFields': const <String>[],
+      'visibilityUserIds': visibilityUserIds,
+    };
+  }
+
+  static Map<String, dynamic> groupUpdated({
+    required String groupId,
+    required String actorUserId,
+    required String groupName,
+    required List<String> visibilityUserIds,
+    String? previousGroupName,
+    List<String> changedFields = const [],
+    Map<String, dynamic> extraMetadata = const {},
+  }) {
+    return {
+      'type': 'group_updated',
+      'entityType': 'group',
+      'entityId': groupId,
+      'groupId': groupId,
+      'performedBy': actorUserId,
+      'performedAt': FieldValue.serverTimestamp(),
+      'metadata': {
+        'groupName': groupName,
+        if (previousGroupName != null) 'previousGroupName': previousGroupName,
+        ...extraMetadata,
+      },
+      'changedFields': changedFields,
+      'visibilityUserIds': visibilityUserIds,
+    };
+  }
+
+  static Map<String, dynamic> friendAdded({
+    required String actorUserId,
+    required String friendUserId,
+    required String friendName,
+  }) {
+    return {
+      'type': 'friend_added',
+      'entityType': 'friend',
+      'entityId': friendUserId,
+      'groupId': null,
+      'performedBy': actorUserId,
+      'performedAt': FieldValue.serverTimestamp(),
+      'metadata': {
+        'friendUserId': friendUserId,
+        'friendName': friendName,
+      },
+      'changedFields': const <String>[],
+      'visibilityUserIds': [actorUserId, friendUserId],
+    };
+  }
+
+  static Map<String, dynamic> friendRemoved({
+    required String actorUserId,
+    required String friendUserId,
+    required String friendName,
+  }) {
+    return {
+      'type': 'friend_removed',
+      'entityType': 'friend',
+      'entityId': friendUserId,
+      'groupId': null,
+      'performedBy': actorUserId,
+      'performedAt': FieldValue.serverTimestamp(),
+      'metadata': {
+        'friendUserId': friendUserId,
+        'friendName': friendName,
+      },
+      'changedFields': const <String>[],
+      'visibilityUserIds': [actorUserId, friendUserId],
+    };
+  }
+
+  static Map<String, dynamic> friendRequestSent({
+    required String actorUserId,
+    required String friendUserId,
+    required String friendName,
+  }) {
+    return {
+      'type': 'friend_request_sent',
+      'entityType': 'friend',
+      'entityId': friendUserId,
+      'groupId': null,
+      'performedBy': actorUserId,
+      'performedAt': FieldValue.serverTimestamp(),
+      'metadata': {
+        'friendUserId': friendUserId,
+        'friendName': friendName,
+      },
+      'changedFields': const <String>[],
+      'visibilityUserIds': [actorUserId, friendUserId],
+    };
+  }
+
+  static Map<String, dynamic> friendRequestAccepted({
+    required String actorUserId,
+    required String friendUserId,
+    required String friendName,
+  }) {
+    return {
+      'type': 'friend_request_accepted',
+      'entityType': 'friend',
+      'entityId': friendUserId,
+      'groupId': null,
+      'performedBy': actorUserId,
+      'performedAt': FieldValue.serverTimestamp(),
+      'metadata': {
+        'friendUserId': friendUserId,
+        'friendName': friendName,
+      },
+      'changedFields': const <String>[],
+      'visibilityUserIds': [actorUserId, friendUserId],
     };
   }
 

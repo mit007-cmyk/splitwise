@@ -30,4 +30,10 @@ abstract class ExpenseRepository {
     required String actorUserId,
     required String text,
   });
+
+  Future<Result<void>> deleteExpenseComment({
+    required String expenseId,
+    required String actorUserId,
+    required String commentId,
+  });
 }

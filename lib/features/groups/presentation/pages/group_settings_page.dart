@@ -132,9 +132,25 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
       _updatingSimplify = true;
     });
 
+    final authState = context.read<AuthBloc>().state;
+    final actorUserId = authState is Authenticated ? authState.user.id : '';
+    if (actorUserId.isEmpty) {
+      setState(() {
+        _simplifyDebts = previous;
+        _updatingSimplify = false;
+      });
+      AppToast.show(
+        context,
+        'Could not update simplify debts. Please try again.',
+        type: ToastType.error,
+      );
+      return;
+    }
+
     final result = await getIt<HomeRepository>().updateSimplifyDebts(
       groupId: widget.groupId,
       enabled: enabled,
+      actorUserId: actorUserId,
     );
     if (!mounted) return;
 
@@ -152,7 +168,6 @@ class _GroupSettingsPageState extends State<GroupSettingsPage> {
     }
 
     context.read<HomeBloc>().add(const RefreshHome());
-    final authState = context.read<AuthBloc>().state;
     if (authState is Authenticated) {
       getIt<FriendsListCubit>().load(authState.user.id);
     }

@@ -34,9 +34,22 @@ abstract class HomeRemoteDataSource {
     required List<String> memberIds,
     required String actorUserId,
   });
-  Future<void> editGroup({required String groupId, required String name, required String type});
-  Future<void> updateSimplifyDebts({required String groupId, required bool enabled});
-  Future<void> leaveGroup({required String groupId, required String userId});
+  Future<void> editGroup({
+    required String groupId,
+    required String name,
+    required String type,
+    required String actorUserId,
+  });
+  Future<void> updateSimplifyDebts({
+    required String groupId,
+    required bool enabled,
+    required String actorUserId,
+  });
+  Future<void> leaveGroup({
+    required String groupId,
+    required String userId,
+    required String actorUserId,
+  });
   Future<void> deleteGroup({
     required String groupId,
     required String actorUserId,
@@ -219,7 +232,12 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
         .where((id) => id.isNotEmpty)
         .toList();
 
+    final usersDoc = await _firestoreService.getDocument('Splitwise', 'users');
+    final usersData = usersDoc.data();
+
     for (final memberId in addedIds) {
+      final userRaw = usersData?[memberId];
+      final invited = userRaw is Map && userRaw['isPendingUser'] == true;
       await ActivityEventWriter.appendDirect(
         _firestoreService.firestore,
         ActivityEventWriter.memberAddedToGroup(
@@ -229,6 +247,7 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
           memberUserId: memberId,
           memberName: UserDisplayNames.resolve(displayNames, memberId),
           visibilityUserIds: visibility,
+          invited: invited,
         ),
       );
     }
@@ -239,6 +258,7 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
     required String groupId,
     required String name,
     required String type,
+    required String actorUserId,
   }) async {
     final groupsDoc = await _firestoreService.getDocument('Splitwise', 'groups');
     final groupsData = groupsDoc.data();
@@ -250,8 +270,16 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
     if (groupMap == null) {
       throw Exception('Group not found');
     }
-    groupMap['name'] = name;
-    groupMap['type'] = type;
+    final previousName = (groupMap['name'] as String?) ?? '';
+    final previousType = (groupMap['type'] as String?) ?? '';
+    final nextName = name.trim();
+    final nextType = type.trim();
+    final changed = <String>[];
+    if (previousName != nextName) changed.add('name');
+    if (previousType != nextType) changed.add('type');
+
+    groupMap['name'] = nextName;
+    groupMap['type'] = nextType;
 
     await _firestoreService.setDocument(
       'Splitwise',
@@ -261,12 +289,31 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
       },
       merge: true,
     );
+
+    if (changed.isEmpty) return;
+
+    await ActivityEventWriter.appendDirect(
+      _firestoreService.firestore,
+      ActivityEventWriter.groupUpdated(
+        groupId: groupId,
+        actorUserId: actorUserId,
+        groupName: nextName,
+        previousGroupName: previousName,
+        changedFields: changed,
+        visibilityUserIds: ActivityEventWriter.memberIdsFromGroup(groupMap),
+        extraMetadata: {
+          'groupType': nextType,
+          'previousGroupType': previousType,
+        },
+      ),
+    );
   }
 
   @override
   Future<void> updateSimplifyDebts({
     required String groupId,
     required bool enabled,
+    required String actorUserId,
   }) async {
     final groupsDoc = await _firestoreService.getDocument('Splitwise', 'groups');
     final groupsData = groupsDoc.data();
@@ -278,6 +325,7 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
     if (groupMap == null) {
       throw Exception('Group not found');
     }
+    final previous = groupMap['simplifyDebts'] as bool? ?? true;
     groupMap['simplifyDebts'] = enabled;
 
     await _firestoreService.setDocument(
@@ -288,10 +336,31 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
       },
       merge: true,
     );
+
+    if (previous == enabled) return;
+
+    final groupName = (groupMap['name'] as String?) ?? 'group';
+    await ActivityEventWriter.appendDirect(
+      _firestoreService.firestore,
+      ActivityEventWriter.groupUpdated(
+        groupId: groupId,
+        actorUserId: actorUserId,
+        groupName: groupName,
+        changedFields: const ['simplifyDebts'],
+        visibilityUserIds: ActivityEventWriter.memberIdsFromGroup(groupMap),
+        extraMetadata: {
+          'simplifyDebts': enabled,
+        },
+      ),
+    );
   }
 
   @override
-  Future<void> leaveGroup({required String groupId, required String userId}) async {
+  Future<void> leaveGroup({
+    required String groupId,
+    required String userId,
+    required String actorUserId,
+  }) async {
     final groupsDoc = await _firestoreService.getDocument('Splitwise', 'groups');
     final groupsData = groupsDoc.data();
     if (groupsData == null || !groupsData.containsKey(groupId)) {
@@ -303,10 +372,17 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
       return;
     }
     final List<dynamic> currentMembers = List.from(groupMap['members'] as List? ?? []);
+    final wasMember = currentMembers.any((id) => id.toString() == userId);
+    if (!wasMember) return;
 
-    currentMembers.remove(userId);
+    currentMembers.removeWhere((id) => id.toString() == userId);
+    final groupName = (groupMap['name'] as String?) ?? 'group';
+    final remainingIds = currentMembers
+        .map((id) => id.toString().trim())
+        .where((id) => id.isNotEmpty)
+        .toList();
 
-    if (currentMembers.isEmpty) {
+    if (remainingIds.isEmpty) {
       await _firestoreService.setDocument(
         'Splitwise',
         'groups',
@@ -326,6 +402,26 @@ class HomeRemoteDataSourceImpl implements HomeRemoteDataSource {
         merge: true,
       );
     }
+
+    final displayNames = await UserDisplayNames.load(_firestoreService);
+    final visibility = <String>{
+      ...remainingIds,
+      userId,
+      actorUserId,
+    }.where((id) => id.trim().isNotEmpty).toList();
+
+    await ActivityEventWriter.appendDirect(
+      _firestoreService.firestore,
+      ActivityEventWriter.memberLeftGroup(
+        groupId: groupId,
+        groupName: groupName,
+        actorUserId: actorUserId,
+        memberUserId: userId,
+        memberName: UserDisplayNames.resolve(displayNames, userId),
+        visibilityUserIds: visibility,
+        removed: actorUserId.trim() != userId.trim(),
+      ),
+    );
   }
 
   @override

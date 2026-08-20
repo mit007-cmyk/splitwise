@@ -208,13 +208,19 @@ class HomeRepositoryImpl implements HomeRepository {
     required String groupId,
     required String name,
     required String type,
+    required String actorUserId,
   }) async {
     try {
       final isOnline = await _connectivityService.isConnected;
       if (!isOnline) {
         return Result.failure(const NetworkFailure('Cannot edit group while offline.'));
       }
-      await _remoteDataSource.editGroup(groupId: groupId, name: name, type: type);
+      await _remoteDataSource.editGroup(
+        groupId: groupId,
+        name: name,
+        type: type,
+        actorUserId: actorUserId,
+      );
       return Result.success(null);
     } catch (e) {
       return Result.failure(ServerFailure('Failed to edit group: $e'));
@@ -225,6 +231,7 @@ class HomeRepositoryImpl implements HomeRepository {
   Future<Result<void>> updateSimplifyDebts({
     required String groupId,
     required bool enabled,
+    required String actorUserId,
   }) async {
     try {
       final isOnline = await _connectivityService.isConnected;
@@ -234,6 +241,7 @@ class HomeRepositoryImpl implements HomeRepository {
       await _remoteDataSource.updateSimplifyDebts(
         groupId: groupId,
         enabled: enabled,
+        actorUserId: actorUserId,
       );
       return Result.success(null);
     } catch (e) {
@@ -245,13 +253,18 @@ class HomeRepositoryImpl implements HomeRepository {
   Future<Result<void>> leaveGroup({
     required String groupId,
     required String userId,
+    required String actorUserId,
   }) async {
     try {
       final isOnline = await _connectivityService.isConnected;
       if (!isOnline) {
         return Result.failure(const NetworkFailure('Cannot leave group while offline.'));
       }
-      await _remoteDataSource.leaveGroup(groupId: groupId, userId: userId);
+      await _remoteDataSource.leaveGroup(
+        groupId: groupId,
+        userId: userId,
+        actorUserId: actorUserId,
+      );
       return Result.success(null);
     } catch (e) {
       return Result.failure(ServerFailure('Failed to leave group: $e'));

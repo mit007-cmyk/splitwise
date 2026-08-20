@@ -10,6 +10,7 @@ import '../../../../core/utils/friend_code_parser.dart';
 import '../../../../core/utils/activity_event_writer.dart';
 import '../../../../core/utils/blocked_users_store.dart';
 import '../../../../core/utils/friendship_id_helper.dart';
+import '../../../../core/utils/user_display_names.dart';
 import '../../../auth/data/models/user_model.dart';
 import '../../domain/entities/friend_code_info.dart';
 import '../../domain/entities/friend_invite_preview.dart';
@@ -381,6 +382,16 @@ class FriendsRemoteDataSourceImpl implements FriendsRemoteDataSource {
       },
       merge: true,
     );
+
+    final friendName = await _friendDisplayName(toUserId);
+    await ActivityEventWriter.appendDirect(
+      _firestoreService.firestore,
+      ActivityEventWriter.friendRequestSent(
+        actorUserId: fromUserId,
+        friendUserId: toUserId,
+        friendName: friendName,
+      ),
+    );
   }
 
   @override
@@ -435,6 +446,16 @@ class FriendsRemoteDataSourceImpl implements FriendsRemoteDataSource {
         },
       },
       merge: true,
+    );
+
+    final friendName = await _friendDisplayName(request.fromUserId);
+    await ActivityEventWriter.appendDirect(
+      _firestoreService.firestore,
+      ActivityEventWriter.friendRequestAccepted(
+        actorUserId: userId,
+        friendUserId: request.fromUserId,
+        friendName: friendName,
+      ),
     );
   }
 
@@ -562,7 +583,19 @@ class FriendsRemoteDataSourceImpl implements FriendsRemoteDataSource {
       throw const ServerException(message: 'This user is unavailable');
     }
 
+    final alreadyFriends = await areFriends(currentUserId, friendUserId);
     await _createFriendship(currentUserId, friendUserId);
+    if (alreadyFriends) return;
+
+    final friendName = await _friendDisplayName(friendUserId);
+    await ActivityEventWriter.appendDirect(
+      _firestoreService.firestore,
+      ActivityEventWriter.friendAdded(
+        actorUserId: currentUserId,
+        friendUserId: friendUserId,
+        friendName: friendName,
+      ),
+    );
   }
 
   Future<void> _createFriendship(String userIdA, String userIdB) async {
@@ -598,6 +631,9 @@ class FriendsRemoteDataSourceImpl implements FriendsRemoteDataSource {
       friendUserId,
     );
 
+    final wereFriends = await areFriends(currentUserId, friendUserId);
+    final friendName = await _friendDisplayName(friendUserId);
+
     try {
       await _firestoreService.updateDocument(
         FirestorePaths.root,
@@ -609,9 +645,20 @@ class FriendsRemoteDataSourceImpl implements FriendsRemoteDataSource {
       // pending/shadow contact) — fall through and clean that up instead.
     }
 
-    await _removePendingContactIfAny(
+    final removedPending = await _removePendingContactIfAny(
       ownerUserId: currentUserId,
       contactId: friendUserId,
+    );
+
+    if (!wereFriends && !removedPending) return;
+
+    await ActivityEventWriter.appendDirect(
+      _firestoreService.firestore,
+      ActivityEventWriter.friendRemoved(
+        actorUserId: currentUserId,
+        friendUserId: friendUserId,
+        friendName: friendName,
+      ),
     );
   }
 
@@ -619,7 +666,7 @@ class FriendsRemoteDataSourceImpl implements FriendsRemoteDataSource {
   /// records) owned by [ownerUserId] for [contactId], if one exists. This is
   /// what actually makes "Remove from friends list" work for contacts that
   /// were added but never turned into a real Splitwise account.
-  Future<void> _removePendingContactIfAny({
+  Future<bool> _removePendingContactIfAny({
     required String ownerUserId,
     required String contactId,
   }) async {
@@ -628,7 +675,7 @@ class FriendsRemoteDataSourceImpl implements FriendsRemoteDataSource {
       FirestorePaths.pendingContacts,
     );
     final pendingData = pendingDoc.data();
-    if (pendingData == null) return;
+    if (pendingData == null) return false;
 
     String? matchedKey;
     for (final entry in pendingData.entries) {
@@ -642,7 +689,7 @@ class FriendsRemoteDataSourceImpl implements FriendsRemoteDataSource {
       }
     }
 
-    if (matchedKey == null) return;
+    if (matchedKey == null) return false;
 
     await _firestoreService.updateDocument(
       FirestorePaths.root,
@@ -667,6 +714,7 @@ class FriendsRemoteDataSourceImpl implements FriendsRemoteDataSource {
         );
       }
     }
+    return true;
   }
 
   @override
@@ -997,7 +1045,19 @@ class FriendsRemoteDataSourceImpl implements FriendsRemoteDataSource {
       if (!emailMatches && !phoneMatches) continue;
       if (await _isBlockedEither(ownerUserId, userId)) continue;
 
+      final alreadyFriends = await areFriends(ownerUserId, userId);
       await _createFriendship(ownerUserId, userId);
+      if (!alreadyFriends) {
+        final friendName = await _friendDisplayName(userId);
+        await ActivityEventWriter.appendDirect(
+          _firestoreService.firestore,
+          ActivityEventWriter.friendAdded(
+            actorUserId: ownerUserId,
+            friendUserId: userId,
+            friendName: friendName,
+          ),
+        );
+      }
 
       final key = (map['id'] as String?) ?? entry.key;
       updates[key] = {
@@ -1214,5 +1274,13 @@ class FriendsRemoteDataSourceImpl implements FriendsRemoteDataSource {
     final raw = doc.data()?[requestId];
     if (raw is! Map) return null;
     return FriendRequestModel.fromJson(Map<String, dynamic>.from(raw));
+  }
+
+  Future<String> _friendDisplayName(String userId) async {
+    final preview = await getUserById(userId);
+    final name = preview?.name.trim();
+    if (name != null && name.isNotEmpty) return name;
+    final names = await UserDisplayNames.load(_firestoreService);
+    return UserDisplayNames.resolve(names, userId);
   }
 }

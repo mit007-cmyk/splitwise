@@ -136,10 +136,16 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     Emitter<HomeState> emit,
   ) async {
     emit(const HomeLoading());
+    final userResult = await _authRepository.getCurrentUser();
+    if (!userResult.isSuccess || userResult.dataOrThrow.id.isEmpty) {
+      emit(const HomeError('User session not found. Please log in again.'));
+      return;
+    }
     final result = await _homeRepository.editGroup(
       groupId: event.groupId,
       name: event.name,
       type: event.type,
+      actorUserId: userResult.dataOrThrow.id,
     );
 
     if (result is SuccessResult<void>) {
@@ -165,6 +171,7 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     final result = await _homeRepository.leaveGroup(
       groupId: event.groupId,
       userId: userId,
+      actorUserId: userId,
     );
 
     if (result is SuccessResult<void>) {
@@ -203,11 +210,18 @@ class HomeBloc extends Bloc<HomeEvent, HomeState> {
     RemoveGroupMemberRequested event,
     Emitter<HomeState> emit,
   ) async {
+    final userResult = await _authRepository.getCurrentUser();
+    if (!userResult.isSuccess || userResult.dataOrThrow.id.isEmpty) {
+      emit(const HomeError('User session not found. Please log in again.'));
+      return;
+    }
+
     emit(const HomeLoading());
 
     final result = await _homeRepository.leaveGroup(
       groupId: event.groupId,
       userId: event.memberId,
+      actorUserId: userResult.dataOrThrow.id,
     );
 
     if (result is SuccessResult<void>) {

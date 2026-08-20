@@ -60,88 +60,82 @@ class _ActivityPageState extends State<ActivityPage> {
   bool _isSettlement(ActivityEvent event) {
     final category = (event.metadata['category'] as String?)?.toLowerCase() ?? '';
     return category == 'settlement' ||
-        event.type == ActivityEventType.settlementAdded;
+        event.type == ActivityEventType.settlementAdded ||
+        event.type == ActivityEventType.settlementUpdated ||
+        event.type == ActivityEventType.settlementDeleted;
   }
 
-  String _line1(ActivityState state, String currentUserId, ActivityEvent event) {
-    final actor = _actorName(state, currentUserId, event.performedBy);
-    final title = (event.metadata['title'] as String?) ?? 'expense';
-    final groupName = (event.metadata['groupName'] as String?) ?? 'group';
-    switch (event.type) {
-      case ActivityEventType.expenseCreated:
-        if (_isSettlement(event)) {
-          return _settlementLine(state, currentUserId, event, actor, groupName);
-        }
-        return '$actor added "$title" in "$groupName".';
-      case ActivityEventType.expenseUpdated:
-        return '$actor edited "$title" in "$groupName".';
-      case ActivityEventType.expenseDeleted:
-        return '$actor deleted "$title" in "$groupName".';
-      case ActivityEventType.expenseRestored:
-        return '$actor restored "$title" in "$groupName".';
-      case ActivityEventType.groupCreated:
-        return '$actor created the group "$groupName".';
-      case ActivityEventType.groupDeleted:
-        return '$actor deleted the group "$groupName".';
-      case ActivityEventType.memberJoinedGroup:
-        final memberId = (event.metadata['memberUserId'] as String?) ?? '';
-        final memberName = _personName(
-          state,
-          currentUserId,
-          memberId,
-          fallback: event.metadata['memberName'] as String?,
-        );
-        return '$actor added $memberName to the group "$groupName".';
-      case ActivityEventType.userBlocked:
-        final name = _personName(
-          state,
-          currentUserId,
-          event.entityId,
-          fallback: event.metadata['blockedUserName'] as String?,
-        );
-        return '$actor blocked $name. This notification is only visible to you.';
-      case ActivityEventType.userUnblocked:
-        final name = _personName(
-          state,
-          currentUserId,
-          event.entityId,
-          fallback: event.metadata['unblockedUserName'] as String?,
-        );
-        return '$actor unblocked $name. This notification is only visible to you.';
-      default:
-        return '$actor performed ${event.type.value.replaceAll('_', ' ')}.';
-    }
+  String _titleOf(ActivityEvent event) {
+    final title = (event.metadata['title'] as String?)?.trim();
+    if (title != null && title.isNotEmpty) return title;
+    return 'expense';
   }
 
-  String _settlementLine(
+  String _groupNameOf(ActivityEvent event) {
+    final name = (event.metadata['groupName'] as String?)?.trim();
+    if (name != null && name.isNotEmpty) return name;
+    return 'group';
+  }
+
+  bool _changedAny(ActivityEvent event, List<String> fields) {
+    return event.changedFields.any(fields.contains);
+  }
+
+  String _quoted(String value) => '"$value"';
+
+  String _otherName(
     ActivityState state,
     String currentUserId,
     ActivityEvent event,
-    String actor,
-    String groupName,
   ) {
-    final participants = event.metadata['participants'];
-    String? otherId;
-    if (participants is List) {
-      for (final id in participants) {
-        final value = id.toString();
-        if (value.isNotEmpty && value != event.performedBy) {
-          otherId = value;
-          break;
+    final fromMetadata = event.metadata['otherUserId'] as String?;
+    String? otherId = fromMetadata?.trim();
+    if (otherId == null || otherId.isEmpty) {
+      final participants = event.metadata['participants'];
+      if (participants is List) {
+        for (final id in participants) {
+          final value = id.toString();
+          if (value.isNotEmpty && value != event.performedBy) {
+            otherId = value;
+            break;
+          }
         }
       }
     }
-    final otherName = otherId == null
+    return otherId == null
         ? 'Splitwise user'
         : _personName(state, currentUserId, otherId);
-    final direction = (event.metadata['netDirection'] as String?) ?? '';
-    if (direction == 'owe') {
-      return '$actor recorded a payment from $otherName in "$groupName".';
-    }
-    return '$actor paid $otherName in "$groupName".';
   }
 
-  InlineSpan _line1Span(
+  String _friendName(
+    ActivityState state,
+    String currentUserId,
+    ActivityEvent event,
+  ) {
+    final id = (event.metadata['friendUserId'] as String?) ?? event.entityId;
+    return _personName(
+      state,
+      currentUserId,
+      id,
+      fallback: event.metadata['friendName'] as String?,
+    );
+  }
+
+  String _memberName(
+    ActivityState state,
+    String currentUserId,
+    ActivityEvent event,
+  ) {
+    final memberId = (event.metadata['memberUserId'] as String?) ?? '';
+    return _personName(
+      state,
+      currentUserId,
+      memberId,
+      fallback: event.metadata['memberName'] as String?,
+    );
+  }
+
+  InlineSpan _headlineSpan(
     BuildContext context,
     ActivityState state,
     String currentUserId,
@@ -152,92 +146,39 @@ class _ActivityPageState extends State<ActivityPage> {
       height: 1.25,
     );
     final bold = base?.copyWith(fontWeight: FontWeight.w700);
-
     TextSpan boldText(String text) => TextSpan(text: text, style: bold);
     TextSpan plain(String text) => TextSpan(text: text, style: base);
 
     final actor = _actorName(state, currentUserId, event.performedBy);
-    final title = (event.metadata['title'] as String?) ?? 'expense';
-    final groupName = (event.metadata['groupName'] as String?) ?? 'group';
+    final title = _titleOf(event);
+    final groupName = _groupNameOf(event);
 
-    switch (event.type) {
-      case ActivityEventType.userBlocked:
-        final name = _personName(
-          state,
-          currentUserId,
-          event.entityId,
-          fallback: event.metadata['blockedUserName'] as String?,
-        );
-        return TextSpan(
-          style: base,
-          children: [
-            boldText(actor),
-            plain(' blocked '),
-            boldText(name),
-            plain('. This notification is only visible to you.'),
-          ],
-        );
-      case ActivityEventType.userUnblocked:
-        final name = _personName(
-          state,
-          currentUserId,
-          event.entityId,
-          fallback: event.metadata['unblockedUserName'] as String?,
-        );
-        return TextSpan(
-          style: base,
-          children: [
-            boldText(actor),
-            plain(' unblocked '),
-            boldText(name),
-            plain('. This notification is only visible to you.'),
-          ],
-        );
-      case ActivityEventType.memberJoinedGroup:
-        final memberId = (event.metadata['memberUserId'] as String?) ?? '';
-        final memberName = _personName(
-          state,
-          currentUserId,
-          memberId,
-          fallback: event.metadata['memberName'] as String?,
-        );
-        return TextSpan(
-          style: base,
-          children: [
-            boldText(actor),
-            plain(' added '),
-            plain(memberName),
-            plain(' to the group '),
-            boldText('"$groupName"'),
-            plain('.'),
-          ],
-        );
-      case ActivityEventType.groupCreated:
-        return TextSpan(
-          style: base,
-          children: [
-            boldText(actor),
-            plain(' created the group '),
-            boldText('"$groupName"'),
-            plain('.'),
-          ],
-        );
-      case ActivityEventType.expenseCreated:
-        if (_isSettlement(event)) {
-          final participants = event.metadata['participants'];
-          String? otherId;
-          if (participants is List) {
-            for (final id in participants) {
-              final value = id.toString();
-              if (value.isNotEmpty && value != event.performedBy) {
-                otherId = value;
-                break;
-              }
-            }
-          }
-          final otherName = otherId == null
-              ? 'Splitwise user'
-              : _personName(state, currentUserId, otherId);
+    if (_isSettlement(event)) {
+      final otherName = _otherName(state, currentUserId, event);
+      switch (event.type) {
+        case ActivityEventType.settlementUpdated:
+        case ActivityEventType.expenseUpdated:
+          return TextSpan(
+            style: base,
+            children: [
+              boldText(actor),
+              plain(' edited a payment in '),
+              boldText(_quoted(groupName)),
+              plain('.'),
+            ],
+          );
+        case ActivityEventType.settlementDeleted:
+        case ActivityEventType.expenseDeleted:
+          return TextSpan(
+            style: base,
+            children: [
+              boldText(actor),
+              plain(' cancelled a payment in '),
+              boldText(_quoted(groupName)),
+              plain('.'),
+            ],
+          );
+        default:
           final direction = (event.metadata['netDirection'] as String?) ?? '';
           if (direction == 'owe') {
             return TextSpan(
@@ -247,7 +188,7 @@ class _ActivityPageState extends State<ActivityPage> {
                 plain(' recorded a payment from '),
                 boldText(otherName),
                 plain(' in '),
-                boldText('"$groupName"'),
+                boldText(_quoted(groupName)),
                 plain('.'),
               ],
             );
@@ -259,7 +200,203 @@ class _ActivityPageState extends State<ActivityPage> {
               plain(' paid '),
               boldText(otherName),
               plain(' in '),
-              boldText('"$groupName"'),
+              boldText(_quoted(groupName)),
+              plain('.'),
+            ],
+          );
+      }
+    }
+
+    switch (event.type) {
+      case ActivityEventType.expenseCreated:
+        return TextSpan(
+          style: base,
+          children: [
+            boldText(actor),
+            plain(' added '),
+            boldText(_quoted(title)),
+            plain(' in '),
+            boldText(_quoted(groupName)),
+            plain('.'),
+          ],
+        );
+      case ActivityEventType.expenseUpdated:
+        if (_changedAny(event, const ['category', 'categoryId']) &&
+            !_changedAny(event, const ['amount'])) {
+          final category = (event.metadata['category'] as String?)?.trim();
+          return TextSpan(
+            style: base,
+            children: [
+              boldText(actor),
+              plain(' changed '),
+              boldText(_quoted(title)),
+              plain(' category'),
+              if (category != null && category.isNotEmpty) ...[
+                plain(' to '),
+                boldText(category),
+              ],
+              plain(' in '),
+              boldText(_quoted(groupName)),
+              plain('.'),
+            ],
+          );
+        }
+        if (_changedAny(event, const [
+              'splits',
+              'paidBy',
+              'splitType',
+              'participantIds',
+            ]) &&
+            !_changedAny(event, const ['amount', 'category', 'categoryId'])) {
+          return TextSpan(
+            style: base,
+            children: [
+              boldText(actor),
+              plain(' changed the split for '),
+              boldText(_quoted(title)),
+              plain(' in '),
+              boldText(_quoted(groupName)),
+              plain('.'),
+            ],
+          );
+        }
+        return TextSpan(
+          style: base,
+          children: [
+            boldText(actor),
+            plain(' edited '),
+            boldText(_quoted(title)),
+            plain(' in '),
+            boldText(_quoted(groupName)),
+            plain('.'),
+          ],
+        );
+      case ActivityEventType.expenseDeleted:
+        return TextSpan(
+          style: base,
+          children: [
+            boldText(actor),
+            plain(' deleted '),
+            boldText(_quoted(title)),
+            plain(' in '),
+            boldText(_quoted(groupName)),
+            plain('.'),
+          ],
+        );
+      case ActivityEventType.expenseRestored:
+        return TextSpan(
+          style: base,
+          children: [
+            boldText(actor),
+            plain(' restored '),
+            boldText(_quoted(title)),
+            plain(' in '),
+            boldText(_quoted(groupName)),
+            plain('.'),
+          ],
+        );
+      case ActivityEventType.commentAdded:
+        return TextSpan(
+          style: base,
+          children: [
+            boldText(actor),
+            plain(' commented on '),
+            boldText(_quoted(title)),
+            plain('.'),
+          ],
+        );
+      case ActivityEventType.commentEdited:
+        return TextSpan(
+          style: base,
+          children: [
+            boldText(actor),
+            plain(' edited a comment on '),
+            boldText(_quoted(title)),
+            plain('.'),
+          ],
+        );
+      case ActivityEventType.commentDeleted:
+        return TextSpan(
+          style: base,
+          children: [
+            boldText(actor),
+            plain(' deleted a comment on '),
+            boldText(_quoted(title)),
+            plain('.'),
+          ],
+        );
+      case ActivityEventType.groupCreated:
+        return TextSpan(
+          style: base,
+          children: [
+            boldText(actor),
+            plain(' created the group '),
+            boldText(_quoted(groupName)),
+            plain('.'),
+          ],
+        );
+      case ActivityEventType.groupDeleted:
+        return TextSpan(
+          style: base,
+          children: [
+            boldText(actor),
+            plain(' deleted the group '),
+            boldText(_quoted(groupName)),
+            plain('.'),
+          ],
+        );
+      case ActivityEventType.groupUpdated:
+        if (event.changedFields.contains('name')) {
+          final previous =
+              (event.metadata['previousGroupName'] as String?)?.trim();
+          return TextSpan(
+            style: base,
+            children: [
+              boldText(actor),
+              plain(' changed group name'),
+              if (previous != null && previous.isNotEmpty) ...[
+                plain(' from '),
+                boldText(_quoted(previous)),
+              ],
+              plain(' to '),
+              boldText(_quoted(groupName)),
+              plain('.'),
+            ],
+          );
+        }
+        return TextSpan(
+          style: base,
+          children: [
+            boldText(actor),
+            plain(' changed settings for the group '),
+            boldText(_quoted(groupName)),
+            plain('.'),
+          ],
+        );
+      case ActivityEventType.memberJoinedGroup:
+        final joinKind = (event.metadata['joinKind'] as String?) ?? 'added';
+        final memberName = _memberName(state, currentUserId, event);
+        if (joinKind == 'joined' ||
+            event.performedBy == (event.metadata['memberUserId'] as String?)) {
+          return TextSpan(
+            style: base,
+            children: [
+              boldText(actor),
+              plain(' joined the group '),
+              boldText(_quoted(groupName)),
+              plain('.'),
+            ],
+          );
+        }
+        if (joinKind == 'invited') {
+          return TextSpan(
+            style: base,
+            children: [
+              boldText(actor),
+              plain(' invited '),
+              boldText(memberName),
+              plain(' to the group '),
+              boldText(_quoted(groupName)),
               plain('.'),
             ],
           );
@@ -269,19 +406,147 @@ class _ActivityPageState extends State<ActivityPage> {
           children: [
             boldText(actor),
             plain(' added '),
-            boldText('"$title"'),
-            plain(' in '),
-            boldText('"$groupName"'),
+            boldText(memberName),
+            plain(' to the group '),
+            boldText(_quoted(groupName)),
             plain('.'),
           ],
         );
+      case ActivityEventType.memberLeftGroup:
+        final joinKind = (event.metadata['joinKind'] as String?) ?? 'left';
+        final memberName = _memberName(state, currentUserId, event);
+        if (joinKind == 'removed') {
+          return TextSpan(
+            style: base,
+            children: [
+              boldText(actor),
+              plain(' removed '),
+              boldText(memberName),
+              plain(' from the group '),
+              boldText(_quoted(groupName)),
+              plain('.'),
+            ],
+          );
+        }
+        return TextSpan(
+          style: base,
+          children: [
+            boldText(actor),
+            plain(' left the group '),
+            boldText(_quoted(groupName)),
+            plain('.'),
+          ],
+        );
+      case ActivityEventType.friendAdded:
+        return TextSpan(
+          style: base,
+          children: [
+            boldText(actor),
+            plain(' added '),
+            boldText(_friendName(state, currentUserId, event)),
+            plain(' as a friend.'),
+          ],
+        );
+      case ActivityEventType.friendRemoved:
+        return TextSpan(
+          style: base,
+          children: [
+            boldText(actor),
+            plain(' removed '),
+            boldText(_friendName(state, currentUserId, event)),
+            plain(' from friends.'),
+          ],
+        );
+      case ActivityEventType.friendRequestSent:
+        final friendId =
+            (event.metadata['friendUserId'] as String?) ?? event.entityId;
+        if (friendId == currentUserId) {
+          return TextSpan(
+            style: base,
+            children: [
+              boldText(actor),
+              plain(' sent you a friend request.'),
+            ],
+          );
+        }
+        return TextSpan(
+          style: base,
+          children: [
+            boldText(actor),
+            plain(' sent a friend request to '),
+            boldText(_friendName(state, currentUserId, event)),
+            plain('.'),
+          ],
+        );
+      case ActivityEventType.friendRequestAccepted:
+        final friendId =
+            (event.metadata['friendUserId'] as String?) ?? event.entityId;
+        if (friendId == currentUserId) {
+          return TextSpan(
+            style: base,
+            children: [
+              boldText(actor),
+              plain(' accepted your friend request.'),
+            ],
+          );
+        }
+        return TextSpan(
+          style: base,
+          children: [
+            boldText(actor),
+            plain(' accepted '),
+            boldText(_friendName(state, currentUserId, event)),
+            plain("'s friend request."),
+          ],
+        );
+      case ActivityEventType.userBlocked:
+        return TextSpan(
+          style: base,
+          children: [
+            boldText(actor),
+            plain(' blocked '),
+            boldText(
+              _personName(
+                state,
+                currentUserId,
+                event.entityId,
+                fallback: event.metadata['blockedUserName'] as String?,
+              ),
+            ),
+            plain('. This notification is only visible to you.'),
+          ],
+        );
+      case ActivityEventType.userUnblocked:
+        return TextSpan(
+          style: base,
+          children: [
+            boldText(actor),
+            plain(' unblocked '),
+            boldText(
+              _personName(
+                state,
+                currentUserId,
+                event.entityId,
+                fallback: event.metadata['unblockedUserName'] as String?,
+              ),
+            ),
+            plain('. This notification is only visible to you.'),
+          ],
+        );
       default:
-        return TextSpan(text: _line1(state, currentUserId, event), style: base);
+        return TextSpan(
+          style: base,
+          children: [
+            boldText(actor),
+            plain(' ${event.type.value.replaceAll('_', ' ')}.'),
+          ],
+        );
     }
   }
 
   bool _isDeletedExpenseEvent(ActivityEvent event) {
     return event.type == ActivityEventType.expenseDeleted ||
+        event.type == ActivityEventType.settlementDeleted ||
         ((event.snapshotAfter?['isDeleted'] as bool?) ?? false);
   }
 
@@ -298,25 +563,21 @@ class _ActivityPageState extends State<ActivityPage> {
         return 'You received $symbol${amount.toStringAsFixed(2)}';
       }
     }
-    if (direction == 'owed') return 'You get back $symbol${amount.toStringAsFixed(2)}';
-    if (direction == 'owe') return 'You owe $symbol${amount.toStringAsFixed(2)}';
+    if (direction == 'owed') {
+      return 'You get back $symbol${amount.toStringAsFixed(2)}';
+    }
+    if (direction == 'owe') {
+      return 'You owe $symbol${amount.toStringAsFixed(2)}';
+    }
     return null;
   }
 
   TextStyle _line2Style(BuildContext context, ActivityEvent event) {
     final direction = (event.metadata['netDirection'] as String?) ?? '';
     final isDeleted = _isDeletedExpenseEvent(event);
-    final isSettlement = _isSettlement(event);
-    final Color amountColor;
-    if (isSettlement) {
-      amountColor = direction == 'owe'
-          ? context.appColors.negativeBalanceColor
-          : context.appColors.positiveBalanceColor;
-    } else {
-      amountColor = direction == 'owe'
-          ? context.appColors.negativeBalanceColor
-          : context.appColors.positiveBalanceColor;
-    }
+    final amountColor = direction == 'owe'
+        ? context.appColors.negativeBalanceColor
+        : context.appColors.positiveBalanceColor;
 
     return context.textTheme.bodyMedium!.copyWith(
       color: isDeleted ? amountColor.withValues(alpha: 0.75) : amountColor,
@@ -343,13 +604,23 @@ class _ActivityPageState extends State<ActivityPage> {
     if (_isSettlement(event)) return Icons.payments_outlined;
     switch (event.type) {
       case ActivityEventType.groupCreated:
+      case ActivityEventType.groupUpdated:
       case ActivityEventType.groupDeleted:
       case ActivityEventType.memberJoinedGroup:
       case ActivityEventType.memberLeftGroup:
         return Icons.list_alt_rounded;
+      case ActivityEventType.friendAdded:
+      case ActivityEventType.friendRemoved:
+      case ActivityEventType.friendRequestSent:
+      case ActivityEventType.friendRequestAccepted:
+        return Icons.person_outline_rounded;
       case ActivityEventType.userBlocked:
       case ActivityEventType.userUnblocked:
         return Icons.person_off_outlined;
+      case ActivityEventType.commentAdded:
+      case ActivityEventType.commentEdited:
+      case ActivityEventType.commentDeleted:
+        return Icons.chat_bubble_outline_rounded;
       case ActivityEventType.expenseCreated:
       case ActivityEventType.expenseUpdated:
       case ActivityEventType.expenseDeleted:
@@ -378,8 +649,15 @@ class _ActivityPageState extends State<ActivityPage> {
       case ActivityEventType.userUnblocked:
         return scheme.primary.withValues(alpha: 0.18);
       case ActivityEventType.groupCreated:
+      case ActivityEventType.groupUpdated:
       case ActivityEventType.memberJoinedGroup:
+      case ActivityEventType.memberLeftGroup:
         return const Color(0xFF6B2D3C).withValues(alpha: 0.55);
+      case ActivityEventType.friendAdded:
+      case ActivityEventType.friendRemoved:
+      case ActivityEventType.friendRequestSent:
+      case ActivityEventType.friendRequestAccepted:
+        return scheme.secondaryContainer.withValues(alpha: 0.7);
       default:
         return scheme.primaryContainer.withValues(alpha: 0.55);
     }
@@ -391,6 +669,7 @@ class _ActivityPageState extends State<ActivityPage> {
     final activityBloc = context.read<ActivityBloc>();
     if (event.entityType == 'expense') {
       if (event.type == ActivityEventType.expenseDeleted ||
+          event.type == ActivityEventType.settlementDeleted ||
           ((event.snapshotAfter?['isDeleted'] as bool?) ?? false)) {
         final restored = await Navigator.of(context).push<bool>(
           MaterialPageRoute(
@@ -490,7 +769,7 @@ class _ActivityPageState extends State<ActivityPage> {
                     ),
                   ),
                   title: Text.rich(
-                    _line1Span(context, state, currentUserId, item),
+                    _headlineSpan(context, state, currentUserId, item),
                   ),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,

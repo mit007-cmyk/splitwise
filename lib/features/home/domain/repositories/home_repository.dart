@@ -52,16 +52,19 @@ abstract class HomeRepository {
     required String groupId,
     required String name,
     required String type,
+    required String actorUserId,
   });
 
   Future<Result<void>> updateSimplifyDebts({
     required String groupId,
     required bool enabled,
+    required String actorUserId,
   });
 
   Future<Result<void>> leaveGroup({
     required String groupId,
     required String userId,
+    required String actorUserId,
   });
 
   Future<Result<void>> deleteGroup({

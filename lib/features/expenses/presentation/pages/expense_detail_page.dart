@@ -206,6 +206,43 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
     if (fetched != null) await _resolveMissingNames();
   }
 
+  Future<void> _deleteComment(ExpenseComment comment) async {
+    if (comment.createdBy != widget.currentUserId) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete comment?'),
+        content: const Text('This comment will be removed from the expense.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final result = await _expenseRepository.deleteExpenseComment(
+      expenseId: _expense.id,
+      actorUserId: widget.currentUserId,
+      commentId: comment.id,
+    );
+    if (!mounted) return;
+    if (result.isSuccess) {
+      await _refetchExpense();
+    } else {
+      final message = result is FailureResult<void>
+          ? result.failure.message
+          : 'Could not delete comment. Try again.';
+      AppToast.show(context, message, type: ToastType.error);
+    }
+  }
+
   Future<void> _submitComment() async {
     final text = _commentController.text.trim();
     if (text.isEmpty || _isSendingComment.value) return;
@@ -483,6 +520,7 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
                     isLoading: _isLoadingComments,
                     currentUserId: widget.currentUserId,
                     displayName: _displayName,
+                    onDelete: _deleteComment,
                   ),
                 ],
               ),
@@ -825,12 +863,14 @@ class _CommentsSection extends StatelessWidget {
   final bool isLoading;
   final String currentUserId;
   final String Function(String userId) displayName;
+  final Future<void> Function(ExpenseComment comment) onDelete;
 
   const _CommentsSection({
     required this.comments,
     required this.isLoading,
     required this.currentUserId,
     required this.displayName,
+    required this.onDelete,
   });
 
   String _meta(ExpenseComment comment) {
@@ -904,25 +944,30 @@ class _CommentsSection extends StatelessWidget {
                     : Alignment.centerLeft,
                 child: ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: 280.w),
-                  child: Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: AppDimensions.md.w,
-                      vertical: AppDimensions.sm.h,
-                    ),
-                    decoration: BoxDecoration(
-                      color: comment.createdBy == currentUserId
-                          ? AppColors.primaryContainerDark
-                          : scheme.surfaceContainerHigh,
-                      borderRadius: BorderRadius.circular(
-                        AppDimensions.radiusLg.r,
+                  child: GestureDetector(
+                    onLongPress: comment.createdBy == currentUserId
+                        ? () => onDelete(comment)
+                        : null,
+                    child: Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: AppDimensions.md.w,
+                        vertical: AppDimensions.sm.h,
                       ),
-                    ),
-                    child: Text(
-                      comment.text,
-                      style: context.textTheme.bodyMedium?.copyWith(
+                      decoration: BoxDecoration(
                         color: comment.createdBy == currentUserId
-                            ? AppColors.onImageLight
-                            : scheme.onSurface,
+                            ? AppColors.primaryContainerDark
+                            : scheme.surfaceContainerHigh,
+                        borderRadius: BorderRadius.circular(
+                          AppDimensions.radiusLg.r,
+                        ),
+                      ),
+                      child: Text(
+                        comment.text,
+                        style: context.textTheme.bodyMedium?.copyWith(
+                          color: comment.createdBy == currentUserId
+                              ? AppColors.onImageLight
+                              : scheme.onSurface,
+                        ),
                       ),
                     ),
                   ),

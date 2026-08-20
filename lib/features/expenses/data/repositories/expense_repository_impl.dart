@@ -93,4 +93,19 @@ class ExpenseRepositoryImpl extends BaseRepository implements ExpenseRepository 
       ),
     );
   }
+
+  @override
+  Future<Result<void>> deleteExpenseComment({
+    required String expenseId,
+    required String actorUserId,
+    required String commentId,
+  }) {
+    return safeCall(
+      () => _remoteDataSource.deleteComment(
+        expenseId: expenseId,
+        actorUserId: actorUserId,
+        commentId: commentId,
+      ),
+    );
+  }
 }
