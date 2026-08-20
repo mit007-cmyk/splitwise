@@ -443,6 +443,7 @@ class _GroupDetailPageState extends State<GroupDetailPage> {
               SizedBox(width: 8.w),
               ExpenseCategoryGlyph(
                 category: expense.category,
+                iconKey: expense.categoryIcon,
                 size: 34.w,
               ),
             ],

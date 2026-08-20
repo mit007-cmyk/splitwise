@@ -205,7 +205,12 @@ class AppRouter {
         builder: (context, state) {
           final groupId = state.pathParameters['groupId'] ?? '';
           final category = state.pathParameters['category'] ?? '';
-          return GroupCategoryExpensesPage(groupId: groupId, category: category);
+          final categoryId = state.uri.queryParameters['categoryId'];
+          return GroupCategoryExpensesPage(
+            groupId: groupId,
+            category: category,
+            categoryId: categoryId,
+          );
         },
       ),
       GoRoute(

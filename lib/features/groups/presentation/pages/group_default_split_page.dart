@@ -18,6 +18,7 @@ import '../../../home/domain/repositories/home_repository.dart';
 import '../../domain/entities/group_default_split.dart';
 import '../../domain/repositories/group_user_settings_repository.dart';
 import '../../../expenses/domain/repositories/expense_repository.dart';
+import '../../../expenses/domain/repositories/category_repository.dart';
 
 /// Configure the signed-in user's personal default split for one group.
 /// Reuses Add Expense split UI; saved template prefills future expenses only.
@@ -51,6 +52,7 @@ class _GroupDefaultSplitPageState extends State<GroupDefaultSplitPage> {
       homeRepository: getIt<HomeRepository>(),
       friendsRepository: getIt<FriendsRepository>(),
       groupUserSettingsRepository: getIt<GroupUserSettingsRepository>(),
+      categoryRepository: getIt<CategoryRepository>(),
       currentUserId: currentUserId,
       currentUserName: currentUserName,
     )..add(InitAddExpense(groupId: widget.groupId));

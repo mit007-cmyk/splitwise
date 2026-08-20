@@ -16,6 +16,7 @@ import '../../../groups/domain/repositories/group_user_settings_repository.dart'
 import '../../domain/entities/expense.dart';
 import '../../domain/entities/split_type.dart';
 import '../../domain/repositories/expense_repository.dart';
+import '../../domain/repositories/category_repository.dart';
 import '../bloc/add_expense_bloc.dart';
 import '../bloc/add_expense_event.dart';
 import '../bloc/add_expense_state.dart';
@@ -69,6 +70,7 @@ class _AddExpensePageState extends State<AddExpensePage> {
       homeRepository: getIt<HomeRepository>(),
       friendsRepository: getIt<FriendsRepository>(),
       groupUserSettingsRepository: getIt<GroupUserSettingsRepository>(),
+      categoryRepository: getIt<CategoryRepository>(),
       currentUserId: currentUserId,
       currentUserName: currentUserName,
     )..add(

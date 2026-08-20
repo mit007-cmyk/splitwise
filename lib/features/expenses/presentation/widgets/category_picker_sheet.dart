@@ -7,6 +7,9 @@ import '../../../../core/utils/context_extension.dart';
 import '../bloc/add_expense_bloc.dart';
 import '../bloc/add_expense_event.dart';
 import '../bloc/add_expense_state.dart';
+import '../../domain/entities/app_category.dart';
+import '../../domain/entities/default_categories.dart';
+import 'category_icons.dart';
 
 enum _ExpenseCategoryKind {
   general,
@@ -29,7 +32,10 @@ class ExpenseCategory {
   const ExpenseCategory(this.name, this.icon);
 
   /// Filled icon for list tiles and badges.
-  static IconData iconFor(String? name) {
+  static IconData iconFor(String? name, {String? iconKey}) {
+    if (iconKey != null && iconKey.trim().isNotEmpty) {
+      return CategoryIcons.dataFor(iconKey);
+    }
     switch (_kindFor(name)) {
       case _ExpenseCategoryKind.food:
         return Icons.restaurant_rounded;
@@ -57,8 +63,15 @@ class ExpenseCategory {
   }
 
   /// Saturated tile colour behind [iconFor], with white glyphs.
-  static Color backgroundFor(String? name) {
-    switch (_kindFor(name)) {
+  static Color backgroundFor(String? name, {String? iconKey}) {
+    final kind = _kindFor(name);
+    if (kind == _ExpenseCategoryKind.general) {
+      final needle = name?.trim().toLowerCase() ?? '';
+      if (needle.isNotEmpty && needle != 'general') {
+        return _hashedColor(iconKey ?? name ?? 'general');
+      }
+    }
+    switch (kind) {
       case _ExpenseCategoryKind.food:
         return AppColors.categoryFood;
       case _ExpenseCategoryKind.groceries:
@@ -82,6 +95,14 @@ class ExpenseCategory {
       case _ExpenseCategoryKind.general:
         return AppColors.categoryGeneral;
     }
+  }
+
+  static Color _hashedColor(String seed) {
+    var hash = 0;
+    for (final code in seed.codeUnits) {
+      hash = (hash * 31 + code) & 0x7fffffff;
+    }
+    return AppColors.chartCategories[hash % AppColors.chartCategories.length];
   }
 
   static _ExpenseCategoryKind _kindFor(String? name) {
@@ -168,11 +189,13 @@ const List<ExpenseCategory> kExpenseCategories = [
 
 class ExpenseCategoryGlyph extends StatelessWidget {
   final String category;
+  final String? iconKey;
   final double size;
 
   const ExpenseCategoryGlyph({
     super.key,
     required this.category,
+    this.iconKey,
     required this.size,
   });
 
@@ -182,11 +205,11 @@ class ExpenseCategoryGlyph extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: ExpenseCategory.backgroundFor(category),
+        color: ExpenseCategory.backgroundFor(category, iconKey: iconKey),
         borderRadius: BorderRadius.circular(8.r),
       ),
       child: Icon(
-        ExpenseCategory.iconFor(category),
+        ExpenseCategory.iconFor(category, iconKey: iconKey),
         size: size * 0.55,
         color: AppColors.onImageLight,
       ),
@@ -217,40 +240,264 @@ class CategoryPickerSheet extends StatelessWidget {
 
     return BlocBuilder<AddExpenseBloc, AddExpenseState>(
       builder: (context, state) {
+        final defaults = state.defaultCategories.isEmpty
+            ? DefaultCategories.forPicker
+            : state.defaultCategories;
+        final canAddCustom = state.groupId != null && state.groupId!.isNotEmpty;
+
         return SafeArea(
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Padding(
                   padding: EdgeInsets.all(AppDimensions.lg.w),
                   child: Text(
                     'Choose a category',
-                    style: context.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                    style: context.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
-                ...kExpenseCategories.map(
-                  (category) => ListTile(
-                    leading: ExpenseCategoryGlyph(
-                      category: category.name,
-                      size: 32.w,
-                    ),
-                    title: Text(category.name),
-                    trailing: state.category == category.name
-                        ? Icon(Icons.check, color: scheme.primary)
-                        : null,
+                _sectionLabel(context, 'Default'),
+                ...defaults.map(
+                  (category) => _CategoryTile(
+                    category: category,
+                    selected: _isSelected(state, category),
                     onTap: () {
-                      context.read<AddExpenseBloc>().add(CategoryChanged(category.name));
+                      context.read<AddExpenseBloc>().add(CategoryChanged(category));
                       Navigator.of(context).pop();
                     },
                   ),
                 ),
+                if (canAddCustom) ...[
+                  SizedBox(height: AppDimensions.sm.h),
+                  _sectionLabel(context, 'Custom Categories'),
+                  if (state.customCategories.isEmpty)
+                    Padding(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: AppDimensions.lg.w,
+                        vertical: AppDimensions.sm.h,
+                      ),
+                      child: Text(
+                        'No custom categories yet',
+                        style: context.textTheme.bodyMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                  ...state.customCategories.map(
+                    (category) => _CategoryTile(
+                      category: category,
+                      selected: _isSelected(state, category),
+                      onTap: () {
+                        context.read<AddExpenseBloc>().add(CategoryChanged(category));
+                        Navigator.of(context).pop();
+                      },
+                    ),
+                  ),
+                  ListTile(
+                    leading: Icon(Icons.add, color: scheme.primary),
+                    title: Text(
+                      'Add category',
+                      style: TextStyle(
+                        color: scheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    enabled: !state.isSavingCategory,
+                    onTap: () => _AddCategorySheet.show(context),
+                  ),
+                ],
                 SizedBox(height: AppDimensions.sm.h),
               ],
             ),
           ),
         );
       },
+    );
+  }
+
+  static bool _isSelected(AddExpenseState state, AppCategory category) {
+    return state.categoryId == category.id &&
+        state.categorySource == category.source;
+  }
+
+  static Widget _sectionLabel(BuildContext context, String label) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        AppDimensions.lg.w,
+        AppDimensions.sm.h,
+        AppDimensions.lg.w,
+        AppDimensions.xs.h,
+      ),
+      child: Text(
+        label.toUpperCase(),
+        style: context.textTheme.labelSmall?.copyWith(
+          letterSpacing: 0.6,
+          fontWeight: FontWeight.w700,
+          color: context.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
+class _CategoryTile extends StatelessWidget {
+  final AppCategory category;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _CategoryTile({
+    required this.category,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: ExpenseCategoryGlyph(
+        category: category.name,
+        iconKey: category.iconKey,
+        size: 32.w,
+      ),
+      title: Text(category.name),
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (selected) Icon(Icons.check, color: context.colorScheme.primary),
+        ],
+      ),
+      onTap: onTap,
+    );
+  }
+}
+
+class _AddCategorySheet extends StatefulWidget {
+  const _AddCategorySheet();
+
+  static Future<void> show(BuildContext context) {
+    final bloc = context.read<AddExpenseBloc>();
+    return showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: context.colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(
+          top: Radius.circular(AppDimensions.radiusXl.r),
+        ),
+      ),
+      builder: (sheetContext) => BlocProvider.value(
+        value: bloc,
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+          ),
+          child: const _AddCategorySheet(),
+        ),
+      ),
+    );
+  }
+
+  @override
+  State<_AddCategorySheet> createState() => _AddCategorySheetState();
+}
+
+class _AddCategorySheetState extends State<_AddCategorySheet> {
+  final _nameController = TextEditingController();
+  String _iconKey = 'pets';
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = context.colorScheme;
+    return SafeArea(
+      child: Padding(
+        padding: EdgeInsets.all(AppDimensions.lg.w),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Add category',
+              style: context.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            SizedBox(height: AppDimensions.lg.h),
+            TextField(
+              controller: _nameController,
+              autofocus: true,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Name',
+                hintText: 'Pet Supplies',
+              ),
+            ),
+            SizedBox(height: AppDimensions.lg.h),
+            Text(
+              'Icon',
+              style: context.textTheme.labelLarge,
+            ),
+            SizedBox(height: AppDimensions.sm.h),
+            Wrap(
+              spacing: AppDimensions.sm.w,
+              runSpacing: AppDimensions.sm.h,
+              children: [
+                for (final key in CategoryIcons.pickerKeys)
+                  InkWell(
+                    onTap: () => setState(() => _iconKey = key),
+                    borderRadius: BorderRadius.circular(AppDimensions.radiusMd.r),
+                    child: Container(
+                      width: 44.w,
+                      height: 44.w,
+                      decoration: BoxDecoration(
+                        color: _iconKey == key
+                            ? scheme.primaryContainer
+                            : scheme.surfaceContainerHighest,
+                        borderRadius:
+                            BorderRadius.circular(AppDimensions.radiusMd.r),
+                        border: Border.all(
+                          color: _iconKey == key
+                              ? scheme.primary
+                              : scheme.outlineVariant,
+                        ),
+                      ),
+                      child: Icon(
+                        CategoryIcons.dataFor(key),
+                        color: _iconKey == key
+                            ? scheme.primary
+                            : scheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            SizedBox(height: AppDimensions.xl.h),
+            FilledButton(
+              onPressed: () {
+                final name = _nameController.text.trim();
+                if (name.isEmpty) return;
+                context.read<AddExpenseBloc>().add(
+                      CreateCustomCategoryRequested(
+                        name: name,
+                        iconKey: _iconKey,
+                      ),
+                    );
+                Navigator.of(context).pop();
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

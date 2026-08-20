@@ -34,14 +34,20 @@ import '../../features/auth/domain/usecases/register_usecase.dart' as _i941;
 import '../../features/auth/domain/usecases/watch_auth_status_usecase.dart'
     as _i281;
 import '../../features/auth/presentation/bloc/auth_bloc.dart' as _i797;
+import '../../features/expenses/data/datasources/category_remote_datasource.dart'
+    as _i95;
 import '../../features/expenses/data/datasources/exchange_rate_remote_datasource.dart'
     as _i1051;
 import '../../features/expenses/data/datasources/expense_remote_datasource.dart'
     as _i848;
+import '../../features/expenses/data/repositories/category_repository_impl.dart'
+    as _i626;
 import '../../features/expenses/data/repositories/exchange_rate_repository_impl.dart'
     as _i243;
 import '../../features/expenses/data/repositories/expense_repository_impl.dart'
     as _i786;
+import '../../features/expenses/domain/repositories/category_repository.dart'
+    as _i559;
 import '../../features/expenses/domain/repositories/exchange_rate_repository.dart'
     as _i470;
 import '../../features/expenses/domain/repositories/expense_repository.dart'
@@ -166,6 +172,8 @@ extension GetItInjectableX on _i174.GetIt {
           gh<_i1047.HiveService>(),
           gh<_i1019.AppLogger>(),
         ));
+    gh.lazySingleton<_i95.CategoryRemoteDataSource>(
+        () => _i95.CategoryRemoteDataSourceImpl(gh<_i52.FirestoreService>()));
     gh.lazySingleton<_i848.ExpenseRemoteDataSource>(
         () => _i848.ExpenseRemoteDataSourceImpl(gh<_i52.FirestoreService>()));
     gh.factory<_i437.AddFriendSearchCubit>(
@@ -209,6 +217,8 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i941.RegisterUseCase(gh<_i787.AuthRepository>()));
     gh.lazySingleton<_i281.WatchAuthStatusUseCase>(
         () => _i281.WatchAuthStatusUseCase(gh<_i787.AuthRepository>()));
+    gh.lazySingleton<_i559.CategoryRepository>(() =>
+        _i626.CategoryRepositoryImpl(gh<_i95.CategoryRemoteDataSource>()));
     gh.lazySingleton<_i939.ExpenseRepository>(
         () => _i786.ExpenseRepositoryImpl(gh<_i848.ExpenseRemoteDataSource>()));
     gh.lazySingleton<_i863.ConvertExpensesToCurrency>(

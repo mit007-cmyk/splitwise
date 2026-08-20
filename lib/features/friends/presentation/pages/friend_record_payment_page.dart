@@ -7,6 +7,7 @@ import '../../../../core/utils/context_extension.dart';
 import '../../../../core/widgets/app_toast.dart';
 import '../../../../core/widgets/avatar_widget.dart';
 import '../../../expenses/domain/entities/expense.dart';
+import '../../../expenses/domain/entities/default_categories.dart';
 import '../../../expenses/domain/entities/split_type.dart';
 import '../../../expenses/domain/repositories/expense_repository.dart';
 
@@ -117,7 +118,10 @@ class _FriendRecordPaymentPageState extends State<FriendRecordPaymentPage> {
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       groupId: groupId,
       title: 'Settlement',
-      category: 'Settlement',
+      category: DefaultCategories.settlement.name,
+      categoryId: DefaultCategories.settlement.id,
+      categorySource: DefaultCategories.settlement.source,
+      categoryIcon: DefaultCategories.settlement.iconKey,
       amount: amount,
       currencyCode: widget.currencyCode,
       currencySymbol: widget.currencySymbol,

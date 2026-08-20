@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import '../../domain/entities/app_category.dart';
 import '../../domain/entities/currency.dart';
 import '../../domain/entities/expense.dart';
 import '../../domain/entities/split_type.dart';
@@ -53,12 +54,25 @@ class AmountChanged extends AddExpenseEvent {
 }
 
 class CategoryChanged extends AddExpenseEvent {
-  final String category;
+  final AppCategory category;
 
   const CategoryChanged(this.category);
 
   @override
   List<Object?> get props => [category];
+}
+
+class CreateCustomCategoryRequested extends AddExpenseEvent {
+  final String name;
+  final String iconKey;
+
+  const CreateCustomCategoryRequested({
+    required this.name,
+    required this.iconKey,
+  });
+
+  @override
+  List<Object?> get props => [name, iconKey];
 }
 
 class NotesChanged extends AddExpenseEvent {

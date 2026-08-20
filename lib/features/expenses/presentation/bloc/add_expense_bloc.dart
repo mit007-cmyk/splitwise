@@ -4,9 +4,12 @@ import '../../../../core/errors/result.dart';
 import '../../../friends/domain/repositories/friends_repository.dart';
 import '../../../home/domain/entities/group_summary.dart';
 import '../../../home/domain/repositories/home_repository.dart';
+import '../../domain/entities/default_categories.dart';
+import '../../domain/entities/category_source.dart';
 import '../../domain/entities/expense.dart';
 import '../../domain/entities/expense_participant.dart';
 import '../../domain/entities/split_type.dart';
+import '../../domain/repositories/category_repository.dart';
 import '../../domain/repositories/expense_repository.dart';
 import '../../../groups/domain/repositories/group_user_settings_repository.dart';
 import '../../domain/services/direct_group.dart';
@@ -18,6 +21,7 @@ class AddExpenseBloc extends Bloc<AddExpenseEvent, AddExpenseState> {
   final HomeRepository _homeRepository;
   final FriendsRepository _friendsRepository;
   final GroupUserSettingsRepository _groupUserSettingsRepository;
+  final CategoryRepository _categoryRepository;
   static const _uuid = Uuid();
 
   /// The full app user directory (fetched once in [_onInit]), keyed by user
@@ -37,12 +41,14 @@ class AddExpenseBloc extends Bloc<AddExpenseEvent, AddExpenseState> {
     required HomeRepository homeRepository,
     required FriendsRepository friendsRepository,
     required GroupUserSettingsRepository groupUserSettingsRepository,
+    required CategoryRepository categoryRepository,
     required String currentUserId,
     required String currentUserName,
   })  : _expenseRepository = expenseRepository,
         _homeRepository = homeRepository,
         _friendsRepository = friendsRepository,
         _groupUserSettingsRepository = groupUserSettingsRepository,
+        _categoryRepository = categoryRepository,
         super(AddExpenseState.initial(
           currentUserId: currentUserId,
           currentUserName: currentUserName,
@@ -51,7 +57,8 @@ class AddExpenseBloc extends Bloc<AddExpenseEvent, AddExpenseState> {
     on<GroupSelected>(_onGroupSelected);
     on<TitleChanged>((event, emit) => emit(state.copyWith(title: event.title)));
     on<AmountChanged>((event, emit) => emit(state.copyWith(amountText: event.amountText)));
-    on<CategoryChanged>((event, emit) => emit(state.copyWith(category: event.category)));
+    on<CategoryChanged>((event, emit) => emit(state.withCategory(event.category)));
+    on<CreateCustomCategoryRequested>(_onCreateCustomCategory);
     on<NotesChanged>((event, emit) => emit(state.copyWith(notes: event.notes)));
     on<DateChanged>((event, emit) => emit(state.copyWith(date: event.date)));
     on<CurrencySearchChanged>(
@@ -108,11 +115,13 @@ class AddExpenseBloc extends Bloc<AddExpenseEvent, AddExpenseState> {
 
     if (event.existingExpense != null) {
       _applyExistingExpense(event.existingExpense!, groups, emit);
+      await _loadPickerCategories(event.existingExpense!.groupId, emit);
       return;
     }
 
     if (event.friendId != null) {
       await _applyFriendMode(event.friendId!, emit);
+      await _loadPickerCategories(state.groupId, emit);
       return;
     }
 
@@ -129,7 +138,11 @@ class AddExpenseBloc extends Bloc<AddExpenseEvent, AddExpenseState> {
     if (initialGroup != null) {
       _applyGroup(initialGroup, emit);
       await _applyDefaultSplit(initialGroup.groupId, emit);
+      await _loadPickerCategories(initialGroup.groupId, emit);
+      return;
     }
+
+    await _loadPickerCategories(null, emit);
   }
 
   Future<void> _applyFriendMode(String friendId, Emitter<AddExpenseState> emit) async {
@@ -180,6 +193,7 @@ class AddExpenseBloc extends Bloc<AddExpenseEvent, AddExpenseState> {
 
     _applyGroup(group, emit);
     await _applyDefaultSplit(group.groupId, emit);
+    await _loadPickerCategories(group.groupId, emit);
   }
 
   void _applyGroup(GroupSummary group, Emitter<AddExpenseState> emit) {
@@ -312,6 +326,15 @@ class AddExpenseBloc extends Bloc<AddExpenseEvent, AddExpenseState> {
       title: expense.title,
       amountText: amountText,
       category: expense.category,
+      categoryId: expense.categoryId ??
+          DefaultCategories.byName(expense.category)?.id ??
+          DefaultCategories.general.id,
+      categorySource: expense.categorySource ??
+          DefaultCategories.byName(expense.category)?.source ??
+          DefaultCategories.general.source,
+      categoryIcon: expense.categoryIcon ??
+          DefaultCategories.byName(expense.category)?.iconKey ??
+          DefaultCategories.general.iconKey,
       notes: expense.notes ?? '',
       date: expense.date,
       currency: state.filteredCurrencies.firstWhere(
@@ -439,6 +462,9 @@ class AddExpenseBloc extends Bloc<AddExpenseEvent, AddExpenseState> {
       groupId: state.groupId!,
       title: state.title.trim(),
       category: state.category,
+      categoryId: state.categoryId,
+      categorySource: state.categorySource,
+      categoryIcon: state.categoryIcon,
       amount: state.amount,
       currencyCode: state.currency.code,
       currencySymbol: state.currency.symbol,
@@ -497,5 +523,65 @@ class AddExpenseBloc extends Bloc<AddExpenseEvent, AddExpenseState> {
         errorMessage: 'Could not delete the expense. Please try again.',
       ));
     }
+  }
+
+  Future<void> _loadPickerCategories(
+    String? groupId,
+    Emitter<AddExpenseState> emit,
+  ) async {
+    final result = await _categoryRepository.getPickerCategories(groupId: groupId);
+    if (result.isFailure) {
+      emit(state.copyWith(defaultCategories: DefaultCategories.forPicker));
+      return;
+    }
+    final lists = result.dataOrThrow;
+    var next = state.copyWith(
+      defaultCategories:
+          lists.defaults.isEmpty ? DefaultCategories.forPicker : lists.defaults,
+      customCategories: lists.custom,
+    );
+    if (next.categorySource == CategorySource.custom &&
+        lists.custom.every((c) => c.id != next.categoryId)) {
+      next = next.withCategory(DefaultCategories.general);
+    }
+    emit(next);
+  }
+
+  Future<void> _onCreateCustomCategory(
+    CreateCustomCategoryRequested event,
+    Emitter<AddExpenseState> emit,
+  ) async {
+    final groupId = state.groupId;
+    if (groupId == null || groupId.isEmpty) {
+      emit(state.copyWith(errorMessage: 'Select a group before adding a category.'));
+      return;
+    }
+    final name = event.name.trim();
+    if (name.isEmpty) {
+      emit(state.copyWith(errorMessage: 'Enter a category name.'));
+      return;
+    }
+
+    emit(state.copyWith(isSavingCategory: true, errorMessage: null));
+    final result = await _categoryRepository.createCustomCategory(
+      groupId: groupId,
+      name: name,
+      iconKey: event.iconKey,
+      createdBy: state.currentUserId,
+    );
+    if (result.isFailure) {
+      emit(state.copyWith(
+        isSavingCategory: false,
+        errorMessage: 'Could not add the category. Please try again.',
+      ));
+      return;
+    }
+    final created = result.dataOrThrow;
+    emit(
+      state.copyWith(
+        isSavingCategory: false,
+        customCategories: [...state.customCategories, created],
+      ).withCategory(created),
+    );
   }
 }

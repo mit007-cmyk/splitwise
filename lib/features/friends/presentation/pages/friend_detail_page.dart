@@ -577,10 +577,15 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
     required bool isDirect,
     required String groupName,
     required String category,
+    String? iconKey,
   }) {
     final size = 40.w;
     if (isDirect) {
-      return ExpenseCategoryGlyph(category: category, size: size);
+      return ExpenseCategoryGlyph(
+        category: category,
+        iconKey: iconKey,
+        size: size,
+      );
     }
 
     return ClipRRect(
@@ -594,7 +599,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
             GeometricIdenticon(seed: groupName, clipToCircle: false),
             Center(
               child: Icon(
-                ExpenseCategory.iconFor(category),
+                ExpenseCategory.iconFor(category, iconKey: iconKey),
                 size: 18.r,
                 color: Colors.white,
               ),
@@ -652,6 +657,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                 isDirect: true,
                 groupName: expense.title,
                 category: expense.category,
+                iconKey: expense.categoryIcon,
               ),
               SizedBox(width: AppDimensions.sm.w),
               Expanded(
@@ -789,6 +795,7 @@ class _FriendDetailPageState extends State<FriendDetailPage> {
                 isDirect: false,
                 groupName: groupName,
                 category: latest.expense.category,
+                iconKey: latest.expense.categoryIcon,
               ),
               SizedBox(width: AppDimensions.sm.w),
               Expanded(

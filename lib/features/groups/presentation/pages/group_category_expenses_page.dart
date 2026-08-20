@@ -17,11 +17,13 @@ import 'package:splitwise/features/home/presentation/bloc/home_state.dart';
 class GroupCategoryExpensesPage extends StatefulWidget {
   final String groupId;
   final String category;
+  final String? categoryId;
 
   const GroupCategoryExpensesPage({
     super.key,
     required this.groupId,
     required this.category,
+    this.categoryId,
   });
 
   @override
@@ -137,6 +139,7 @@ class _GroupCategoryExpensesPageState extends State<GroupCategoryExpensesPage> {
               SizedBox(width: 8.w),
               ExpenseCategoryGlyph(
                 category: expense.category,
+                iconKey: expense.categoryIcon,
                 size: 34.w,
               ),
             ],
@@ -221,7 +224,10 @@ class _GroupCategoryExpensesPageState extends State<GroupCategoryExpensesPage> {
                   final filteredExpenses = state.expenses
                       .where((e) =>
                           !e.isDeleted &&
-                          e.category.toLowerCase() == widget.category.toLowerCase())
+                          e.matchesCategory(
+                            name: widget.category,
+                            categoryId: widget.categoryId,
+                          ))
                       .toList();
 
                   if (filteredExpenses.isEmpty) {

@@ -1,4 +1,5 @@
 import '../../../expenses/data/datasources/currency_catalog.dart';
+import '../../../expenses/domain/entities/default_categories.dart';
 import '../../../expenses/domain/entities/expense.dart';
 
 /// What a group spent, and how much of it is yours, for a single currency and
@@ -39,9 +40,16 @@ class SpendPoint {
 /// One slice on the "Spending by category" chart.
 class CategorySpend {
   final String category;
+  final String? categoryId;
+  final String? categoryIcon;
   final double amount;
 
-  const CategorySpend({required this.category, required this.amount});
+  const CategorySpend({
+    required this.category,
+    this.categoryId,
+    this.categoryIcon,
+    required this.amount,
+  });
 }
 
 /// Spending totals behind the group "Totals" screen.
@@ -233,24 +241,58 @@ class GroupSpendingCalculator {
     DateTime? month,
     String? forUserId,
   }) {
-    final totals = <String, double>{};
+    final totals = <String, _CategoryBucket>{};
     for (final expense in _inCurrency(
       expenses,
       currencyCode,
       forUserId: forUserId,
     )) {
       if (month != null && monthOf(expense.date) != monthOf(month)) continue;
-      final name = expense.category.trim().isEmpty
-          ? 'General'
-          : expense.category.trim();
-      totals[name] =
-          (totals[name] ?? 0) + attributedAmount(expense, forUserId: forUserId);
+      final key = _categoryKey(expense);
+      final amount = attributedAmount(expense, forUserId: forUserId);
+      final existing = totals[key];
+      if (existing == null) {
+        totals[key] = _CategoryBucket(
+          name: _categoryName(expense),
+          categoryId: expense.categoryId ?? DefaultCategories.byName(expense.category)?.id,
+          iconKey: expense.categoryIcon ??
+              DefaultCategories.byName(expense.category)?.iconKey,
+          amount: amount,
+          latestDate: expense.date,
+        );
+      } else {
+        existing.amount += amount;
+        if (expense.date.isAfter(existing.latestDate)) {
+          existing.name = _categoryName(expense);
+          existing.latestDate = expense.date;
+        }
+      }
     }
     final rows = [
-      for (final entry in totals.entries)
-        CategorySpend(category: entry.key, amount: entry.value),
+      for (final bucket in totals.values)
+        CategorySpend(
+          category: bucket.name,
+          categoryId: bucket.categoryId,
+          categoryIcon: bucket.iconKey,
+          amount: bucket.amount,
+        ),
     ]..sort((a, b) => b.amount.compareTo(a.amount));
     return rows;
+  }
+
+  static String _categoryName(Expense expense) {
+    final name = expense.category.trim();
+    return name.isEmpty ? 'General' : name;
+  }
+
+  static String _categoryKey(Expense expense) {
+    final inferred = DefaultCategories.byName(expense.category);
+    final id = expense.categoryId ?? inferred?.id;
+    if (id != null && id.isNotEmpty) {
+      final source = expense.categorySource ?? inferred?.source;
+      return '${source?.value ?? 'default'}:$id';
+    }
+    return 'name:${_categoryName(expense).toLowerCase()}';
   }
 
   static DateTime monthOf(DateTime date) => DateTime(date.year, date.month);
@@ -270,4 +312,20 @@ class GroupSpendingCalculator {
       return attributedAmount(expense, forUserId: forUserId).abs() >= 0.01;
     });
   }
+}
+
+class _CategoryBucket {
+  String name;
+  final String? categoryId;
+  final String? iconKey;
+  double amount;
+  DateTime latestDate;
+
+  _CategoryBucket({
+    required this.name,
+    required this.categoryId,
+    required this.iconKey,
+    required this.amount,
+    required this.latestDate,
+  });
 }

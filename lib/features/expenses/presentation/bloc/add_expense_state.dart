@@ -1,6 +1,9 @@
 import 'package:equatable/equatable.dart';
 import '../../../home/domain/entities/group_summary.dart';
+import '../../domain/entities/app_category.dart';
+import '../../domain/entities/category_source.dart';
 import '../../domain/entities/currency.dart';
+import '../../domain/entities/default_categories.dart';
 import '../../domain/entities/expense_participant.dart';
 import '../../domain/entities/split_type.dart';
 import '../../domain/services/split_calculator.dart';
@@ -45,6 +48,12 @@ class AddExpenseState extends Equatable {
   final Currency currency;
   final String currencyQuery;
   final String category;
+  final String categoryId;
+  final CategorySource categorySource;
+  final String categoryIcon;
+  final List<AppCategory> defaultCategories;
+  final List<AppCategory> customCategories;
+  final bool isSavingCategory;
   final String notes;
   final DateTime date;
 
@@ -75,6 +84,12 @@ class AddExpenseState extends Equatable {
     this.currency = CurrencyCatalog.defaultCurrency,
     this.currencyQuery = '',
     this.category = 'General',
+    this.categoryId = 'general',
+    this.categorySource = CategorySource.defaultSource,
+    this.categoryIcon = 'receipt',
+    this.defaultCategories = DefaultCategories.forPicker,
+    this.customCategories = const [],
+    this.isSavingCategory = false,
     this.notes = '',
     required this.date,
     this.isMultiplePayers = false,
@@ -244,6 +259,15 @@ class AddExpenseState extends Equatable {
       payersError == null &&
       splitError == null;
 
+  AddExpenseState withCategory(AppCategory selected) {
+    return copyWith(
+      category: selected.name,
+      categoryId: selected.id,
+      categorySource: selected.source,
+      categoryIcon: selected.iconKey,
+    );
+  }
+
   AddExpenseState copyWith({
     AddExpenseStatus? status,
     Object? errorMessage = _unset,
@@ -260,6 +284,12 @@ class AddExpenseState extends Equatable {
     Currency? currency,
     String? currencyQuery,
     String? category,
+    String? categoryId,
+    CategorySource? categorySource,
+    String? categoryIcon,
+    List<AppCategory>? defaultCategories,
+    List<AppCategory>? customCategories,
+    bool? isSavingCategory,
     String? notes,
     DateTime? date,
     bool? isMultiplePayers,
@@ -291,6 +321,12 @@ class AddExpenseState extends Equatable {
       currency: currency ?? this.currency,
       currencyQuery: currencyQuery ?? this.currencyQuery,
       category: category ?? this.category,
+      categoryId: categoryId ?? this.categoryId,
+      categorySource: categorySource ?? this.categorySource,
+      categoryIcon: categoryIcon ?? this.categoryIcon,
+      defaultCategories: defaultCategories ?? this.defaultCategories,
+      customCategories: customCategories ?? this.customCategories,
+      isSavingCategory: isSavingCategory ?? this.isSavingCategory,
       notes: notes ?? this.notes,
       date: date ?? this.date,
       isMultiplePayers: isMultiplePayers ?? this.isMultiplePayers,
@@ -323,6 +359,12 @@ class AddExpenseState extends Equatable {
         currency,
         currencyQuery,
         category,
+        categoryId,
+        categorySource,
+        categoryIcon,
+        defaultCategories,
+        customCategories,
+        isSavingCategory,
         notes,
         date,
         isMultiplePayers,

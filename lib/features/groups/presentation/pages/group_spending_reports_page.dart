@@ -159,12 +159,16 @@ class _GroupSpendingReportsPageState extends State<GroupSpendingReportsPage> {
                     month: _isAllTime ? null : selectedMonth,
                   ),
                   currencySymbol: summary.currencySymbol,
-                  onCategoryTap: (category) {
+                  onCategoryTap: (row) {
                     context.pushNamed(
                       RouteConstants.groupCategoryExpensesName,
                       pathParameters: {
                         'groupId': widget.groupId,
-                        'category': category,
+                        'category': row.category,
+                      },
+                      queryParameters: {
+                        if (row.categoryId != null && row.categoryId!.isNotEmpty)
+                          'categoryId': row.categoryId!,
                       },
                     );
                   },

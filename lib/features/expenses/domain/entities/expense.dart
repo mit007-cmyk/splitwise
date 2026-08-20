@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import 'category_source.dart';
 import 'expense_comment.dart';
 import 'split_type.dart';
 
@@ -11,7 +12,12 @@ class Expense extends Equatable {
   final String id;
   final String groupId;
   final String title;
+  /// Display-name snapshot. Kept so historical lists and charts still work
+  /// if a custom category is later renamed or soft-deleted.
   final String category;
+  final String? categoryId;
+  final CategorySource? categorySource;
+  final String? categoryIcon;
   final double amount;
   final String currencyCode;
   final String currencySymbol;
@@ -34,6 +40,9 @@ class Expense extends Equatable {
     required this.groupId,
     required this.title,
     required this.category,
+    this.categoryId,
+    this.categorySource,
+    this.categoryIcon,
     required this.amount,
     required this.currencyCode,
     required this.currencySymbol,
@@ -57,6 +66,9 @@ class Expense extends Equatable {
     String? groupId,
     String? title,
     String? category,
+    String? categoryId,
+    CategorySource? categorySource,
+    String? categoryIcon,
     double? amount,
     String? currencyCode,
     String? currencySymbol,
@@ -79,6 +91,9 @@ class Expense extends Equatable {
       groupId: groupId ?? this.groupId,
       title: title ?? this.title,
       category: category ?? this.category,
+      categoryId: categoryId ?? this.categoryId,
+      categorySource: categorySource ?? this.categorySource,
+      categoryIcon: categoryIcon ?? this.categoryIcon,
       amount: amount ?? this.amount,
       currencyCode: currencyCode ?? this.currencyCode,
       currencySymbol: currencySymbol ?? this.currencySymbol,
@@ -98,12 +113,27 @@ class Expense extends Equatable {
     );
   }
 
+  bool matchesCategory({required String name, String? categoryId}) {
+    final id = categoryId?.trim();
+    if (id != null && id.isNotEmpty) {
+      if (this.categoryId == id) return true;
+      if (this.categoryId == null || this.categoryId!.isEmpty) {
+        return category.toLowerCase() == name.toLowerCase();
+      }
+      return false;
+    }
+    return category.toLowerCase() == name.toLowerCase();
+  }
+
   @override
   List<Object?> get props => [
         id,
         groupId,
         title,
         category,
+        categoryId,
+        categorySource,
+        categoryIcon,
         amount,
         currencyCode,
         currencySymbol,

@@ -1,4 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../domain/entities/category_source.dart';
+import '../../domain/entities/default_categories.dart';
 import '../../domain/entities/expense.dart';
 import '../../domain/entities/expense_comment.dart';
 import '../../domain/entities/split_type.dart';
@@ -9,6 +11,9 @@ class ExpenseModel extends Expense {
     required super.groupId,
     required super.title,
     required super.category,
+    super.categoryId,
+    super.categorySource,
+    super.categoryIcon,
     required super.amount,
     required super.currencyCode,
     required super.currencySymbol,
@@ -33,6 +38,9 @@ class ExpenseModel extends Expense {
       groupId: expense.groupId,
       title: expense.title,
       category: expense.category,
+      categoryId: expense.categoryId,
+      categorySource: expense.categorySource,
+      categoryIcon: expense.categoryIcon,
       amount: expense.amount,
       currencyCode: expense.currencyCode,
       currencySymbol: expense.currencySymbol,
@@ -96,12 +104,26 @@ class ExpenseModel extends Expense {
     );
 
     final title = (map['title'] as String?)?.trim();
+    final categoryName = (map['category'] as String?) ?? 'General';
+    final inferred = DefaultCategories.byName(categoryName);
+    final rawCategoryId = (map['categoryId'] as String?)?.trim();
+    final rawSource = map['categorySource'] as String?;
+    final rawIcon = (map['categoryIcon'] as String?)?.trim();
 
     return ExpenseModel(
       id: id,
       groupId: groupId,
       title: title != null && title.isNotEmpty ? title : 'Expense',
-      category: (map['category'] as String?) ?? 'General',
+      category: categoryName,
+      categoryId: (rawCategoryId != null && rawCategoryId.isNotEmpty)
+          ? rawCategoryId
+          : inferred?.id,
+      categorySource: rawSource != null
+          ? CategorySource.fromValue(rawSource)
+          : (inferred != null ? CategorySource.defaultSource : null),
+      categoryIcon: (rawIcon != null && rawIcon.isNotEmpty)
+          ? rawIcon
+          : inferred?.iconKey,
       amount: amount,
       currencyCode: (map['currencyCode'] as String?) ?? 'INR',
       currencySymbol: (map['currencySymbol'] as String?) ?? '₹',
@@ -181,6 +203,10 @@ class ExpenseModel extends Expense {
       'groupId': groupId,
       'title': title.trim(),
       'category': category,
+      if (categoryId != null && categoryId!.isNotEmpty) 'categoryId': categoryId,
+      if (categorySource != null) 'categorySource': categorySource!.value,
+      if (categoryIcon != null && categoryIcon!.isNotEmpty)
+        'categoryIcon': categoryIcon,
       'amount': amount,
       'currencyCode': currencyCode,
       'currencySymbol': currencySymbol,

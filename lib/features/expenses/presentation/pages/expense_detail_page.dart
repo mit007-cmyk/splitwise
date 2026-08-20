@@ -490,7 +490,10 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
                       Positioned(
                         left: AppDimensions.xl.w,
                         top: -32,
-                        child: _CategoryBadge(category: e.category),
+                        child: _CategoryBadge(
+                          category: e.category,
+                          iconKey: e.categoryIcon,
+                        ),
                       ),
                     ],
                   ),
@@ -515,8 +518,9 @@ class _ExpenseDetailPageState extends State<ExpenseDetailPage> {
 
 class _CategoryBadge extends StatelessWidget {
   final String category;
+  final String? iconKey;
 
-  const _CategoryBadge({required this.category});
+  const _CategoryBadge({required this.category, this.iconKey});
 
   @override
   Widget build(BuildContext context) {
@@ -536,7 +540,7 @@ class _CategoryBadge extends StatelessWidget {
         ],
       ),
       child: Icon(
-        ExpenseCategory.iconFor(category),
+        ExpenseCategory.iconFor(category, iconKey: iconKey),
         size: 28,
         color: AppColors.textPrimaryLight,
       ),

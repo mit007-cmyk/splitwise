@@ -676,7 +676,7 @@ class _TrendLinePainter extends CustomPainter {
 class GroupCategoryBreakdown extends StatelessWidget {
   final List<CategorySpend> categories;
   final String currencySymbol;
-  final ValueChanged<String>? onCategoryTap;
+  final ValueChanged<CategorySpend>? onCategoryTap;
 
   const GroupCategoryBreakdown({
     super.key,
@@ -727,12 +727,13 @@ class GroupCategoryBreakdown extends StatelessWidget {
           if (i > 0) SizedBox(height: AppDimensions.md.h),
           _CategoryRow(
             category: categories[i].category,
+            iconKey: categories[i].categoryIcon,
             amount:
                 '$currencySymbol${categories[i].amount.toStringAsFixed(2)}',
             color: AppColors.chartCategories[i % AppColors.chartCategories.length],
             onTap: onCategoryTap == null
                 ? null
-                : () => onCategoryTap!(categories[i].category),
+                : () => onCategoryTap!(categories[i]),
           ),
         ],
       ],
@@ -742,12 +743,14 @@ class GroupCategoryBreakdown extends StatelessWidget {
 
 class _CategoryRow extends StatelessWidget {
   final String category;
+  final String? iconKey;
   final String amount;
   final Color color;
   final VoidCallback? onTap;
 
   const _CategoryRow({
     required this.category,
+    this.iconKey,
     required this.amount,
     required this.color,
     this.onTap,
@@ -764,7 +767,7 @@ class _CategoryRow extends StatelessWidget {
         ),
         SizedBox(width: AppDimensions.sm.w),
         Icon(
-          ExpenseCategory.iconFor(category),
+          ExpenseCategory.iconFor(category, iconKey: iconKey),
           size: 18.r,
           color: context.colorScheme.onSurfaceVariant,
         ),
