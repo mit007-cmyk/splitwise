@@ -152,32 +152,37 @@ class _OnboardingTourPageState extends State<OnboardingTourPage>
             Expanded(
               child: Stack(
                 children: [
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: _advance,
-                    child: videoReady
-                        ? FadeTransition(
-                            opacity: _fadeAnimation,
-                            child: SizedBox.expand(
-                              child: FittedBox(
-                                fit: BoxFit.cover,
-                                child: SizedBox(
-                                  width: controller.value.size.width,
-                                  height: controller.value.size.height,
-                                  child: VideoPlayer(controller),
-                                ),
-                              ),
-                            ),
-                          )
-                        : const ColoredBox(
-                            color: Color(0xFFF2A882),
-                            child: Center(
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2.5,
-                              ),
-                            ),
+                  if (videoReady)
+                    FadeTransition(
+                      opacity: _fadeAnimation,
+                      child: SizedBox.expand(
+                        child: FittedBox(
+                          fit: BoxFit.cover,
+                          child: SizedBox(
+                            width: controller.value.size.width,
+                            height: controller.value.size.height,
+                            child: VideoPlayer(controller),
                           ),
+                        ),
+                      ),
+                    )
+                  else
+                    const ColoredBox(
+                      color: Color(0xFFF2A882),
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2.5,
+                        ),
+                      ),
+                    ),
+                  // Overlay to intercept taps
+                  Positioned.fill(
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _advance,
+                      child: Container(color: Colors.transparent),
+                    ),
                   ),
                   Positioned(
                     bottom: 30.h,
