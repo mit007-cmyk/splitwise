@@ -34,33 +34,99 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
   DateTime? _startDate;
   DateTime? _endDate;
 
+  DateTime get _today => _dateOnly(DateTime.now());
+
+  DateTime get _minSelectableDate =>
+      _today.subtract(const Duration(days: 365));
+
+  DateTime get _maxSelectableDate =>
+      _today.add(const Duration(days: 365 * 5));
+
+  bool get _hasInvalidTripDateRange {
+    if (_startDate == null || _endDate == null) return false;
+    return _dateOnly(_startDate!).isAfter(_dateOnly(_endDate!));
+  }
+
+  static DateTime _dateOnly(DateTime date) =>
+      DateTime(date.year, date.month, date.day);
+
+  static DateTime _clampDate(DateTime date, DateTime first, DateTime last) {
+    final value = _dateOnly(date);
+    if (value.isBefore(first)) return first;
+    if (value.isAfter(last)) return last;
+    return value;
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
     super.dispose();
   }
 
-  void _selectDate(BuildContext context, bool isStart) async {
-    final initialDate = DateTime.now();
-    final firstDate = DateTime.now().subtract(const Duration(days: 365));
-    final lastDate = DateTime.now().add(const Duration(days: 365 * 5));
+  Future<void> _selectDate(BuildContext context, bool isStart) async {
+    final overallFirst = _minSelectableDate;
+    final overallLast = _maxSelectableDate;
+
+    var firstDate = isStart
+        ? overallFirst
+        : (_startDate != null ? _dateOnly(_startDate!) : overallFirst);
+    var lastDate = isStart
+        ? (_endDate != null ? _dateOnly(_endDate!) : overallLast)
+        : overallLast;
+
+    if (firstDate.isAfter(lastDate)) {
+      firstDate = overallFirst;
+      lastDate = overallLast;
+    }
+
+    final preferredInitial = isStart
+        ? (_startDate ?? _today)
+        : (_endDate ?? _startDate ?? _today);
 
     final selected = await showDatePicker(
       context: context,
-      initialDate: initialDate,
+      initialDate: _clampDate(preferredInitial, firstDate, lastDate),
       firstDate: firstDate,
       lastDate: lastDate,
     );
 
-    if (selected != null) {
-      setState(() {
-        if (isStart) {
-          _startDate = selected;
-        } else {
-          _endDate = selected;
+    if (!mounted || selected == null) return;
+
+    setState(() {
+      final picked = _dateOnly(selected);
+      if (isStart) {
+        _startDate = picked;
+        if (_endDate != null && _dateOnly(_endDate!).isBefore(picked)) {
+          _endDate = picked;
         }
-      });
+      } else {
+        _endDate = picked;
+        if (_startDate != null && _dateOnly(_startDate!).isAfter(picked)) {
+          _startDate = picked;
+        }
+      }
+    });
+  }
+
+  void _validateAndSubmit() {
+    final isFormValid = _formKey.currentState?.validate() ?? false;
+    if (!isFormValid) return;
+
+    if (_addTripDates && _hasInvalidTripDateRange) {
+      AppToast.show(
+        context,
+        context.loc.tripDateRangeInvalid,
+        type: ToastType.error,
+      );
+      return;
     }
+
+    context.read<HomeBloc>().add(
+      CreateGroupRequested(
+        name: _nameController.text,
+        type: _selectedType,
+      ),
+    );
   }
 
   @override
@@ -88,16 +154,7 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              if (_formKey.currentState?.validate() ?? false) {
-                context.read<HomeBloc>().add(
-                  CreateGroupRequested(
-                    name: _nameController.text,
-                    type: _selectedType,
-                  ),
-                );
-              }
-            },
+            onPressed: _validateAndSubmit,
             child: Text(
               'Done',
               style: theme.textTheme.titleMedium?.copyWith(
@@ -297,9 +354,14 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                           child: InkWell(
                             onTap: () => _selectDate(context, true),
                             child: InputDecorator(
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 labelText: 'Start',
-                                suffixIcon: Icon(Icons.calendar_today_rounded),
+                                suffixIcon:
+                                    const Icon(Icons.calendar_today_rounded),
+                                errorText: _hasInvalidTripDateRange
+                                    ? ''
+                                    : null,
+                                errorStyle: const TextStyle(height: 0),
                               ),
                               child: Text(
                                 _startDate != null
@@ -315,9 +377,14 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                           child: InkWell(
                             onTap: () => _selectDate(context, false),
                             child: InputDecorator(
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 labelText: 'End',
-                                suffixIcon: Icon(Icons.calendar_today_rounded),
+                                suffixIcon:
+                                    const Icon(Icons.calendar_today_rounded),
+                                errorText: _hasInvalidTripDateRange
+                                    ? ''
+                                    : null,
+                                errorStyle: const TextStyle(height: 0),
                               ),
                               child: Text(
                                 _endDate != null
@@ -330,6 +397,18 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
                         ),
                       ],
                     ),
+                    if (_hasInvalidTripDateRange) ...[
+                      SizedBox(height: AppDimensions.xs.h),
+                      Semantics(
+                        liveRegion: true,
+                        child: Text(
+                          context.loc.tripDateRangeInvalid,
+                          style: context.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.error,
+                          ),
+                        ),
+                      ),
+                    ],
                   ],
                 ],
               ],

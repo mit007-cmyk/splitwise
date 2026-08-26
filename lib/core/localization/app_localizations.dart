@@ -32,6 +32,7 @@ class AppLocalizations {
       'force_update_msg': 'A new version of the app is available. Please update to continue.',
       'force_update_btn': 'Update Now',
       'search_placeholder': 'Search...',
+      'trip_date_range_invalid': 'Start date must be on or before the end date',
     },
     'es': {
       'app_title': 'Splitwise',
@@ -50,6 +51,8 @@ class AppLocalizations {
       'force_update_msg': 'Una nueva versión de la aplicación está disponible. Por favor, actualice para continuar.',
       'force_update_btn': 'Actualizar ahora',
       'search_placeholder': 'Buscar...',
+      'trip_date_range_invalid':
+          'La fecha de inicio debe ser igual o anterior a la fecha de fin',
     }
   };
 
@@ -75,6 +78,7 @@ class AppLocalizations {
   String get forceUpdateMsg => translate('force_update_msg');
   String get forceUpdateBtn => translate('force_update_btn');
   String get searchPlaceholder => translate('search_placeholder');
+  String get tripDateRangeInvalid => translate('trip_date_range_invalid');
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {
