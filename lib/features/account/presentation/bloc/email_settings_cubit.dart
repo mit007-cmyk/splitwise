@@ -59,7 +59,10 @@ class EmailSettingsCubit extends Cubit<EmailSettingsState> {
   Future<void> loadSettings(String userId) async {
     emit(state.copyWith(isLoading: true, isSuccess: false));
     try {
-      final doc = await getIt<FirestoreService>().getDocument('Splitwise', 'email_configuration');
+      final doc = await getIt<FirestoreService>().getDocument(
+        FirestorePaths.root,
+        FirestorePaths.emailConfiguration,
+      );
       final data = doc.data()?[userId] as Map?;
       if (data != null) {
         final Map<String, bool> updated = Map<String, bool>.from(state.settings);
@@ -87,8 +90,8 @@ class EmailSettingsCubit extends Cubit<EmailSettingsState> {
     emit(state.copyWith(isLoading: true, isSuccess: false));
     try {
       await getIt<FirestoreService>().setDocument(
-        'Splitwise',
-        'email_configuration',
+        FirestorePaths.root,
+        FirestorePaths.emailConfiguration,
         {
           userId: state.settings,
         },
