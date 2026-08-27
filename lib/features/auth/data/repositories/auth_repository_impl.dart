@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:injectable/injectable.dart';
 import '../../../../core/errors/result.dart';
+import '../../../../core/notifications/fcm_service.dart';
 import '../../../../shared/repositories/base_repository.dart';
 import '../../domain/entities/user_entity.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -11,8 +12,13 @@ import '../datasources/auth_remote_datasource.dart';
 class AuthRepositoryImpl extends BaseRepository implements AuthRepository {
   final AuthRemoteDataSource _remoteDataSource;
   final AuthLocalDataSource _localDataSource;
+  final FcmService _fcmService;
 
-  AuthRepositoryImpl(this._remoteDataSource, this._localDataSource);
+  AuthRepositoryImpl(
+    this._remoteDataSource,
+    this._localDataSource,
+    this._fcmService,
+  );
 
   @override
   Future<Result<UserEntity>> login({
@@ -51,6 +57,7 @@ class AuthRepositoryImpl extends BaseRepository implements AuthRepository {
   @override
   Future<Result<void>> logout() async {
     return safeCall(() async {
+      await _fcmService.deactivateCurrentDevice();
       await _remoteDataSource.logout();
       await _localDataSource.clearCache();
     });

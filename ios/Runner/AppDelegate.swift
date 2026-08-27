@@ -8,6 +8,7 @@ import UIKit
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
   ) -> Bool {
     GeneratedPluginRegistrant.register(with: self)
+    application.registerForRemoteNotifications()
 
     if let controller = window?.rootViewController as? FlutterViewController {
       let channel = FlutterMethodChannel(

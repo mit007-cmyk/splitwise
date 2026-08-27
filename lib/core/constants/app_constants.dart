@@ -14,6 +14,9 @@ class AppConstants {
   static const String hiveThemeBox = 'theme_box';
   static const String hiveThemeModeKey = 'theme_mode';
   static const String hivePendingSyncBox = 'pending_sync_box';
+  /// Stable per-install id used as the `{deviceId}` half of
+  /// `Splitwise/devices.{userId}|{deviceId}`.
+  static const String hiveDeviceIdKey = 'installation_device_id';
 
   // Remote Config Keys
   static const String rcMaintenanceMode = 'maintenance_mode';
@@ -42,6 +45,11 @@ class FirestorePaths {
   static const String app = 'app';
   static const String emailConfiguration = 'email_configuration';
   static const String securityDetails = 'security_details';
+  /// FCM device tokens (`Splitwise/devices.{userId}|{deviceId}`).
+  static const String devices = 'devices';
+
+  static String deviceRecordKey(String userId, String deviceId) =>
+      '$userId|$deviceId';
 }
 
 class AppDimensions {

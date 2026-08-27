@@ -8,6 +8,32 @@ class PermissionHelper {
 
   PermissionHelper(this._logger);
 
+  /// Returns true when notifications are authorized or provisional.
+  ///
+  /// Requests the system prompt only when status is still undetermined so
+  /// denied / permanently denied users are not prompted again.
+  Future<bool> ensureNotificationPermission() async {
+    try {
+      final messaging = FirebaseMessaging.instance;
+      final current = await messaging.getNotificationSettings();
+      switch (current.authorizationStatus) {
+        case AuthorizationStatus.authorized:
+        case AuthorizationStatus.provisional:
+          return true;
+        case AuthorizationStatus.denied:
+          _logger.w(
+            'Notification permission denied; skipping FCM token registration.',
+          );
+          return false;
+        case AuthorizationStatus.notDetermined:
+          return requestNotificationPermission();
+      }
+    } catch (e, stackTrace) {
+      _logger.e('Failed to resolve notification permission', e, stackTrace);
+      return false;
+    }
+  }
+
   /// Requests notification permission specifically
   Future<bool> requestNotificationPermission() async {
     try {
@@ -18,7 +44,7 @@ class PermissionHelper {
         badge: true,
         carPlay: false,
         criticalAlert: false,
-        provisional: false,
+        provisional: true,
         sound: true,
       );
 

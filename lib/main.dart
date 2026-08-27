@@ -17,6 +17,7 @@ import 'core/localization/app_localizations.dart';
 import 'core/errors/global_bloc_observer.dart';
 import 'core/services/hive_service.dart';
 import 'core/services/notification_service.dart';
+import 'core/notifications/fcm_service.dart';
 import 'core/services/remote_config_service.dart';
 import 'core/services/app_logger.dart';
 import 'core/widgets/biometric_lock_gate.dart';
@@ -73,6 +74,13 @@ void main() async {
       await getIt<NotificationService>().init();
     } catch (e, stack) {
       logger.e('Failed to initialize FCM NotificationService', e, stack);
+    }
+
+    // 4b. Start FCM token lifecycle without blocking first frame.
+    try {
+      unawaited(getIt<FcmService>().initialize());
+    } catch (e, stack) {
+      logger.e('Failed to start FcmService', e, stack);
     }
 
     // 5. Initialize Firebase Remote Config
