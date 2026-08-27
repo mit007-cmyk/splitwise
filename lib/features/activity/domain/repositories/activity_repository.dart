@@ -7,5 +7,10 @@ abstract class ActivityRepository {
     DateTime? before,
     int limit = 20,
   });
+
+  Future<Result<void>> markAsRead({
+    required String eventId,
+    required String userId,
+  });
 }
 

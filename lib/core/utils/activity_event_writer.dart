@@ -20,7 +20,30 @@ class ActivityEventWriter {
     Map<String, dynamic> eventData,
   ) {
     final eventId = _uuid.v4();
-    transaction.set(eventsRef, {eventId: eventData}, SetOptions(merge: true));
+    transaction.set(
+      eventsRef,
+      {eventId: _withReadFlags(eventData)},
+      SetOptions(merge: true),
+    );
+  }
+
+  /// Per-user unread flags. The actor is already "seen"; everyone else in
+  /// [visibilityUserIds] starts unread so their Activity row stays highlighted.
+  static Map<String, dynamic> _withReadFlags(Map<String, dynamic> eventData) {
+    if (eventData['isRead'] is Map) return eventData;
+    final visibility = eventData['visibilityUserIds'] is List
+        ? List<String>.from(eventData['visibilityUserIds'] as List)
+            .map((id) => id.toString().trim())
+            .where((id) => id.isNotEmpty)
+            .toList()
+        : const <String>[];
+    final actor = (eventData['performedBy'] as String?)?.trim() ?? '';
+    return {
+      ...eventData,
+      'isRead': <String, bool>{
+        for (final id in visibility) id: id == actor,
+      },
+    };
   }
 
   static List<String> memberIdsFromGroup(Map<String, dynamic> groupData) {
@@ -302,6 +325,9 @@ class ActivityEventWriter {
     Map<String, dynamic> eventData,
   ) async {
     final eventId = _uuid.v4();
-    await eventsRef(firestore).set({eventId: eventData}, SetOptions(merge: true));
+    await eventsRef(firestore).set(
+      {eventId: _withReadFlags(eventData)},
+      SetOptions(merge: true),
+    );
   }
 }

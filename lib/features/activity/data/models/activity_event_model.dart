@@ -15,6 +15,7 @@ class ActivityEventModel extends ActivityEvent {
     super.snapshotAfter,
     super.changedFields,
     super.visibilityUserIds,
+    super.isRead,
   });
 
   factory ActivityEventModel.fromFirestore(
@@ -45,6 +46,14 @@ class ActivityEventModel extends ActivityEvent {
       visibilityUserIds: map['visibilityUserIds'] is List
           ? List<String>.from(map['visibilityUserIds'] as List)
           : const [],
+      isRead: _parseIsRead(map['isRead']),
+    );
+  }
+
+  static Map<String, bool> _parseIsRead(dynamic raw) {
+    if (raw is! Map) return const {};
+    return raw.map(
+      (key, value) => MapEntry(key.toString(), value == true),
     );
   }
 }

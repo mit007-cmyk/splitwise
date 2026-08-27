@@ -30,5 +30,18 @@ class ActivityRepositoryImpl extends BaseRepository implements ActivityRepositor
       );
     });
   }
+
+  @override
+  Future<Result<void>> markAsRead({
+    required String eventId,
+    required String userId,
+  }) {
+    return safeCall(() {
+      return _remoteDataSource.markAsRead(
+        eventId: eventId,
+        userId: userId,
+      );
+    });
+  }
 }
 

@@ -22,6 +22,11 @@ abstract class ActivityRemoteDataSource {
     DateTime? before,
     int limit = 20,
   });
+
+  Future<void> markAsRead({
+    required String eventId,
+    required String userId,
+  });
 }
 
 @LazySingleton(as: ActivityRemoteDataSource)
@@ -97,6 +102,27 @@ class ActivityRemoteDataSourceImpl implements ActivityRemoteDataSource {
       items: items,
       nextCursor: items.isEmpty ? null : items.last.performedAt,
       hasMore: hasMore,
+    );
+  }
+
+  @override
+  Future<void> markAsRead({
+    required String eventId,
+    required String userId,
+  }) async {
+    final trimmedEventId = eventId.trim();
+    final trimmedUserId = userId.trim();
+    if (trimmedEventId.isEmpty || trimmedUserId.isEmpty) return;
+
+    await _firestoreService.setDocument(
+      FirestorePaths.root,
+      FirestorePaths.events,
+      {
+        trimmedEventId: {
+          'isRead': {trimmedUserId: true},
+        },
+      },
+      merge: true,
     );
   }
 }

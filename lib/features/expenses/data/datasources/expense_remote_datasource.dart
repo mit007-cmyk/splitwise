@@ -3,6 +3,7 @@ import 'package:injectable/injectable.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/services/firestore_service.dart';
+import '../../../../core/utils/activity_event_writer.dart';
 import '../models/expense_model.dart';
 
 abstract class ExpenseRemoteDataSource {
@@ -223,8 +224,7 @@ class ExpenseRemoteDataSourceImpl implements ExpenseRemoteDataSource {
     DocumentReference<Map<String, dynamic>> eventsRef,
     Map<String, dynamic> eventData,
   ) {
-    final eventId = _uuid.v4();
-    transaction.set(eventsRef, {eventId: eventData}, SetOptions(merge: true));
+    ActivityEventWriter.append(transaction, eventsRef, eventData);
   }
 
   @override

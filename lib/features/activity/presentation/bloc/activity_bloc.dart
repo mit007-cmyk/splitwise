@@ -5,6 +5,7 @@ import '../../../../core/services/firestore_service.dart';
 import '../../../../core/utils/user_display_names.dart';
 import '../../../auth/domain/repositories/auth_repository.dart';
 import '../../../home/domain/repositories/home_repository.dart';
+import '../../domain/entities/activity_event.dart';
 import '../../domain/entities/activity_page_result.dart';
 import '../../domain/repositories/activity_repository.dart';
 import 'activity_event.dart';
@@ -27,6 +28,7 @@ class ActivityBloc extends Bloc<ActivityTimelineEvent, ActivityState> {
     on<RefreshActivity>(_onRefreshActivity);
     on<LoadMoreActivity>(_onLoadMoreActivity);
     on<LoadAllActivity>(_onLoadAllActivity);
+    on<MarkActivityRead>(_onMarkActivityRead);
   }
 
   Future<void> _onLoadActivity(
@@ -72,6 +74,40 @@ class ActivityBloc extends Bloc<ActivityTimelineEvent, ActivityState> {
     if (!isClosed) {
       emit(state.copyWith(isLoadingMore: false));
     }
+  }
+
+  Future<void> _onMarkActivityRead(
+    MarkActivityRead event,
+    Emitter<ActivityState> emit,
+  ) async {
+    final userId = await _resolveCurrentUserId();
+    if (userId == null) return;
+
+    ActivityEvent? current;
+    for (final item in state.items) {
+      if (item.id == event.eventId) {
+        current = item;
+        break;
+      }
+    }
+    if (current == null || current.isReadFor(userId)) return;
+
+    emit(
+      state.copyWith(
+        items: [
+          for (final item in state.items)
+            if (item.id == event.eventId)
+              item.copyWith(isRead: {...item.isRead, userId: true})
+            else
+              item,
+        ],
+      ),
+    );
+
+    await _activityRepository.markAsRead(
+      eventId: event.eventId,
+      userId: userId,
+    );
   }
 
   Future<void> _fetchUsersIfNeeded(Emitter<ActivityState> emit) async {

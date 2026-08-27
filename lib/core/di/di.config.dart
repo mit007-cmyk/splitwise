@@ -86,6 +86,17 @@ import '../../features/home/data/repositories/home_repository_impl.dart'
 import '../../features/home/domain/repositories/home_repository.dart' as _i0;
 import '../../features/home/presentation/bloc/home_bloc.dart' as _i202;
 import '../helpers/permission_helper.dart' as _i650;
+import '../notifications/auth_user_id_changes.dart' as _i1018;
+import '../notifications/current_user_id_provider.dart' as _i199;
+import '../notifications/data/datasources/device_token_remote_datasource.dart'
+    as _i75;
+import '../notifications/data/repositories/device_token_repository_impl.dart'
+    as _i985;
+import '../notifications/device_identity_store.dart' as _i215;
+import '../notifications/domain/repositories/device_token_repository.dart'
+    as _i483;
+import '../notifications/fcm_service.dart' as _i877;
+import '../notifications/fcm_token_client.dart' as _i1038;
 import '../services/analytics_service.dart' as _i222;
 import '../services/app_logger.dart' as _i1019;
 import '../services/biometric_lock_service.dart' as _i600;
@@ -112,6 +123,10 @@ extension GetItInjectableX on _i174.GetIt {
       environmentFilter,
     );
     gh.singleton<_i1019.AppLogger>(() => _i1019.AppLogger());
+    gh.lazySingleton<_i199.CurrentUserIdProvider>(
+        () => _i199.FirebaseCurrentUserIdProvider());
+    gh.lazySingleton<_i1018.AuthUserIdChanges>(
+        () => _i1018.FirebaseAuthUserIdChanges());
     gh.lazySingleton<_i1051.ExchangeRateRemoteDataSource>(
         () => _i1051.ExchangeRateRemoteDataSourceImpl());
     gh.singleton<_i650.PermissionHelper>(
@@ -145,6 +160,8 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i992.AuthLocalDataSourceImpl(gh<_i1047.HiveService>()));
     gh.lazySingleton<_i611.ThemeCubit>(
         () => _i611.ThemeCubit(gh<_i1047.HiveService>()));
+    gh.lazySingleton<_i1038.FcmTokenClient>(
+        () => _i1038.FirebaseFcmTokenClient(gh<_i1019.AppLogger>()));
     gh.lazySingleton<_i747.ActivityRemoteDataSource>(
         () => _i747.ActivityRemoteDataSourceImpl(gh<_i52.FirestoreService>()));
     gh.lazySingleton<_i30.FriendsRepository>(
@@ -157,6 +174,15 @@ extension GetItInjectableX on _i174.GetIt {
               gh<_i1019.AppLogger>(),
               gh<_i52.FirestoreService>(),
               gh<_i252.FriendsRemoteDataSource>(),
+            ));
+    gh.factory<_i437.AddFriendSearchCubit>(() => _i437.AddFriendSearchCubit(
+          gh<_i1008.ContactsService>(),
+          gh<_i30.FriendsRepository>(),
+        ));
+    gh.lazySingleton<_i215.DeviceIdentityStore>(
+        () => _i215.DeviceIdentityStoreImpl(
+              gh<_i1047.HiveService>(),
+              gh<_i1019.AppLogger>(),
             ));
     gh.lazySingleton<_i470.ExchangeRateRepository>(() =>
         _i243.ExchangeRateRepositoryImpl(
@@ -172,12 +198,12 @@ extension GetItInjectableX on _i174.GetIt {
           gh<_i1047.HiveService>(),
           gh<_i1019.AppLogger>(),
         ));
+    gh.lazySingleton<_i75.DeviceTokenRemoteDataSource>(() =>
+        _i75.DeviceTokenRemoteDataSourceImpl(gh<_i52.FirestoreService>()));
     gh.lazySingleton<_i95.CategoryRemoteDataSource>(
         () => _i95.CategoryRemoteDataSourceImpl(gh<_i52.FirestoreService>()));
     gh.lazySingleton<_i848.ExpenseRemoteDataSource>(
         () => _i848.ExpenseRemoteDataSourceImpl(gh<_i52.FirestoreService>()));
-    gh.factory<_i437.AddFriendSearchCubit>(
-        () => _i437.AddFriendSearchCubit(gh<_i1008.ContactsService>()));
     gh.lazySingleton<_i278.GroupUserSettingsRepository>(() =>
         _i174.GroupUserSettingsRepositoryImpl(
             gh<_i3.GroupUserSettingsRemoteDataSource>()));
@@ -188,22 +214,50 @@ extension GetItInjectableX on _i174.GetIt {
           gh<_i314.HomeLocalDataSource>(),
           gh<_i47.ConnectivityService>(),
         ));
-    gh.lazySingleton<_i787.AuthRepository>(() => _i153.AuthRepositoryImpl(
-          gh<_i161.AuthRemoteDataSource>(),
-          gh<_i992.AuthLocalDataSource>(),
-        ));
     gh.factory<_i427.FriendInviteCubit>(
         () => _i427.FriendInviteCubit(gh<_i30.FriendsRepository>()));
     gh.factory<_i938.MyCodeCubit>(
         () => _i938.MyCodeCubit(gh<_i30.FriendsRepository>()));
+    gh.lazySingleton<_i787.FriendsListCubit>(() => _i787.FriendsListCubit(
+          gh<_i30.FriendsRepository>(),
+          gh<_i0.HomeRepository>(),
+        ));
+    gh.lazySingleton<_i483.DeviceTokenRepository>(() =>
+        _i985.DeviceTokenRepositoryImpl(
+            gh<_i75.DeviceTokenRemoteDataSource>()));
+    gh.lazySingleton<_i559.CategoryRepository>(() =>
+        _i626.CategoryRepositoryImpl(gh<_i95.CategoryRemoteDataSource>()));
+    gh.lazySingleton<_i939.ExpenseRepository>(
+        () => _i786.ExpenseRepositoryImpl(gh<_i848.ExpenseRemoteDataSource>()));
+    gh.lazySingleton<_i863.ConvertExpensesToCurrency>(
+        () => _i863.ConvertExpensesToCurrency(
+              gh<_i470.ExchangeRateRepository>(),
+              gh<_i939.ExpenseRepository>(),
+              gh<_i52.FirestoreService>(),
+            ));
+    gh.lazySingleton<_i877.FcmService>(() => _i877.FcmService(
+          gh<_i483.DeviceTokenRepository>(),
+          gh<_i215.DeviceIdentityStore>(),
+          gh<_i1038.FcmTokenClient>(),
+          gh<_i199.CurrentUserIdProvider>(),
+          gh<_i1018.AuthUserIdChanges>(),
+          gh<_i650.PermissionHelper>(),
+          gh<_i1019.AppLogger>(),
+        ));
+    gh.lazySingleton<_i787.AuthRepository>(() => _i153.AuthRepositoryImpl(
+          gh<_i161.AuthRemoteDataSource>(),
+          gh<_i992.AuthLocalDataSource>(),
+          gh<_i877.FcmService>(),
+        ));
+    gh.factory<_i866.FriendDetailCubit>(() => _i866.FriendDetailCubit(
+          gh<_i30.FriendsRepository>(),
+          gh<_i0.HomeRepository>(),
+          gh<_i939.ExpenseRepository>(),
+        ));
     gh.factory<_i202.HomeBloc>(() => _i202.HomeBloc(
           gh<_i0.HomeRepository>(),
           gh<_i787.AuthRepository>(),
           gh<_i47.ConnectivityService>(),
-        ));
-    gh.lazySingleton<_i787.FriendsListCubit>(() => _i787.FriendsListCubit(
-          gh<_i30.FriendsRepository>(),
-          gh<_i0.HomeRepository>(),
         ));
     gh.lazySingleton<_i17.GetCurrentUserUseCase>(
         () => _i17.GetCurrentUserUseCase(gh<_i787.AuthRepository>()));
@@ -217,16 +271,6 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i941.RegisterUseCase(gh<_i787.AuthRepository>()));
     gh.lazySingleton<_i281.WatchAuthStatusUseCase>(
         () => _i281.WatchAuthStatusUseCase(gh<_i787.AuthRepository>()));
-    gh.lazySingleton<_i559.CategoryRepository>(() =>
-        _i626.CategoryRepositoryImpl(gh<_i95.CategoryRemoteDataSource>()));
-    gh.lazySingleton<_i939.ExpenseRepository>(
-        () => _i786.ExpenseRepositoryImpl(gh<_i848.ExpenseRemoteDataSource>()));
-    gh.lazySingleton<_i863.ConvertExpensesToCurrency>(
-        () => _i863.ConvertExpensesToCurrency(
-              gh<_i470.ExchangeRateRepository>(),
-              gh<_i939.ExpenseRepository>(),
-              gh<_i52.FirestoreService>(),
-            ));
     gh.factory<_i797.AuthBloc>(() => _i797.AuthBloc(
           gh<_i188.LoginUseCase>(),
           gh<_i941.RegisterUseCase>(),
@@ -234,11 +278,6 @@ extension GetItInjectableX on _i174.GetIt {
           gh<_i17.GetCurrentUserUseCase>(),
           gh<_i281.WatchAuthStatusUseCase>(),
           gh<_i57.LoginWithGoogleUseCase>(),
-        ));
-    gh.factory<_i866.FriendDetailCubit>(() => _i866.FriendDetailCubit(
-          gh<_i30.FriendsRepository>(),
-          gh<_i0.HomeRepository>(),
-          gh<_i939.ExpenseRepository>(),
         ));
     return this;
   }

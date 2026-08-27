@@ -752,40 +752,54 @@ class _ActivityPageState extends State<ActivityPage> {
             final widgets = <Widget>[];
             for (final item in state.items) {
               final line2 = _line2(item);
+              final unread = item.isUnreadFor(currentUserId);
               widgets.add(
-                ListTile(
-                  onTap: () => _openEvent(context, state, item),
-                  contentPadding: EdgeInsets.symmetric(
-                    horizontal: AppDimensions.lg.w,
-                    vertical: 4.h,
-                  ),
-                  leading: CircleAvatar(
-                    radius: 22.r,
-                    backgroundColor: _iconBgForEvent(context, item),
-                    child: Icon(
-                      _iconForEvent(item),
-                      color: context.colorScheme.onSurface,
-                      size: 22.r,
+                Material(
+                  color: unread
+                      ? context.colorScheme.primaryContainer.withValues(
+                          alpha: 0.55,
+                        )
+                      : Colors.transparent,
+                  child: ListTile(
+                    onTap: () {
+                      context.read<ActivityBloc>().add(MarkActivityRead(item.id));
+                      _openEvent(context, state, item);
+                    },
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: AppDimensions.lg.w,
+                      vertical: 4.h,
                     ),
-                  ),
-                  title: Text.rich(
-                    _headlineSpan(context, state, currentUserId, item),
-                  ),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      if (line2 != null)
-                        Text(
-                          line2,
-                          style: _line2Style(context, item),
-                        ),
-                      Text(
-                        _relativeTimestamp(item.performedAt),
-                        style: context.textTheme.bodySmall?.copyWith(
-                          color: context.colorScheme.onSurfaceVariant,
-                        ),
+                    leading: CircleAvatar(
+                      radius: 22.r,
+                      backgroundColor: _iconBgForEvent(context, item),
+                      child: Icon(
+                        _iconForEvent(item),
+                        color: context.colorScheme.onSurface,
+                        size: 22.r,
                       ),
-                    ],
+                    ),
+                    title: Text.rich(
+                      _headlineSpan(context, state, currentUserId, item),
+                      style: unread
+                          ? const TextStyle(fontWeight: FontWeight.w600)
+                          : null,
+                    ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (line2 != null)
+                          Text(
+                            line2,
+                            style: _line2Style(context, item),
+                          ),
+                        Text(
+                          _relativeTimestamp(item.performedAt),
+                          style: context.textTheme.bodySmall?.copyWith(
+                            color: context.colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               );

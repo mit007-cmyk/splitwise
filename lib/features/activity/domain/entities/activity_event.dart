@@ -48,6 +48,8 @@ class ActivityEvent extends Equatable {
   final Map<String, dynamic>? snapshotAfter;
   final List<String> changedFields;
   final List<String> visibilityUserIds;
+  /// Per-user read flags (`userId` → true after that user opens the row).
+  final Map<String, bool> isRead;
 
   const ActivityEvent({
     required this.id,
@@ -62,7 +64,35 @@ class ActivityEvent extends Equatable {
     this.snapshotAfter,
     this.changedFields = const [],
     this.visibilityUserIds = const [],
+    this.isRead = const {},
   });
+
+  /// Legacy events with no map are treated as already seen.
+  bool isReadFor(String userId) {
+    if (userId.isEmpty) return true;
+    if (isRead.isEmpty) return true;
+    return isRead[userId] == true;
+  }
+
+  bool isUnreadFor(String userId) => !isReadFor(userId);
+
+  ActivityEvent copyWith({Map<String, bool>? isRead}) {
+    return ActivityEvent(
+      id: id,
+      type: type,
+      entityType: entityType,
+      entityId: entityId,
+      groupId: groupId,
+      performedBy: performedBy,
+      performedAt: performedAt,
+      metadata: metadata,
+      snapshotBefore: snapshotBefore,
+      snapshotAfter: snapshotAfter,
+      changedFields: changedFields,
+      visibilityUserIds: visibilityUserIds,
+      isRead: isRead ?? this.isRead,
+    );
+  }
 
   @override
   List<Object?> get props => [
@@ -78,6 +108,7 @@ class ActivityEvent extends Equatable {
         snapshotAfter,
         changedFields,
         visibilityUserIds,
+        isRead,
       ];
 }
 

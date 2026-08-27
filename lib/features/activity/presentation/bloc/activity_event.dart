@@ -23,3 +23,12 @@ class LoadAllActivity extends ActivityTimelineEvent {
   const LoadAllActivity();
 }
 
+class MarkActivityRead extends ActivityTimelineEvent {
+  const MarkActivityRead(this.eventId);
+
+  final String eventId;
+
+  @override
+  List<Object?> get props => [eventId];
+}
+
