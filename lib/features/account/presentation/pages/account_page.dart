@@ -204,7 +204,7 @@ class AccountPage extends StatelessWidget {
                     context,
                     icon: Icons.mail_outline,
                     title: 'Email settings',
-                    onTap: () => context.push(RouteConstants.emailSettingsPath),
+                    onTap: () => AppToast.show(context, 'Email settings coming soon!', type: ToastType.info),
                   ),
                   _buildMenuItem(
                     context,

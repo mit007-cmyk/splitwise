@@ -20,15 +20,15 @@ class EmailSettingsState extends Equatable {
   factory EmailSettingsState.initial() {
     return const EmailSettingsState(
       settings: {
-        'addsMeToGroup': true,
-        'addsMeAsFriend': true,
+        'addsMeToGroup': false,
+        'addsMeAsFriend': false,
         'expenseAdded': false,
         'expenseEditedDeleted': false,
         'expenseCommented': false,
-        'expenseDue': true,
-        'paysMe': true,
-        'monthlyActivitySummary': true,
-        'majorNewsUpdates': true,
+        'expenseDue': false,
+        'paysMe': false,
+        'monthlyActivitySummary': false,
+        'majorNewsUpdates': false,
       },
       isLoading: true,
       isSuccess: false,
